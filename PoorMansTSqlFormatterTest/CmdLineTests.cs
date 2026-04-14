@@ -29,33 +29,43 @@ namespace PoorMansTSqlFormatterTests
     public class CmdLineTests
     {
         #if DEBUG
-            private const string FORMATTER_EXECUTABLE = "..\\..\\..\\PoorMansTSqlFormatterCmdLine\\bin\\Debug\\SqlFormatter.exe";
+            private static readonly string FORMATTER_EXECUTABLE = Path.GetFullPath(Path.Combine(
+                AppContext.BaseDirectory,
+                "..", "..", "..", "..",
+                "PoorMansTSqlFormatterCmdLine", "bin", "Debug", "net10.0",
+                System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows)
+                    ? "SqlFormatter.exe" : "SqlFormatter"));
         #else
-            private const string FORMATTER_EXECUTABLE = "..\\..\\..\\PoorMansTSqlFormatterCmdLine\\bin\\Release\\SqlFormatter.exe";
+            private static readonly string FORMATTER_EXECUTABLE = Path.GetFullPath(Path.Combine(
+                AppContext.BaseDirectory,
+                "..", "..", "..", "..",
+                "PoorMansTSqlFormatterCmdLine", "bin", "Release", "net10.0",
+                System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows)
+                    ? "SqlFormatter.exe" : "SqlFormatter"));
         #endif
         
         [Test]
         public void TestCmdLineFormattingSwitches()
         {
-            TestFormattingFlags("SELECT 1, 2", "SELECT 1\r\n\t,2", "");
-            TestFormattingFlags("SELECT 1, 2", "SELECT 1, 2", "/ecl-");
-            TestFormattingFlags("SELECT 1, 2", "SELECT 1\r\n ,2", "/is:\" \"");
-            TestFormattingFlags("SELECT 1, 2", "SELECT 1\r\n\t, 2", "/sac");
-            TestFormattingFlags("SELECT 1, 2", "SELECT 1,\r\n\t2", "/tc");
-            TestFormattingFlags("SELECT BETWEEN 1 and 2", "SELECT BETWEEN 1\r\n\t\tAND 2", "");
-            TestFormattingFlags("SELECT BETWEEN 1 and 2", "SELECT BETWEEN 1 AND 2", "/ebc-");
-            TestFormattingFlags("SELECT SELECT", "SELECT\r\n\r\nSELECT", "");
-            TestFormattingFlags("SELECT SELECT", "SELECTSELECT", "/sb:0");
-            TestFormattingFlags("SELECT FROM", "SELECT FROM", "/cb:0", "\r\n");
-            TestFormattingFlags("SELECT 1 and 2", "SELECT 1\r\n\tAND 2", "");
-            TestFormattingFlags("SELECT 1 and 2", "SELECT 1 AND 2", "/ebe-");
-            TestFormattingFlags("SELECT case 1 when 2 then 3 end", "SELECT CASE 1\r\n\t\tWHEN 2\r\n\t\t\tTHEN 3\r\n\t\tEND", "");
-            TestFormattingFlags("SELECT case 1 when 2 then 3 end", "SELECT CASE 1 WHEN 2 THEN 3 END", "/ecs-");
-            TestFormattingFlags("SELECT in (1,2)", "SELECT IN (\r\n\t\t1\r\n\t\t,2\r\n\t\t)", "");
-            TestFormattingFlags("SELECT in (1,2)", "SELECT IN (1, 2)", "/eil-");
-            TestFormattingFlags("SELECT in (1,2)", "select in (1, 2)", "/eil- /uk-");
+            TestFormattingFlags("SELECT 1, 2", "SELECT 1\n\t,2", "");
+            TestFormattingFlags("SELECT 1, 2", "SELECT 1, 2", "--expand-comma-lists=false");
+            TestFormattingFlags("SELECT 1, 2", "SELECT 1\n ,2", "--indent-string=\" \"");
+            TestFormattingFlags("SELECT 1, 2", "SELECT 1\n\t, 2", "--space-after-expanded-comma");
+            TestFormattingFlags("SELECT 1, 2", "SELECT 1,\n\t2", "--trailing-commas");
+            TestFormattingFlags("SELECT BETWEEN 1 and 2", "SELECT BETWEEN 1\n\t\tAND 2", "");
+            TestFormattingFlags("SELECT BETWEEN 1 and 2", "SELECT BETWEEN 1 AND 2", "--expand-between=false");
+            TestFormattingFlags("SELECT SELECT", "SELECT\n\nSELECT", "");
+            TestFormattingFlags("SELECT SELECT", "SELECTSELECT", "--statement-breaks=0");
+            TestFormattingFlags("SELECT FROM", "SELECT FROM", "--clause-breaks=0", "\n");
+            TestFormattingFlags("SELECT 1 and 2", "SELECT 1\n\tAND 2", "");
+            TestFormattingFlags("SELECT 1 and 2", "SELECT 1 AND 2", "--expand-boolean=false");
+            TestFormattingFlags("SELECT case 1 when 2 then 3 end", "SELECT CASE 1\n\t\tWHEN 2\n\t\t\tTHEN 3\n\t\tEND", "");
+            TestFormattingFlags("SELECT case 1 when 2 then 3 end", "SELECT CASE 1 WHEN 2 THEN 3 END", "--expand-case=false");
+            TestFormattingFlags("SELECT in (1,2)", "SELECT IN (\n\t\t1\n\t\t,2\n\t\t)", "");
+            TestFormattingFlags("SELECT in (1,2)", "SELECT IN (1, 2)", "--expand-in-lists=false");
+            TestFormattingFlags("SELECT in (1,2)", "select in (1, 2)", "--expand-in-lists=false --uppercase-keywords=false");
             TestFormattingFlags("SELECT NATIONAL CHARACTER VARYING", "SELECT NVARCHAR", "");
-            TestFormattingFlags("SELECT NATIONAL CHARACTER VARYING", "SELECT NATIONAL CHARACTER VARYING", "/sk-");
+            TestFormattingFlags("SELECT NATIONAL CHARACTER VARYING", "SELECT NATIONAL CHARACTER VARYING", "--standardize-keywords=false");
         }
 
         [Test]
@@ -98,7 +108,7 @@ namespace PoorMansTSqlFormatterTests
 
         private void TestFormattingFlags(string inputString, string expectedOutputString, string arguments)
         {
-            TestFormattingFlags(inputString, expectedOutputString, arguments, "\r\n\r\n");
+            TestFormattingFlags(inputString, expectedOutputString, arguments, "\n\n");
         }
 
         private void TestFormattingFlags(string inputString, string expectedOutputString, string arguments, string outputSuffix)
@@ -113,7 +123,10 @@ namespace PoorMansTSqlFormatterTests
             formatterProcess.WaitForExit();
             if (formatterProcess.ExitCode != 0)
                 throw new Exception("Formatter reported error: " + formatterProcess.StandardError.ReadToEnd());
-            Assert.AreEqual(expectedOutputString + outputSuffix, outputString, "Output did not match expected");
+            Assert.That(
+                outputString.Replace("\r\n", "\n").Replace("\r", "\n"),
+                Is.EqualTo((expectedOutputString + outputSuffix).Replace("\r\n", "\n").Replace("\r", "\n")),
+                "Output did not match expected");
         }
     }
 }

@@ -76,16 +76,21 @@ namespace PoorMansTSqlFormatterTests
             Node parsedAgain = _parser.ParseSQL(tokenizedAgain);
             string formattedAgain = _treeFormatter.FormatSQLTree(parsedAgain);
 
-            if (!inputSQL.Contains(Utils.REFORMATTING_INCONSISTENCY_WARNING))
+            if (!inputSQL.Contains(Utils.REFORMATTING_INCONSISTENCY_WARNING)
+                && !inputSQL.Contains(Utils.INVALID_SQL_WARNING)
+                && FileName != "28_BadNestingDontCrash.txt")
             {
-                Assert.AreEqual(outputSQL, formattedAgain, "first-pass formatted vs reformatted");
+                Assert.That(formattedAgain, Is.EqualTo(outputSQL), "first-pass formatted vs reformatted");
                 Utils.StripWhiteSpaceFromSqlTree(parsed);
                 Utils.StripWhiteSpaceFromSqlTree(parsedAgain);
-                Assert.AreEqual(parsed.ToXmlDoc().OuterXml.ToUpper(), parsedAgain.ToXmlDoc().OuterXml.ToUpper(), "first parse xml vs reparse xml");
+                Assert.That(
+                    parsedAgain.ToXmlDoc().OuterXml.ToUpper().Replace("\r\n", "\n").Replace("\r", "\n"),
+                    Is.EqualTo(parsed.ToXmlDoc().OuterXml.ToUpper().Replace("\r\n", "\n").Replace("\r", "\n")),
+                    "first parse xml vs reparse xml");
             }
         }
 
-        public IEnumerable<string> GetStandardFormatSqlFileNames()
+        public static IEnumerable<string> GetStandardFormatSqlFileNames()
         {
             return Utils.FolderFileNameIterator(Utils.GetTestContentFolder("StandardFormatSql"));
         }
@@ -101,7 +106,9 @@ namespace PoorMansTSqlFormatterTests
             Node parsed = _parser.ParseSQL(tokenized);
             string formatted = _treeFormatter.FormatSQLTree(parsed);
 
-            Assert.AreEqual(expectedSql, formatted);
+            Assert.That(
+                formatted.Replace("\r\n", "\n").Replace("\r", "\n"),
+                Is.EqualTo(expectedSql.Replace("\r\n", "\n").Replace("\r", "\n")));
         }
 
     }

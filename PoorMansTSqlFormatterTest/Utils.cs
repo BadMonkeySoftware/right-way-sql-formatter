@@ -42,8 +42,8 @@ namespace PoorMansTSqlFormatterTests
 
         public static string GetTestContentFolder(string folderName)
         {
-            DirectoryInfo thisDirectory = new DirectoryInfo(".");
-            return Path.Combine(Path.Combine(thisDirectory.Parent.Parent.FullName, DATAFOLDER), folderName);
+            DirectoryInfo thisDirectory = new DirectoryInfo(AppContext.BaseDirectory);
+            return Path.Combine(thisDirectory.FullName, DATAFOLDER, folderName);
         }
 
         public static IEnumerable<string> FolderFileNameIterator(string path)
@@ -82,7 +82,8 @@ namespace PoorMansTSqlFormatterTests
 
         public static string GetTestFileContent(string fileName, string testFolderPath)
         {
-            return File.ReadAllText(Path.Combine(Utils.GetTestContentFolder(testFolderPath), fileName));
+            return File.ReadAllText(Path.Combine(Utils.GetTestContentFolder(testFolderPath), fileName))
+                .Replace("\r\n", "\n").Replace("\r", "\n");
         }
 
         public static string StripFileConfigString(string fileName)

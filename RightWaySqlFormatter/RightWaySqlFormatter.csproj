@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>RightWaySqlFormatter</AssemblyName>
+    <RootNamespace>PoorMansTSqlFormatter</RootNamespace>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <Version>1.0.0</Version>
+    <Description>T-SQL formatter library — modernized from PoorMansTSqlFormatter</Description>
+  </PropertyGroup>
+</Project>

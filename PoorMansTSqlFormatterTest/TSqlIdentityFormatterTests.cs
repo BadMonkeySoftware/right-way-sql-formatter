@@ -50,7 +50,7 @@ namespace PoorMansTSqlFormatterTests
             string inputSQL = Utils.GetTestFileContent(FileName, Utils.INPUTSQLFOLDER);
             ITokenList tokenized = _tokenizer.TokenizeSQL(inputSQL);
             string outputSQL = _tokenFormatter.FormatSQLTokens(tokenized);
-            Assert.AreEqual(inputSQL, outputSQL);
+            Assert.That(outputSQL, Is.EqualTo(inputSQL));
         }
 
         [Test, TestCaseSource(typeof(Utils), "GetInputSqlFileNames")]
@@ -60,7 +60,7 @@ namespace PoorMansTSqlFormatterTests
             ITokenList tokenized = _tokenizer.TokenizeSQL(inputSQL);
             Node parsed = _parser.ParseSQL(tokenized);
             string outputSQL = _treeFormatter.FormatSQLTree(parsed);
-            Assert.AreEqual(inputSQL, outputSQL);
+            Assert.That(outputSQL, Is.EqualTo(inputSQL));
         }
     }
 }

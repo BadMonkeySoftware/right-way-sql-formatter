@@ -42,7 +42,7 @@ namespace PoorMansTSqlFormatterTests
             _parser = new TSqlStandardParser();
         }
 
-        public IEnumerable<string> GetParsedSqlFileNames()
+        public static IEnumerable<string> GetParsedSqlFileNames()
         {
             return Utils.FolderFileNameIterator(Utils.GetTestContentFolder(Utils.PARSEDSQLFOLDER));
         }
@@ -58,7 +58,9 @@ namespace PoorMansTSqlFormatterTests
             ITokenList tokenized = _tokenizer.TokenizeSQL(inputSql);
             Node parsed = _parser.ParseSQL(tokenized);
 
-            Assert.AreEqual(expectedXmlDoc.OuterXml, parsed.ToXmlDoc().OuterXml);
+            Assert.That(
+                parsed.ToXmlDoc().OuterXml.Replace("\r\n", "\n").Replace("\r", "\n"),
+                Is.EqualTo(expectedXmlDoc.OuterXml.Replace("\r\n", "\n").Replace("\r", "\n")));
         }
 
     }
