@@ -1,0 +1,151 @@
+{
+  "name": "right-way-sql-formatter",
+  "displayName": "Right Way SQL Formatter",
+  "description": "T-SQL formatter for SSMS-style SQL — format document or selection with configurable rules.",
+  "version": "0.1.0",
+  "publisher": "bad-monkey-software",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Formatters"
+  ],
+  "keywords": [
+    "sql",
+    "tsql",
+    "formatter",
+    "mssql"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "sql",
+        "extensions": [
+          ".sql"
+        ],
+        "aliases": [
+          "SQL",
+          "sql"
+        ]
+      }
+    ],
+    "commands": [
+      {
+        "command": "rightWaySqlFormatter.formatDocument",
+        "title": "Right Way SQL: Format Document"
+      },
+      {
+        "command": "rightWaySqlFormatter.formatSelection",
+        "title": "Right Way SQL: Format Selection"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "when": "editorLangId == sql",
+          "command": "rightWaySqlFormatter.formatDocument",
+          "group": "1_modification"
+        },
+        {
+          "when": "editorHasSelection && editorLangId == sql",
+          "command": "rightWaySqlFormatter.formatSelection",
+          "group": "1_modification"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Right Way SQL Formatter",
+      "properties": {
+        "rightWaySqlFormatter.executablePath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the SqlFormatter executable. Leave empty to auto-detect from the extension's bundled binary or PATH."
+        },
+        "rightWaySqlFormatter.indentString": {
+          "type": "string",
+          "default": "\t",
+          "description": "String to use for each level of indentation (default: tab)."
+        },
+        "rightWaySqlFormatter.spacesPerTab": {
+          "type": "number",
+          "default": 4,
+          "description": "Number of spaces per tab (used when indent string is a tab)."
+        },
+        "rightWaySqlFormatter.maxLineWidth": {
+          "type": "number",
+          "default": 999,
+          "description": "Maximum line width before wrapping."
+        },
+        "rightWaySqlFormatter.uppercaseKeywords": {
+          "type": "boolean",
+          "default": true,
+          "description": "Uppercase SQL keywords (SELECT, FROM, WHERE, etc.)."
+        },
+        "rightWaySqlFormatter.standardizeKeywords": {
+          "type": "boolean",
+          "default": true,
+          "description": "Standardize keyword synonyms (e.g. NATIONAL CHARACTER VARYING → NVARCHAR)."
+        },
+        "rightWaySqlFormatter.expandCommaLists": {
+          "type": "boolean",
+          "default": true,
+          "description": "Expand comma-separated lists onto separate lines."
+        },
+        "rightWaySqlFormatter.expandInLists": {
+          "type": "boolean",
+          "default": true,
+          "description": "Expand IN (...) lists onto separate lines."
+        },
+        "rightWaySqlFormatter.trailingCommas": {
+          "type": "boolean",
+          "default": false,
+          "description": "Use trailing commas instead of leading commas."
+        },
+        "rightWaySqlFormatter.expandBooleanExpressions": {
+          "type": "boolean",
+          "default": true,
+          "description": "Expand AND/OR boolean expressions onto separate lines."
+        },
+        "rightWaySqlFormatter.expandCaseStatements": {
+          "type": "boolean",
+          "default": true,
+          "description": "Expand CASE/WHEN/THEN/END onto separate lines."
+        },
+        "rightWaySqlFormatter.expandBetweenConditions": {
+          "type": "boolean",
+          "default": true,
+          "description": "Expand BETWEEN ... AND ... onto separate lines."
+        },
+        "rightWaySqlFormatter.breakJoinOnSections": {
+          "type": "boolean",
+          "default": false,
+          "description": "Break JOIN clauses onto separate lines."
+        },
+        "rightWaySqlFormatter.newStatementLineBreaks": {
+          "type": "number",
+          "default": 2,
+          "description": "Number of blank lines between statements."
+        },
+        "rightWaySqlFormatter.newClauseLineBreaks": {
+          "type": "number",
+          "default": 1,
+          "description": "Number of blank lines between clauses."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package",
+    "vscode:prepublish": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.3.2",
+    "typescript": "^5.7.3"
+  }
+}

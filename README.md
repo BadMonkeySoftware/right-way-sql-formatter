@@ -1,124 +1,164 @@
-﻿
-## Poor Man's T-SQL Formatter
+# Right Way SQL Formatter
 
-This is a small free .Net 2.0 and JS library (with demo winforms program, web service,
-SSMS and Visual Studio Addin, Command-line utility, Notepad++ plugin, and WinMerge 
-plugin) for reformatting T-SQL code.
+A modernized T-SQL formatter based on [PoorMansTSqlFormatter](https://github.com/TaoK/PoorMansTSqlFormatter) by Tao Klerks.
 
+Targets: **SSMS plugin**, **VS Code extension**, **CLI tool** — all powered by the same .NET 10 core formatting engine.
 
+> Personal use. Licensed under GNU AGPL v3 (inherited from upstream).
 
-### Features
+---
 
-* Simple Xml-style parse tree
-* Extensible, with possibility of supporting other SQL dialects (but none implemented)
-* Configurable according to SQL formatting preferences
-* Handles "procedural" T-SQL; this is not just a SQL statement formatter, but it also 
-    formats entire batches, and multi-batch scripts.
-* Optional colorized HTML output
-* Fault-tolerant parsing and formatting - if some unknown SQL construct is encountered
-    or a keyword is misinterpreted, parsing does not fail (but will simply not colorize
-    or indent that portion correctly). If the parsing fails more catastrophically, a 
-    "best effort" will be made and warning displayed (or in the case of interactive 
-    use, eg in SSMS, the operation can be aborted).
-* Reasonably fast: reformatting 1,500 or so files totalling 4MB takes 30 seconds on a 
-    cheap atom-processor (2009) netbook.
-* Works in Microsoft .Net framework, as well as Mono. The Winforms Demo App is not (yet?)
-    available in Mono, but the library itself is fully functional, as is the command-line
-    bulk formatting tool.
-* JS library (transpiled from C#) is fully functional for browser or other (eg Node.js) 
-    contexts.
+## Projects
 
+| Project | Description |
+|---|---|
+| `RightWaySqlFormatter/` | Core formatting library (.NET 10) |
+| `PoorMansTSqlFormatterCmdLine/` | CLI tool — `SqlFormatter` binary |
+| `PoorMansTSqlFormatterSSMSPackage/` | SSMS plugin (Windows build only) |
+| `PoorMansTSqlFormatterSSMSLib/` | Shared SSMS helper library |
+| `PoorMansTSqlFormatterTest/` | NUnit 4 test suite |
+| `vscode-extension/` | VS Code extension (TypeScript, shells out to CLI) |
 
-### General Limitations
+---
 
-* This is NOT a full SQL-parsing solution: only "coarse" parsing is performed, the 
-    minimum necessary for re-formatting.
-* The standard formatter does not always maintain the order of comments in the code;
-    a comment inside an "INNER JOIN" compound keyword, like "inner/\*test\*/join", would
-    get moved out, to "INNER JOIN /\*test\*/". The original data is maintaned in the 
-    parse tree, but the standard formatter shuffles comments in cases like this for 
-    clarity.
-* DDL parsing, in particular, is VERY coarse - the bare minimum to display ordered table 
-    column and procedure parameter declarations.
-* No effort has been made to support compatibility level 70 (SQL Server 7)
-* Where there is ambiguity between different compatibility levels (eg cross apply 
-    parens in compatibility level 90 vs table hints without "WITH" keyword in 
-    compatibility level 80), no approach has been decided. For now, table hints 
-    without WITH are considered to be arguments to a function.
-* Settings may not be correctly maintained across major upgrades of SSMS and Visual Studio
- 
-### Known Issues / Todo
+## Requirements
 
-* Handling of DDL Triggers (eg "FOR LOGON")
-* Formatting/indenting of ranking functions 
-* FxCop checking
-* And other stuff that is tracked in the GitHub issues list
+- [.NET 10 SDK](https://dot.net) — for building C# projects
+- [Node.js 18+](https://nodejs.org) — for building the VS Code extension
+- Windows + Visual Studio — for building the SSMS plugin only
 
+### Install .NET 10 SDK (macOS/Linux, no sudo)
 
-### Longer-term enhancements / additions
+```bash
+curl -fsSL https://dot.net/v1/dotnet-install.sh | bash -s -- --channel 10.0 --install-dir ~/.dotnet
+export PATH="$HOME/.dotnet:$PATH"
+```
 
-* Compiled mono library + bulk formatting tool download (eg for use on SVN server)
-* Documentation of Xml structure and class usage
-    * Keeping track of versioning and documentation more carefully: http://semver.org/
+---
 
-### License & Credits
+## Building
 
-This application and library is released under the GNU Affero GPL v3: 
-http://www.gnu.org/licenses/agpl.txt
+### Core library + CLI + Tests
 
-The homepage for this project is currently: 
-http://www.architectshack.com/PoorMansTSqlFormatter.ashx
+```bash
+export PATH="$HOME/.dotnet:$PATH"
 
-This project uses several external libraries:
+# Build everything (except SSMS plugin)
+dotnet build RightWaySqlFormatter.slnx
 
-* NDesk.Options, for command-line parsing: The NDesk.Options library is licensed under 
-    the MIT/X11 license, and its homepage is here: http://www.ndesk.org/Options
-* LinqBridge, for convenience, supporting extension methods and Linq-to-Objects 
-    despite this being a .Net 2.0 library. LinqBridge is licensed under the BSD 3-clause 
-    license, and its homepage is here: http://code.google.com/p/linqbridge/
-* NUnit, for automated testing. NUnit is licensed under a custom open-source license
-    based on the zlib/libpng license, and its homepage is: http://www.nunit.org/
-* UnmanagedExports (DLLExport), for exporting .Net code to Notepad++ plugin environment
-* Notepad++ C# plugin template, based on work by Robert Giesecke and UFO, 
-    available from the [notepad++ plugin development forum](https://sourceforge.net/projects/notepad-plus/forums/forum/482781).
-* ILRepack, by François Valdy, for assembly-merging, available from the [github project page](https://github.com/gluck/il-repack).
-* Bridge.Net, by Object.Net, for C#-to-JS transpiling, available from http://bridge.net
+# Run tests
+dotnet test PoorMansTSqlFormatterTest/PoorMansTSqlFormatterTests.csproj
+```
 
-Special thanks to contributors that have given their time to make this library better:
+Expected: `180 passed, 2 skipped, 0 failed`
 
-* Timothy Klenke
+### CLI (Release build)
 
-Also thanks to Adam Pawsey, who maintains the [NuGet package](http://nuget.org/packages/PoorMansTSQLFormatter/).
+```bash
+dotnet build PoorMansTSqlFormatterCmdLine/PoorMansTSqlFormatterCmdLine.csproj -c Release
+# Binary: PoorMansTSqlFormatterCmdLine/bin/Release/net10.0/SqlFormatter
+```
 
-Many of the features in this project result from feedback by multiple people, including
-but not limited to:
+### VS Code Extension
 
-* Loren Halvorson
-* Recep Guzel
-* Lane Duncan
-* Gokhan Varol
-* Pushpendra Rishi
-* Jonathan Fahey
-* Tim Costello
-* Jörg Burdorf
-* William Lin
-* Brad Wood
-* Richard King
-* Jeff Clark
-* Jarred Cleem
-* Paul Toms
-* Tom Holden
-* Marvin Eads
-* Bill Ruehle
-* Farzad Jalali
-* Sheldon Hull
-* Benjamin Solomon
+```bash
+cd vscode-extension
+npm install
+npm run compile
+# Optional: package to .vsix
+npm run package
+```
 
+---
 
-Translation work on this project was originally facilitated by [Amanuens](http://amanuens.com/), the online translation platform that is now sadly defunct.
+## CLI Usage
 
-Please contact me with any questions, concerns, or issues: my email address starts
-with tao, and is hosted at klerks dot biz.
+Format SQL from stdin to stdout:
 
-Tao Klerks
+```bash
+echo "select id,name from users where active=1" | SqlFormatter
+```
 
+Format a file in-place:
+
+```bash
+SqlFormatter myquery.sql
+```
+
+Format a file, write to a new file:
+
+```bash
+SqlFormatter --output formatted.sql myquery.sql
+```
+
+### Common flags
+
+```
+--indent-string="\t"        Indentation (default: tab)
+--uppercase-keywords=true   Uppercase keywords (default: true)
+--standardize-keywords=true Normalize synonyms, e.g. NVARCHAR (default: true)
+--expand-comma-lists=true   Expand column lists onto separate lines (default: true)
+--expand-in-lists=true      Expand IN (...) lists (default: true)
+--trailing-commas=false     Leading vs trailing commas (default: leading)
+--statement-breaks=2        Blank lines between statements (default: 2)
+--clause-breaks=1           Blank lines between clauses (default: 1)
+--max-line-width=999        Max line width (default: 999)
+```
+
+Run `SqlFormatter --help` for the full list.
+
+### Examples
+
+```bash
+# Format with spaces instead of tabs
+echo "select 1,2,3" | SqlFormatter --indent-string="    "
+
+# Lowercase keywords
+echo "SELECT 1" | SqlFormatter --uppercase-keywords=false
+
+# Compact output (no expansions)
+echo "select id,name,email from users" | SqlFormatter \
+  --expand-comma-lists=false \
+  --expand-boolean=false \
+  --expand-case=false \
+  --statement-breaks=1
+```
+
+---
+
+## VS Code Extension
+
+See [vscode-extension/README.md](vscode-extension/README.md) for full setup and usage.
+
+**Quick start:**
+1. Build the CLI (Release) and copy to `vscode-extension/bin/SqlFormatter`
+2. `cd vscode-extension && npm install && npm run compile`
+3. Open in VS Code and press `F5` to launch Extension Development Host
+4. Open a `.sql` file → right-click → "Right Way SQL: Format Document"
+
+---
+
+## SSMS Plugin
+
+The `PoorMansTSqlFormatterSSMSPackage/` project is the VS Package-style SSMS plugin. Build requires:
+- Windows
+- Visual Studio 2019+ with VSIX development workload
+- SSMS 18+ (for testing)
+
+Build on Windows VM, install the resulting `.vsix`.
+
+---
+
+## Development Notes
+
+- **Namespaces** are intentionally kept as `PoorMansTSqlFormatterLib.*` in the core library to avoid breaking anything if upstream changes are ever cherry-picked in.
+- **Upstream reference**: `git fetch upstream` to pull latest changes from TaoK/PoorMansTSqlFormatter for comparison.
+- **Nullable warnings**: 76 nullable reference warnings remain in the core library (pre-existing from the original codebase). Not blocking but targeted for cleanup.
+- **Known test skips**: `02_Random_INVALID.txt` and `28_BadNestingDontCrash.txt` are skipped in reformatting tests — both contain intentionally malformed SQL that the original formatter also couldn't round-trip cleanly.
+
+---
+
+## License
+
+GNU Affero General Public License v3 — inherited from [PoorMansTSqlFormatter](https://github.com/TaoK/PoorMansTSqlFormatter).
+Personal use only. Not for redistribution or commercial deployment.
