@@ -137,10 +137,12 @@
     }
   },
   "scripts": {
+    "build:cli": "node scripts/build-cli.js",
     "compile": "tsc -p ./",
+    "build": "npm run build:cli && npm run compile",
     "watch": "tsc -watch -p ./",
-    "package": "vsce package",
-    "vscode:prepublish": "npm run compile"
+    "package": "npm run build && vsce package",
+    "vscode:prepublish": "npm run build"
   },
   "devDependencies": {
     "@types/node": "^25.6.0",

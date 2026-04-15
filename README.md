@@ -64,7 +64,7 @@ dotnet build PoorMansTSqlFormatterCmdLine/PoorMansTSqlFormatterCmdLine.csproj -c
 ```bash
 cd vscode-extension
 npm install
-npm run compile
+npm run build   # builds self-contained CLI binary + compiles TypeScript
 # Optional: package to .vsix
 npm run package
 ```

@@ -19,51 +19,36 @@ Both commands are also available in the right-click context menu when editing a 
 
 ## Setup
 
-### 1. Build the CLI
+### 1. Build everything
 
-From the repo root:
-
-```bash
-export PATH="$HOME/.dotnet:$PATH"
-dotnet build PoorMansTSqlFormatterCmdLine/PoorMansTSqlFormatterCmdLine.csproj -c Release
-```
-
-The binary will be at:
-```
-PoorMansTSqlFormatterCmdLine/bin/Release/net10.0/SqlFormatter
-```
-
-### 2. Make it accessible
-
-**Option A — Copy to extension bin/ folder (recommended for dev):**
-```bash
-mkdir -p vscode-extension/bin
-cp PoorMansTSqlFormatterCmdLine/bin/Release/net10.0/SqlFormatter vscode-extension/bin/
-chmod +x vscode-extension/bin/SqlFormatter
-```
-
-**Option B — Add to PATH:**
-```bash
-# Add to your shell profile (e.g. ~/.zshrc):
-export PATH="$PATH:/path/to/right-way-sql-formatter/PoorMansTSqlFormatterCmdLine/bin/Release/net10.0"
-```
-
-**Option C — Set in VS Code settings:**
-```json
-{
-  "rightWaySqlFormatter.executablePath": "/absolute/path/to/SqlFormatter"
-}
-```
-
-### 3. Install the extension (dev mode)
+From the `vscode-extension/` directory:
 
 ```bash
-cd vscode-extension
 npm install
-npm run compile
+npm run build
 ```
 
-Then in VS Code: `F1` → "Extensions: Install from VSIX..." or press `F5` to launch an Extension Development Host.
+That's it. `npm run build` will:
+- Find the .NET SDK automatically (checks `~/.dotnet`, system locations, then PATH)
+- Publish a self-contained `SqlFormatter` binary into `vscode-extension/bin/` — no .NET required at runtime
+- Compile the TypeScript extension
+
+### 2. Install the extension (dev mode)
+
+Open the `vscode-extension/` folder in VS Code and press `F5` to launch an Extension Development Host.
+Or open the repo root and use the Remote SSH workflow from the Mac Mini.
+
+### 3. Package for install
+
+```bash
+npm run package
+# Produces: right-way-sql-formatter-0.1.0.vsix
+```
+
+Install with:
+```bash
+code --install-extension right-way-sql-formatter-0.1.0.vsix
+```
 
 ## Settings
 
