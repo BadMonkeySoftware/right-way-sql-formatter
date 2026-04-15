@@ -118,24 +118,18 @@ namespace PoorMansTSqlFormatterLib.Formatters
             //someone forgot to close a "[noformat]" or "[minify]" region... we'll assume that's ok
             if (state.SpecialRegionActive == SpecialRegionType.NoFormat)
             {
-                Node? skippedXml = NodeExtensions.ExtractStructureBetween(state.RegionStartNode, sqlTreeDoc);
-                if (skippedXml != null)
-                {
-                    TSqlIdentityFormatter tempFormatter = new TSqlIdentityFormatter(Options.HTMLColoring);
-                    state.AddOutputContentRaw(tempFormatter.FormatSQLTree(skippedXml));
-                }
+                Node skippedXml = NodeExtensions.ExtractStructureBetween(state.RegionStartNode, sqlTreeDoc);
+                TSqlIdentityFormatter tempFormatter = new TSqlIdentityFormatter(Options.HTMLColoring);
+                state.AddOutputContentRaw(tempFormatter.FormatSQLTree(skippedXml));
             }
             else if (state.SpecialRegionActive == SpecialRegionType.Minify)
             {
-                Node? skippedXml = NodeExtensions.ExtractStructureBetween(state.RegionStartNode, sqlTreeDoc);
-                if (skippedXml != null)
-                {
-                    TSqlObfuscatingFormatter tempFormatter = new TSqlObfuscatingFormatter();
-                    if (HTMLFormatted)
-                        state.AddOutputContentRaw(Utils.HtmlEncode(tempFormatter.FormatSQLTree(skippedXml)!)!);
-                    else
-                        state.AddOutputContentRaw(tempFormatter.FormatSQLTree(skippedXml));
-                }
+                Node skippedXml = NodeExtensions.ExtractStructureBetween(state.RegionStartNode, sqlTreeDoc);
+                TSqlObfuscatingFormatter tempFormatter = new TSqlObfuscatingFormatter();
+                if (HTMLFormatted)
+                    state.AddOutputContentRaw(Utils.HtmlEncode(tempFormatter.FormatSQLTree(skippedXml)));
+                else
+                    state.AddOutputContentRaw(tempFormatter.FormatSQLTree(skippedXml));
             }
             string output = state.DumpOutput();
 
@@ -361,6 +355,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
                         i++;
                     }
                     // lines[start..i) is the SELECT block.
+                    // Dispatch based on ColumnAliasStyle
                     if (Options.ColumnAliasStyle == ColumnAliasStyle.EqualSign)
                         AlignBlockEqualSign(lines, start, i);
                     else
@@ -424,90 +419,68 @@ namespace PoorMansTSqlFormatterLib.Formatters
             }
         }
 
-        /// <summary>
-        /// Aligns SELECT column lines already rewritten in "alias = expr" form so that the
-        /// '=' signs are vertically aligned.  The target column is the smallest multiple of
-        /// IndentSize that is greater than (maxAliasLen + 1), i.e. the next tab stop past the
-        /// longest alias.  Lines that are not in "alias = expr" form are left unchanged.
-        /// </summary>
         private void AlignBlockEqualSign(string[] lines, int start, int end)
         {
-            int indentSize = Options.SpacesPerTab > 0 ? Options.SpacesPerTab : 4;
-
-            // Collect parseable alias = expr lines.
-            var items = new List<(int lineIdx, string prefix, string alias, string expr, bool trailingComma)>();
+            // For lines in alias = expr format, align the = signs to a tab stop column.
+            // Lines look like: indent + [SELECT | ,] + alias + = + expr
+            var items = new List<(int lineIdx, string prefix, string alias, string expr)>();
 
             for (int i = start; i < end; i++)
             {
                 string line = lines[i];
                 string trimmed = line.TrimStart();
+                string indent = line.Substring(0, line.Length - trimmed.Length);
 
+                // Handle SELECT keyword on first line
                 string content;
                 string prefix;
                 if (trimmed.ToUpperInvariant().StartsWith("SELECT "))
                 {
-                    content = trimmed.Substring(7).TrimStart();
-                    prefix = line.Substring(0, line.Length - trimmed.Length) + "SELECT ";
+                    content = trimmed.Substring(7).TrimStart(); // after "SELECT "
+                    prefix = indent + "SELECT ";
                 }
                 else if (trimmed.StartsWith(","))
                 {
                     content = trimmed.Substring(1).TrimStart();
-                    prefix = line.Substring(0, line.Length - trimmed.Length) + ",";
+                    prefix = indent + ",";
                 }
                 else
                 {
                     content = trimmed;
-                    prefix = line.Substring(0, line.Length - trimmed.Length);
+                    prefix = indent;
                 }
 
-                // Strip trailing comma (trailing-comma style)
-                bool hadTrailingComma = content.EndsWith(",");
-                string col = hadTrailingComma ? content.Substring(0, content.Length - 1).TrimEnd() : content;
-
-                // Parse "alias = expr" — find first top-level ' = '
-                int eqPos = FindEqualSignOutsideParens(col);
-                if (eqPos < 0) continue;
-
-                string alias = col.Substring(0, eqPos).TrimEnd();
-                string expr  = col.Substring(eqPos + 3).TrimStart(); // skip " = "
-                if (string.IsNullOrEmpty(alias) || string.IsNullOrEmpty(expr)) continue;
-
-                items.Add((i, prefix, alias, expr, hadTrailingComma));
+                int eqPos = FindEqualSignOutsideParens(content);
+                if (eqPos >= 0)
+                {
+                    string alias = content.Substring(0, eqPos).TrimEnd();
+                    string expr = content.Substring(eqPos + 1).TrimStart();
+                    items.Add((i, prefix, alias, expr));
+                }
             }
 
             if (items.Count < 2) return;
 
             int maxAliasLen = items.Max(it => it.alias.Length);
-            // Next tab stop strictly greater than maxAliasLen (alias + at least 1 space).
-            int targetCol = ((maxAliasLen / indentSize) + 1) * indentSize;
+            int targetCol = ((maxAliasLen / Options.SpacesPerTab) + 1) * Options.SpacesPerTab;
 
-            foreach (var (lineIdx, prefix, alias, expr, trailingComma) in items)
+            foreach (var (lineIdx, prefix, alias, expr) in items)
             {
-                string padding = new string(' ', targetCol - alias.Length);
-                lines[lineIdx] = prefix + alias + padding + "= " + expr + (trailingComma ? "," : "");
+                int padding = targetCol - alias.Length;
+                lines[lineIdx] = prefix + alias + new string(' ', padding) + "= " + expr;
             }
         }
 
-        /// <summary>
-        /// Finds the position of a top-level " = " in a string, ignoring occurrences inside
-        /// parentheses or string literals.  Returns -1 if not found.
-        /// </summary>
-        private static int FindEqualSignOutsideParens(string s)
+        private int FindEqualSignOutsideParens(string content)
         {
             int depth = 0;
-            bool inString = false;
-            for (int i = 0; i < s.Length - 2; i++)
+            for (int i = 0; i < content.Length; i++)
             {
-                char c = s[i];
-                if (inString)
-                {
-                    if (c == '\'') inString = false;
-                    continue;
-                }
-                if (c == '\'') { inString = true; continue; }
-                if (c == '(') { depth++; continue; }
-                if (c == ')') { depth--; continue; }
-                if (depth == 0 && c == ' ' && s[i + 1] == '=' && s[i + 2] == ' ')
+                if (content[i] == '(')
+                    depth++;
+                else if (content[i] == ')')
+                    depth--;
+                else if (content[i] == '=' && depth == 0)
                     return i;
             }
             return -1;
@@ -700,7 +673,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
                             foreach (Node ifStatement in clause.ChildrenByName(SqlStructureConstants.ENAME_IF_STATEMENT))
                                 singleStatementIsIf = true;
 
-					if (singleStatementIsIf && contentElement.Parent!.Name.Equals(SqlStructureConstants.ENAME_ELSE_CLAUSE))
+					if (singleStatementIsIf && contentElement.Parent.Name.Equals(SqlStructureConstants.ENAME_ELSE_CLAUSE))
 					{
 						//artificially decrement indent and skip new statement break for "ELSE IF" constructs
 						state.DecrementIndent();
@@ -710,7 +683,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
 						state.BreakExpected = true;
 					}
                     ProcessSqlNodeList(contentElement.Children, state);
-					if (singleStatementIsIf && contentElement.Parent!.Name.Equals(SqlStructureConstants.ENAME_ELSE_CLAUSE))
+					if (singleStatementIsIf && contentElement.Parent.Name.Equals(SqlStructureConstants.ENAME_ELSE_CLAUSE))
 					{
 						//bring indent back to symmetrical level
 						state.IncrementIndent();
@@ -854,9 +827,9 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 case SqlStructureConstants.ENAME_BEGIN_END_BLOCK:
                 case SqlStructureConstants.ENAME_TRY_BLOCK:
                 case SqlStructureConstants.ENAME_CATCH_BLOCK:
-                    if (contentElement.Parent!.Name.Equals(SqlStructureConstants.ENAME_SQL_CLAUSE)
-                        && contentElement.Parent!.Parent!.Name.Equals(SqlStructureConstants.ENAME_SQL_STATEMENT)
-                        && contentElement.Parent!.Parent!.Parent!.Name.Equals(SqlStructureConstants.ENAME_CONTAINER_SINGLESTATEMENT)
+                    if (contentElement.Parent.Name.Equals(SqlStructureConstants.ENAME_SQL_CLAUSE)
+                        && contentElement.Parent.Parent.Name.Equals(SqlStructureConstants.ENAME_SQL_STATEMENT)
+                        && contentElement.Parent.Parent.Parent.Name.Equals(SqlStructureConstants.ENAME_CONTAINER_SINGLESTATEMENT)
                         )
                         state.DecrementIndent();
                     ProcessSqlNodeList(contentElement.ChildrenByName(SqlStructureConstants.ENAME_CONTAINER_OPEN), state);
@@ -865,9 +838,9 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     state.BreakExpected = true;
                     ProcessSqlNodeList(contentElement.ChildrenByName(SqlStructureConstants.ENAME_CONTAINER_CLOSE), state);
                     state.IncrementIndent();
-                    if (contentElement.Parent!.Name.Equals(SqlStructureConstants.ENAME_SQL_CLAUSE)
-                        && contentElement.Parent!.Parent!.Name.Equals(SqlStructureConstants.ENAME_SQL_STATEMENT)
-                        && contentElement.Parent!.Parent!.Parent!.Name.Equals(SqlStructureConstants.ENAME_CONTAINER_SINGLESTATEMENT)
+                    if (contentElement.Parent.Name.Equals(SqlStructureConstants.ENAME_SQL_CLAUSE)
+                        && contentElement.Parent.Parent.Name.Equals(SqlStructureConstants.ENAME_SQL_STATEMENT)
+                        && contentElement.Parent.Parent.Parent.Name.Equals(SqlStructureConstants.ENAME_CONTAINER_SINGLESTATEMENT)
                         )
                         state.IncrementIndent();
                     break;
@@ -901,15 +874,15 @@ namespace PoorMansTSqlFormatterLib.Formatters
                         state.BreakExpected = true;
                     if (Options.IndentWhereAndOrConditions)
                         state.IncrementIndent();
-                    ProcessSqlNode(contentElement.ChildByName(SqlStructureConstants.ENAME_OTHERKEYWORD)!, state);
+                    ProcessSqlNode(contentElement.ChildByName(SqlStructureConstants.ENAME_OTHERKEYWORD), state);
                     if (Options.IndentWhereAndOrConditions)
                         state.DecrementIndent();
                     break;
 
                 case SqlStructureConstants.ENAME_COMMENT_MULTILINE:
-                    if (state.SpecialRegionActive == SpecialRegionType.NoFormat && contentElement.TextValue!.ToUpperInvariant().Contains("[/NOFORMAT]"))
+                    if (state.SpecialRegionActive == SpecialRegionType.NoFormat && contentElement.TextValue.ToUpperInvariant().Contains("[/NOFORMAT]"))
                     {
-                        Node? skippedXml = NodeExtensions.ExtractStructureBetween(state.RegionStartNode, contentElement);
+                        Node skippedXml = NodeExtensions.ExtractStructureBetween(state.RegionStartNode, contentElement);
                         if (skippedXml != null)
                         {
                             TSqlIdentityFormatter tempFormatter = new TSqlIdentityFormatter(Options.HTMLColoring);
@@ -920,14 +893,14 @@ namespace PoorMansTSqlFormatterLib.Formatters
                         state.SpecialRegionActive = null;
                         state.RegionStartNode = null;
                     }
-                    else if (state.SpecialRegionActive == SpecialRegionType.Minify && contentElement.TextValue!.ToUpperInvariant().Contains("[/MINIFY]"))
+                    else if (state.SpecialRegionActive == SpecialRegionType.Minify && contentElement.TextValue.ToUpperInvariant().Contains("[/MINIFY]"))
                     {
-                        Node? skippedXml = NodeExtensions.ExtractStructureBetween(state.RegionStartNode, contentElement);
+                        Node skippedXml = NodeExtensions.ExtractStructureBetween(state.RegionStartNode, contentElement);
                         if (skippedXml != null)
                         {
                             TSqlObfuscatingFormatter tempFormatter = new TSqlObfuscatingFormatter();
                             if (HTMLFormatted)
-                                state.AddOutputContentRaw(Utils.HtmlEncode(tempFormatter.FormatSQLTree(skippedXml))!);
+                                state.AddOutputContentRaw(Utils.HtmlEncode(tempFormatter.FormatSQLTree(skippedXml)));
                             else
                                 state.AddOutputContentRaw(tempFormatter.FormatSQLTree(skippedXml));
                             state.WordSeparatorExpected = false;
@@ -938,11 +911,11 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     }
 
                     WhiteSpace_SeparateComment(contentElement, state);
-                    state.AddOutputContent("/*" + contentElement.TextValue! + "*/", SqlHtmlConstants.CLASS_COMMENT);
-                    if (contentElement.Parent!.Name.Equals(SqlStructureConstants.ENAME_SQL_STATEMENT)
+                    state.AddOutputContent("/*" + contentElement.TextValue + "*/", SqlHtmlConstants.CLASS_COMMENT);
+                    if (contentElement.Parent.Name.Equals(SqlStructureConstants.ENAME_SQL_STATEMENT)
                         || (contentElement.NextSibling() != null
-                            && contentElement.NextSibling()!.Name.Equals(SqlStructureConstants.ENAME_WHITESPACE)
-                            && Regex.IsMatch(contentElement.NextSibling()!.TextValue!, @"(\r|\n)+")
+                            && contentElement.NextSibling().Name.Equals(SqlStructureConstants.ENAME_WHITESPACE)
+                            && Regex.IsMatch(contentElement.NextSibling().TextValue, @"(\r|\n)+")
                             )
                         )
                         //if this block comment is at the start or end of a statement, or if it was followed by a 
@@ -953,13 +926,13 @@ namespace PoorMansTSqlFormatterLib.Formatters
                         state.WordSeparatorExpected = true;
                     }
 
-                    if (state.SpecialRegionActive == null && contentElement.TextValue!.ToUpperInvariant().Contains("[NOFORMAT]"))
+                    if (state.SpecialRegionActive == null && contentElement.TextValue.ToUpperInvariant().Contains("[NOFORMAT]"))
                     {
                         //state.AddOutputLineBreak();
                         state.SpecialRegionActive = SpecialRegionType.NoFormat;
                         state.RegionStartNode = contentElement;
                     }
-                    else if (state.SpecialRegionActive == null && contentElement.TextValue!.ToUpperInvariant().Contains("[MINIFY]"))
+                    else if (state.SpecialRegionActive == null && contentElement.TextValue.ToUpperInvariant().Contains("[MINIFY]"))
                     {
                         //state.AddOutputLineBreak();
                         state.SpecialRegionActive = SpecialRegionType.Minify;
@@ -969,9 +942,9 @@ namespace PoorMansTSqlFormatterLib.Formatters
 
                 case SqlStructureConstants.ENAME_COMMENT_SINGLELINE:
                 case SqlStructureConstants.ENAME_COMMENT_SINGLELINE_CSTYLE:
-                    if (state.SpecialRegionActive == SpecialRegionType.NoFormat && contentElement.TextValue!.ToUpperInvariant().Contains("[/NOFORMAT]"))
+                    if (state.SpecialRegionActive == SpecialRegionType.NoFormat && contentElement.TextValue.ToUpperInvariant().Contains("[/NOFORMAT]"))
                     {
-                        Node? skippedXml = NodeExtensions.ExtractStructureBetween(state.RegionStartNode, contentElement);
+                        Node skippedXml = NodeExtensions.ExtractStructureBetween(state.RegionStartNode, contentElement);
                         if (skippedXml != null)
                         {
                             TSqlIdentityFormatter tempFormatter = new TSqlIdentityFormatter(Options.HTMLColoring);
@@ -982,14 +955,14 @@ namespace PoorMansTSqlFormatterLib.Formatters
                         state.SpecialRegionActive = null;
                         state.RegionStartNode = null;
                     }
-                    else if (state.SpecialRegionActive == SpecialRegionType.Minify && contentElement.TextValue!.ToUpperInvariant().Contains("[/MINIFY]"))
+                    else if (state.SpecialRegionActive == SpecialRegionType.Minify && contentElement.TextValue.ToUpperInvariant().Contains("[/MINIFY]"))
                     {
-                        Node? skippedXml = NodeExtensions.ExtractStructureBetween(state.RegionStartNode, contentElement);
+                        Node skippedXml = NodeExtensions.ExtractStructureBetween(state.RegionStartNode, contentElement);
                         if (skippedXml != null)
                         {
                             TSqlObfuscatingFormatter tempFormatter = new TSqlObfuscatingFormatter();
                             if (HTMLFormatted)
-                                state.AddOutputContentRaw(Utils.HtmlEncode(tempFormatter.FormatSQLTree(skippedXml))!);
+                                state.AddOutputContentRaw(Utils.HtmlEncode(tempFormatter.FormatSQLTree(skippedXml)));
                             else
                                 state.AddOutputContentRaw(tempFormatter.FormatSQLTree(skippedXml));
                             state.WordSeparatorExpected = false;
@@ -1000,17 +973,17 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     }
 
                     WhiteSpace_SeparateComment(contentElement, state);
-                    state.AddOutputContent((contentElement.Name == SqlStructureConstants.ENAME_COMMENT_SINGLELINE ? "--" : "//") + contentElement.TextValue!.Replace("\r", "").Replace("\n", ""), SqlHtmlConstants.CLASS_COMMENT);
+                    state.AddOutputContent((contentElement.Name == SqlStructureConstants.ENAME_COMMENT_SINGLELINE ? "--" : "//") + contentElement.TextValue.Replace("\r", "").Replace("\n", ""), SqlHtmlConstants.CLASS_COMMENT);
                     state.BreakExpected = true;
                     state.SourceBreakPending = true;
 
-                    if (state.SpecialRegionActive == null && contentElement.TextValue!.ToUpperInvariant().Contains("[NOFORMAT]"))
+                    if (state.SpecialRegionActive == null && contentElement.TextValue.ToUpperInvariant().Contains("[NOFORMAT]"))
                     {
                         state.AddOutputLineBreak();
                         state.SpecialRegionActive = SpecialRegionType.NoFormat;
                         state.RegionStartNode = contentElement;
                     }
-                    else if (state.SpecialRegionActive == null && contentElement.TextValue!.ToUpperInvariant().Contains("[MINIFY]"))
+                    else if (state.SpecialRegionActive == null && contentElement.TextValue.ToUpperInvariant().Contains("[MINIFY]"))
                     {
                         state.AddOutputLineBreak();
                         state.SpecialRegionActive = SpecialRegionType.Minify;
@@ -1021,22 +994,24 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 case SqlStructureConstants.ENAME_STRING:
                 case SqlStructureConstants.ENAME_NSTRING:
                     WhiteSpace_SeparateWords(state);
-                    string outValue = contentElement.Name.Equals(SqlStructureConstants.ENAME_NSTRING) ?
-                        "N'" + contentElement.TextValue!.Replace("'", "''") + "'" :
-                        "'" + contentElement.TextValue!.Replace("'", "''") + "'";
+                    string outValue = null;
+                    if (contentElement.Name.Equals(SqlStructureConstants.ENAME_NSTRING))
+                        outValue = "N'" + contentElement.TextValue.Replace("'", "''") + "'";
+                    else
+                        outValue = "'" + contentElement.TextValue.Replace("'", "''") + "'";
                     state.AddOutputContent(outValue, SqlHtmlConstants.CLASS_STRING);
                     state.WordSeparatorExpected = true;
                     break;
 
                 case SqlStructureConstants.ENAME_BRACKET_QUOTED_NAME:
                     WhiteSpace_SeparateWords(state);
-                    state.AddOutputContent("[" + contentElement.TextValue!.Replace("]", "]]") + "]");
+                    state.AddOutputContent("[" + contentElement.TextValue.Replace("]", "]]") + "]");
                     state.WordSeparatorExpected = true;
                     break;
 
                 case SqlStructureConstants.ENAME_QUOTED_STRING:
                     WhiteSpace_SeparateWords(state);
-                    state.AddOutputContent("\"" + contentElement.TextValue!.Replace("\"", "\"\"") + "\"");
+                    state.AddOutputContent("\"" + contentElement.TextValue.Replace("\"", "\"\"") + "\"");
                     state.WordSeparatorExpected = true;
                     break;
 
@@ -1048,13 +1023,13 @@ namespace PoorMansTSqlFormatterLib.Formatters
                         state.AddOutputContent(FormatOperator(","), SqlHtmlConstants.CLASS_OPERATOR);
 
                         if ((Options.ExpandCommaLists
-								&& !(contentElement.Parent!.Name.Equals(SqlStructureConstants.ENAME_DDLDETAIL_PARENS)
-									|| contentElement.Parent!.Name.Equals(SqlStructureConstants.ENAME_FUNCTION_PARENS)
-									|| contentElement.Parent!.Name.Equals(SqlStructureConstants.ENAME_IN_PARENS)
+								&& !(contentElement.Parent.Name.Equals(SqlStructureConstants.ENAME_DDLDETAIL_PARENS)
+									|| contentElement.Parent.Name.Equals(SqlStructureConstants.ENAME_FUNCTION_PARENS)
+									|| contentElement.Parent.Name.Equals(SqlStructureConstants.ENAME_IN_PARENS)
 									)
 								)
 							|| (Options.ExpandInLists
-								&& contentElement.Parent!.Name.Equals(SqlStructureConstants.ENAME_IN_PARENS)
+								&& contentElement.Parent.Name.Equals(SqlStructureConstants.ENAME_IN_PARENS)
 								)
 							)
                             state.BreakExpected = true;
@@ -1064,13 +1039,13 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     else
                     {
                         if ((Options.ExpandCommaLists
-								&& !(contentElement.Parent!.Name.Equals(SqlStructureConstants.ENAME_DDLDETAIL_PARENS)
-									|| contentElement.Parent!.Name.Equals(SqlStructureConstants.ENAME_FUNCTION_PARENS)
-									|| contentElement.Parent!.Name.Equals(SqlStructureConstants.ENAME_IN_PARENS)
+								&& !(contentElement.Parent.Name.Equals(SqlStructureConstants.ENAME_DDLDETAIL_PARENS)
+									|| contentElement.Parent.Name.Equals(SqlStructureConstants.ENAME_FUNCTION_PARENS)
+									|| contentElement.Parent.Name.Equals(SqlStructureConstants.ENAME_IN_PARENS)
 									)
 								)
 							|| (Options.ExpandInLists
-								&& contentElement.Parent!.Name.Equals(SqlStructureConstants.ENAME_IN_PARENS)
+								&& contentElement.Parent.Name.Equals(SqlStructureConstants.ENAME_IN_PARENS)
 								)
 							)
                         {
@@ -1095,7 +1070,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     //always ignores requested word spacing, and doesn't request a following space either.
                     state.WordSeparatorExpected = false;
                     WhiteSpace_BreakAsExpected(state);
-                    state.AddOutputContent(FormatOperator(contentElement.TextValue!), SqlHtmlConstants.CLASS_OPERATOR);
+                    state.AddOutputContent(FormatOperator(contentElement.TextValue), SqlHtmlConstants.CLASS_OPERATOR);
                     break;
 
                 case SqlStructureConstants.ENAME_ASTERISK:
@@ -1103,14 +1078,14 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 case SqlStructureConstants.ENAME_ALPHAOPERATOR:
                 case SqlStructureConstants.ENAME_OTHEROPERATOR:
                     WhiteSpace_SeparateWords(state);
-                    state.AddOutputContent(FormatOperator(contentElement.TextValue!), SqlHtmlConstants.CLASS_OPERATOR);
+                    state.AddOutputContent(FormatOperator(contentElement.TextValue), SqlHtmlConstants.CLASS_OPERATOR);
                     state.WordSeparatorExpected = true;
                     break;
 
                 case SqlStructureConstants.ENAME_COMPOUNDKEYWORD:
                     WhiteSpace_SeparateWords(state);
-                    state.SetRecentKeyword(contentElement.GetAttributeValue(SqlStructureConstants.ANAME_SIMPLETEXT)!);
-                    state.AddOutputContent(FormatKeyword(contentElement.GetAttributeValue(SqlStructureConstants.ANAME_SIMPLETEXT)!), SqlHtmlConstants.CLASS_KEYWORD);
+                    state.SetRecentKeyword(contentElement.GetAttributeValue(SqlStructureConstants.ANAME_SIMPLETEXT));
+                    state.AddOutputContent(FormatKeyword(contentElement.GetAttributeValue(SqlStructureConstants.ANAME_SIMPLETEXT)), SqlHtmlConstants.CLASS_KEYWORD);
                     state.WordSeparatorExpected = true;
                     ProcessSqlNodeList(contentElement.ChildrenByNames(SqlStructureConstants.ENAMELIST_COMMENT), state.IncrementIndent());
                     state.DecrementIndent();
@@ -1120,7 +1095,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 case SqlStructureConstants.ENAME_OTHERKEYWORD:
                 case SqlStructureConstants.ENAME_DATATYPE_KEYWORD:
                 {
-                    string kwUpper = contentElement.TextValue!.ToUpperInvariant();
+                    string kwUpper = contentElement.TextValue.ToUpperInvariant();
 
                     // DDLConstraintsOnNewLine: force a line break before constraint-starting keywords
                     // inside a DDL column list (DDL_PARENS context), but only when the keyword is
@@ -1133,7 +1108,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     {
                         // Don't add extra break if the nearest preceding non-whitespace sibling is a comma
                         // (that means this constraint is already on its own comma-separated line).
-                        Node? prev = contentElement.PreviousSibling();
+                        Node prev = contentElement.PreviousSibling();
                         while (prev != null && prev.Name == SqlStructureConstants.ENAME_WHITESPACE)
                             prev = prev.PreviousSibling();
                         if (prev == null || prev.Name != SqlStructureConstants.ENAME_COMMA)
@@ -1141,8 +1116,8 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     }
 
                     WhiteSpace_SeparateWords(state);
-                    state.SetRecentKeyword(contentElement.TextValue!);
-                    state.AddOutputContent(FormatKeyword(contentElement.TextValue!), SqlHtmlConstants.CLASS_KEYWORD);
+                    state.SetRecentKeyword(contentElement.TextValue);
+                    state.AddOutputContent(FormatKeyword(contentElement.TextValue), SqlHtmlConstants.CLASS_KEYWORD);
                     state.WordSeparatorExpected = true;
 
                     // When SelectFirstColumnOnNewLine is on and this is a SELECT keyword,
@@ -1157,14 +1132,14 @@ namespace PoorMansTSqlFormatterLib.Formatters
 
                 case SqlStructureConstants.ENAME_PSEUDONAME:
                     WhiteSpace_SeparateWords(state);
-                    state.AddOutputContent(FormatKeyword(contentElement.TextValue!), SqlHtmlConstants.CLASS_KEYWORD);
+                    state.AddOutputContent(FormatKeyword(contentElement.TextValue), SqlHtmlConstants.CLASS_KEYWORD);
                     state.WordSeparatorExpected = true;
                     break;
 
                 case SqlStructureConstants.ENAME_FUNCTION_KEYWORD:
                     WhiteSpace_SeparateWords(state);
-                    state.SetRecentKeyword(contentElement.TextValue!);
-                    state.AddOutputContent(contentElement.TextValue!, SqlHtmlConstants.CLASS_FUNCTION);
+                    state.SetRecentKeyword(contentElement.TextValue);
+                    state.AddOutputContent(contentElement.TextValue, SqlHtmlConstants.CLASS_FUNCTION);
                     state.WordSeparatorExpected = true;
                     break;
 
@@ -1172,26 +1147,26 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 case SqlStructureConstants.ENAME_MONETARY_VALUE:
                 case SqlStructureConstants.ENAME_LABEL:
                     WhiteSpace_SeparateWords(state);
-                    state.AddOutputContent(contentElement.TextValue!);
+                    state.AddOutputContent(contentElement.TextValue);
                     state.WordSeparatorExpected = true;
                     break;
 
                 case SqlStructureConstants.ENAME_NUMBER_VALUE:
                     WhiteSpace_SeparateWords(state);
-                    state.AddOutputContent(contentElement.TextValue!.ToLowerInvariant());
+                    state.AddOutputContent(contentElement.TextValue.ToLowerInvariant());
                     state.WordSeparatorExpected = true;
                     break;
 
                 case SqlStructureConstants.ENAME_BINARY_VALUE:
                     WhiteSpace_SeparateWords(state);
                     state.AddOutputContent("0x");
-                    state.AddOutputContent(contentElement.TextValue!.Substring(2).ToUpperInvariant());
+                    state.AddOutputContent(contentElement.TextValue.Substring(2).ToUpperInvariant());
                     state.WordSeparatorExpected = true;
                     break;
 
                 case SqlStructureConstants.ENAME_WHITESPACE:
                     //take note if it's a line-breaking space, but don't DO anything here
-                    if (Regex.IsMatch(contentElement.TextValue!, @"(\r|\n)+"))
+                    if (Regex.IsMatch(contentElement.TextValue, @"(\r|\n)+"))
                         state.SourceBreakPending = true;
                     break;
                 default:
@@ -1208,7 +1183,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
 
         private string FormatKeyword(string keyword)
         {
-            string? outputKeyword;
+            string outputKeyword;
             if (!KeywordMapping.TryGetValue(keyword.ToUpperInvariant(), out outputKeyword))
                 outputKeyword = keyword;
 
@@ -1231,18 +1206,18 @@ namespace PoorMansTSqlFormatterLib.Formatters
             if (state.StatementBreakExpected)
             {
                 //check whether this is a DECLARE/SET clause with similar precedent, and therefore exempt from double-linebreak.
-                Node? thisClauseStarter = FirstSemanticElementChild(contentElement);
+                Node thisClauseStarter = FirstSemanticElementChild(contentElement);
 				if (!(thisClauseStarter != null
 					&& thisClauseStarter.Name.Equals(SqlStructureConstants.ENAME_OTHERKEYWORD)
 					&& state.GetRecentKeyword() != null
-					&& ((thisClauseStarter.TextValue!.ToUpperInvariant().Equals("SET")
-							&& state.GetRecentKeyword()!.Equals("SET")
+					&& ((thisClauseStarter.TextValue.ToUpperInvariant().Equals("SET")
+							&& state.GetRecentKeyword().Equals("SET")
 							)
-						|| (thisClauseStarter.TextValue!.ToUpperInvariant().Equals("DECLARE")
-							&& state.GetRecentKeyword()!.Equals("DECLARE")
+						|| (thisClauseStarter.TextValue.ToUpperInvariant().Equals("DECLARE")
+							&& state.GetRecentKeyword().Equals("DECLARE")
 							)
-						|| (thisClauseStarter.TextValue!.ToUpperInvariant().Equals("PRINT")
-							&& state.GetRecentKeyword()!.Equals("PRINT")
+						|| (thisClauseStarter.TextValue.ToUpperInvariant().Equals("PRINT")
+							&& state.GetRecentKeyword().Equals("PRINT")
 							)
 						)
 					))
@@ -1265,10 +1240,9 @@ namespace PoorMansTSqlFormatterLib.Formatters
             }
         }
 
-        private Node? FirstSemanticElementChild(Node startElement)
+        private Node FirstSemanticElementChild(Node contentElement)
         {
-            Node? target = null;
-            Node? contentElement = startElement;
+            Node target = null;
             while (contentElement != null)
             {
                 target = contentElement.ChildrenExcludingNames(SqlStructureConstants.ENAMELIST_NONCONTENT).FirstOrDefault();
@@ -1371,7 +1345,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
             public bool CurrentLineHasContent { get; private set; }
 
             public SpecialRegionType? SpecialRegionActive { get; set; }
-            public Node? RegionStartNode { get; set; }
+            public Node RegionStartNode { get; set; }
 
             private static Regex _startsWithBreakChecker = new Regex(@"^\s*(\r|\n)", RegexOptions.None);
             public bool StartsWithBreak
@@ -1388,7 +1362,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     AddOutputContent(content, null);
             }
 
-            public override void AddOutputContent(string content, string? htmlClassName)
+            public override void AddOutputContent(string content, string htmlClassName)
             {
                 if (CurrentLineHasContent && (content.Length + CurrentLineLength > MaxLineWidth))
                     WhiteSpace_BreakToNextLine();
@@ -1480,9 +1454,9 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     _mostRecentKeywordsAtEachLevel.Add(IndentLevel, ElementName.ToUpperInvariant());
             }
 
-            public string? GetRecentKeyword()
+            public string GetRecentKeyword()
             {
-                string? keywordFound = null;
+                string keywordFound = null;
                 int? keywordFoundAt = null;
                 foreach (int key in _mostRecentKeywordsAtEachLevel.Keys)
                 {

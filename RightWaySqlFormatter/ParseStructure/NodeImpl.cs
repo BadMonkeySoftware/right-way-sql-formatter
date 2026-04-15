@@ -48,7 +48,7 @@ namespace PoorMansTSqlFormatterLib.ParseStructure
         public void InsertChildBefore(Node newChild, Node existingChild)
         {
             SetParentOnChild(newChild);
-            var childList = Children as IList<Node>;
+            var childList = (IList<Node>)Children;
             childList.Insert(childList.IndexOf(existingChild), newChild);
         }
 

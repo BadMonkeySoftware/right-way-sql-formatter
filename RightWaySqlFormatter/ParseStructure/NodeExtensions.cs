@@ -181,7 +181,7 @@ namespace PoorMansTSqlFormatterLib.ParseStructure
                     }
                     else if (currentNode.Equals(previousNode.NextSibling()) && remainderPosition.Parent == null)
                     {
-                        Node copyOfThisNodesParent = NodeFactory.CreateNode(currentNode.Parent.Name, currentNode.Parent.TextValue);
+                        Node copyOfThisNodesParent = NodeFactory.CreateNode(currentNode.Parent!.Name, currentNode.Parent!.TextValue);
                         remainder = copyOfThisNodesParent;
                         remainder.AddChild(remainderPosition);
                         remainder.AddChild(copyOfThisNode);

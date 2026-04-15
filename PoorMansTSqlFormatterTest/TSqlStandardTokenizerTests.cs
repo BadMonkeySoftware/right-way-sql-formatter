@@ -57,8 +57,8 @@ namespace PoorMansTSqlFormatterTests
         private void TestMarkerPosition(string inputSQLNoLineBreaks, int inputPosition)
         {
             ITokenList tokenized = _tokenizer.TokenizeSQL(inputSQLNoLineBreaks, inputPosition);
-            Assert.That(tokenized.MarkerToken.Type, Is.EqualTo(SqlTokenType.OtherNode), "token type");
-            Assert.That(tokenized.MarkerToken.Value, Is.EqualTo("from"), "token value");
+            Assert.That(tokenized.MarkerToken!.Type, Is.EqualTo(SqlTokenType.OtherNode), "token type");
+            Assert.That(tokenized.MarkerToken!.Value, Is.EqualTo("from"), "token value");
             Assert.That(tokenized.MarkerPosition, Is.EqualTo(2));
         }
     }

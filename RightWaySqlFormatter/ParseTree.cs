@@ -46,7 +46,7 @@ namespace PoorMansTSqlFormatterLib
                 if (value == null)
                     throw new ArgumentNullException("CurrentContainer");
 
-                if (!value.RootContainer().Equals(this))
+                if (!value.RootContainer()!.Equals(this))
                     throw new Exception("Current Container node can only be set to an element in the current document.");
 
                 _currentContainer = value;
@@ -254,7 +254,7 @@ namespace PoorMansTSqlFormatterLib
                 )
             {
                 //we just ended the boolean clause of an if or while, and need to pop to the single-statement container.
-                return SaveNewElement(SqlStructureConstants.ENAME_CONTAINER_SINGLESTATEMENT, "", CurrentContainer.Parent);
+                return SaveNewElement(SqlStructureConstants.ENAME_CONTAINER_SINGLESTATEMENT, "", CurrentContainer.Parent!);
             }
             else if (PathNameMatches(0, SqlStructureConstants.ENAME_SQL_CLAUSE)
                 && PathNameMatches(1, SqlStructureConstants.ENAME_SQL_STATEMENT)
@@ -360,7 +360,7 @@ namespace PoorMansTSqlFormatterLib
             {
                 //complete current clause, start a new one in the same container
                 Node previousContainerElement = CurrentContainer;
-                CurrentContainer = SaveNewElement(SqlStructureConstants.ENAME_SQL_CLAUSE, "", CurrentContainer.Parent);
+                CurrentContainer = SaveNewElement(SqlStructureConstants.ENAME_SQL_CLAUSE, "", CurrentContainer.Parent!);
                 MigrateApplicableCommentsFromContainer(previousContainerElement);
             }
             else if (CurrentContainer.Name.Equals(SqlStructureConstants.ENAME_EXPRESSION_PARENS)
@@ -377,7 +377,7 @@ namespace PoorMansTSqlFormatterLib
         internal void EscapeAnySelectionTarget()
         {
             if (PathNameMatches(0, SqlStructureConstants.ENAME_SELECTIONTARGET))
-                CurrentContainer = CurrentContainer.Parent;
+                CurrentContainer = CurrentContainer.Parent!;
         }
 
         internal void EscapeJoinCondition()
@@ -394,7 +394,7 @@ namespace PoorMansTSqlFormatterLib
             return nextStatementContainer != null
                 && (nextStatementContainer.Name.Equals(SqlStructureConstants.ENAME_SQL_ROOT)
                     || (nextStatementContainer.Name.Equals(SqlStructureConstants.ENAME_CONTAINER_GENERALCONTENT)
-                        && nextStatementContainer.Parent.Name.Equals(SqlStructureConstants.ENAME_DDL_AS_BLOCK)
+                        && nextStatementContainer.Parent!.Name.Equals(SqlStructureConstants.ENAME_DDL_AS_BLOCK)
                         )
                     );
         }
@@ -404,8 +404,9 @@ namespace PoorMansTSqlFormatterLib
             return PathNameMatches(CurrentContainer, levelsUp, nameToMatch);
         }
 
-        internal bool PathNameMatches(Node targetNode, int levelsUp, string nameToMatch)
+        internal bool PathNameMatches(Node? targetNode, int levelsUp, string nameToMatch)
         {
+            if (targetNode == null) return false;
             Node? currentNode = targetNode;
             while (levelsUp > 0)
             {
@@ -422,7 +423,7 @@ namespace PoorMansTSqlFormatterLib
                     && !testElement.Name.Equals(SqlStructureConstants.ENAME_COMMENT_SINGLELINE)
                     && !testElement.Name.Equals(SqlStructureConstants.ENAME_COMMENT_SINGLELINE_CSTYLE)
                     && (!testElement.Name.Equals(SqlStructureConstants.ENAME_COMMENT_MULTILINE)
-                        || Regex.IsMatch(testElement.TextValue, @"(\r|\n)+")
+                        || Regex.IsMatch(testElement.TextValue!, @"(\r|\n)+")
                         )
                     )
                     return true;
@@ -435,12 +436,12 @@ namespace PoorMansTSqlFormatterLib
             return containerNode.ChildrenExcludingNames(SqlStructureConstants.ENAMELIST_NONCONTENT).Any();
         }
 
-		internal Node GetFirstNonWhitespaceNonCommentChildElement(Node targetElement)
+		internal Node? GetFirstNonWhitespaceNonCommentChildElement(Node targetElement)
 		{
             return targetElement.ChildrenExcludingNames(SqlStructureConstants.ENAMELIST_NONCONTENT).FirstOrDefault();
 		}
 
-		internal Node GetLastNonWhitespaceNonCommentChildElement(Node targetElement)
+		internal Node? GetLastNonWhitespaceNonCommentChildElement(Node targetElement)
 		{
             return targetElement.ChildrenExcludingNames(SqlStructureConstants.ENAMELIST_NONCONTENT).LastOrDefault();
 		}

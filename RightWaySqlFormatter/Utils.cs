@@ -39,7 +39,7 @@ namespace PoorMansTSqlFormatterLib
             if (raw == null)
                 return null;
 
-            StringBuilder outBuilder = null;
+            StringBuilder? outBuilder = null;
             int latestCheckPos = 0;
             int latestReplacementPos = 0;
 

@@ -45,13 +45,13 @@ namespace PoorMansTSqlFormatterLib.Parsers
          */
 
         //yay for static constructors!
-        public static Dictionary<string, KeywordType> KeywordList { get; set; }
+        public static Dictionary<string, KeywordType> KeywordList { get; set; } = null!;
         static TSqlStandardParser()
         {
             InitializeKeywordList();
             //temporary, to convince VisualStudio to copy the LinqBridge DLL, otherwise ILMerge fails because of the missing file.
             // - maybe instead I should remove LinqBridge, as I'm not using it at the moment...
-            KeywordList.Take(3);
+            KeywordList!.Take(3);
         }
 
         static Regex _JoinDetector = new Regex("^((RIGHT|INNER|LEFT|CROSS|FULL) )?(OUTER )?((HASH|LOOP|MERGE|REMOTE) )?(JOIN|APPLY) ");
@@ -77,8 +77,8 @@ namespace PoorMansTSqlFormatterLib.Parsers
                 switch (token.Type)
                 {
                     case SqlTokenType.OpenParens:
-						Node firstNonCommentParensSibling = sqlTree.GetFirstNonWhitespaceNonCommentChildElement(sqlTree.CurrentContainer);
-						Node lastNonCommentParensSibling = sqlTree.GetLastNonWhitespaceNonCommentChildElement(sqlTree.CurrentContainer);
+						Node? firstNonCommentParensSibling = sqlTree.GetFirstNonWhitespaceNonCommentChildElement(sqlTree.CurrentContainer);
+						Node? lastNonCommentParensSibling = sqlTree.GetLastNonWhitespaceNonCommentChildElement(sqlTree.CurrentContainer);
 						bool isInsertOrValuesClause = (
                             firstNonCommentParensSibling != null
                             && (
@@ -87,7 +87,7 @@ namespace PoorMansTSqlFormatterLib.Parsers
                                    )
                                 || 
                                 (firstNonCommentParensSibling.Name.Equals(SqlStructureConstants.ENAME_COMPOUNDKEYWORD)
-                                   && firstNonCommentParensSibling.GetAttributeValue(SqlStructureConstants.ANAME_SIMPLETEXT).ToUpperInvariant().StartsWith("INSERT ")
+                                   && firstNonCommentParensSibling.GetAttributeValue(SqlStructureConstants.ANAME_SIMPLETEXT)!.ToUpperInvariant().StartsWith("INSERT ")
                                    )
                                 ||
                                 (firstNonCommentParensSibling.Name.Equals(SqlStructureConstants.ENAME_OTHERKEYWORD)
@@ -159,8 +159,8 @@ namespace PoorMansTSqlFormatterLib.Parsers
                         }
                         else if (sqlTree.CurrentContainer.Name.Equals(SqlStructureConstants.ENAME_SQL_CLAUSE)
                                 && sqlTree.CurrentContainer.Parent!.Name.Equals(SqlStructureConstants.ENAME_SELECTIONTARGET_PARENS)
-                                && sqlTree.CurrentContainer!.Parent!.Parent.Name.Equals(SqlStructureConstants.ENAME_CONTAINER_GENERALCONTENT)
-                                && sqlTree.CurrentContainer!.Parent!.Parent.Parent.Name.Equals(SqlStructureConstants.ENAME_CTE_AS_BLOCK)
+                                && sqlTree.CurrentContainer!.Parent!.Parent!.Name.Equals(SqlStructureConstants.ENAME_CONTAINER_GENERALCONTENT)
+                                && sqlTree.CurrentContainer!.Parent!.Parent!.Parent!.Name.Equals(SqlStructureConstants.ENAME_CTE_AS_BLOCK)
                                 )
                         {
                             sqlTree.MoveToAncestorContainer(4, SqlStructureConstants.ENAME_CTE_WITH_CLAUSE);
@@ -591,10 +591,10 @@ namespace PoorMansTSqlFormatterLib.Parsers
                                 )
                             {
                                 //clause.statement.multicontainer.try
-                                Node tryBlock = sqlTree.CurrentContainer!.Parent!.Parent.Parent;
-                                Node tryContainerClose = sqlTree.SaveNewElement(SqlStructureConstants.ENAME_CONTAINER_CLOSE, "", tryBlock);
+                                Node? tryBlock = sqlTree.CurrentContainer!.Parent!.Parent!.Parent;
+                                Node tryContainerClose = sqlTree.SaveNewElement(SqlStructureConstants.ENAME_CONTAINER_CLOSE, "", tryBlock!);
                                 ProcessCompoundKeyword(tokenList, sqlTree, tryContainerClose, ref tokenID, significantTokenPositions, 2);
-                                sqlTree.CurrentContainer = tryBlock.Parent;
+                                sqlTree.CurrentContainer = tryBlock!.Parent!;
                             }
                             else
                             {
@@ -612,10 +612,10 @@ namespace PoorMansTSqlFormatterLib.Parsers
                                 )
                             {
                                 //clause.statement.multicontainer.catch
-                                Node catchBlock = sqlTree.CurrentContainer!.Parent!.Parent.Parent;
-                                Node catchContainerClose = sqlTree.SaveNewElement(SqlStructureConstants.ENAME_CONTAINER_CLOSE, "", catchBlock);
+                                Node? catchBlock = sqlTree.CurrentContainer!.Parent!.Parent!.Parent;
+                                Node catchContainerClose = sqlTree.SaveNewElement(SqlStructureConstants.ENAME_CONTAINER_CLOSE, "", catchBlock!);
                                 ProcessCompoundKeyword(tokenList, sqlTree, catchContainerClose, ref tokenID, significantTokenPositions, 2);
-                                sqlTree.CurrentContainer = catchBlock.Parent;
+                                sqlTree.CurrentContainer = catchBlock!.Parent!;
                             }
                             else
                             {
@@ -651,10 +651,10 @@ namespace PoorMansTSqlFormatterLib.Parsers
                                     && sqlTree.PathNameMatches(3, SqlStructureConstants.ENAME_BEGIN_END_BLOCK)
                                     )
                                 {
-                                    Node beginBlock = sqlTree.CurrentContainer!.Parent!.Parent.Parent;
-                                    Node beginContainerClose = sqlTree.SaveNewElement(SqlStructureConstants.ENAME_CONTAINER_CLOSE, "", beginBlock);
+                                    Node? beginBlock = sqlTree.CurrentContainer!.Parent!.Parent!.Parent;
+                                    Node beginContainerClose = sqlTree.SaveNewElement(SqlStructureConstants.ENAME_CONTAINER_CLOSE, "", beginBlock!);
                                     sqlTree.SaveNewElement(SqlStructureConstants.ENAME_OTHERKEYWORD, token.Value, beginContainerClose);
-                                    sqlTree.CurrentContainer = beginBlock.Parent;
+                                    sqlTree.CurrentContainer = beginBlock!.Parent!;
                                 }
                                 else
                                 {
@@ -673,10 +673,10 @@ namespace PoorMansTSqlFormatterLib.Parsers
                                 // we found a batch separator - were we supposed to?
                                 if (sqlTree.FindValidBatchEnd())
                                 {
-                                    Node sqlRoot = sqlTree.RootContainer();
-                                    Node batchSeparator = sqlTree.SaveNewElement(SqlStructureConstants.ENAME_BATCH_SEPARATOR, "", sqlRoot);
+                                    Node? sqlRoot = sqlTree.RootContainer();
+                                    Node batchSeparator = sqlTree.SaveNewElement(SqlStructureConstants.ENAME_BATCH_SEPARATOR, "", sqlRoot!);
                                     sqlTree.SaveNewElement(SqlStructureConstants.ENAME_OTHERKEYWORD, token.Value, batchSeparator);
-                                    sqlTree.StartNewStatement(sqlRoot);
+                                    sqlTree.StartNewStatement(sqlRoot!);
                                 }
                                 else
                                 {
@@ -791,14 +791,14 @@ namespace PoorMansTSqlFormatterLib.Parsers
                                 {
                                     //we need to pop up the single-statement containers stack to the next "if" that doesn't have an "else" (if any; else error).
                                     // LOCAL SEARCH - we're not actually changing the "CurrentContainer" until we decide to start a statement.
-                                    Node currentNode = sqlTree.CurrentContainer.Parent!.Parent;
+                                    Node? currentNode = sqlTree.CurrentContainer.Parent!.Parent;
                                     bool stopSearching = false;
                                     while (!stopSearching)
                                     {
                                         if (sqlTree.PathNameMatches(currentNode, 1, SqlStructureConstants.ENAME_IF_STATEMENT))
                                         {
                                             //if this is in an "If", then the "Else" must still be available - yay!
-                                            sqlTree.CurrentContainer = currentNode.Parent;
+                                            sqlTree.CurrentContainer = currentNode!.Parent!;
                                             sqlTree.StartNewContainer(SqlStructureConstants.ENAME_ELSE_CLAUSE, token.Value, SqlStructureConstants.ENAME_CONTAINER_SINGLESTATEMENT);
                                             sqlTree.StartNewStatement();
                                             stopSearching = true;
@@ -807,13 +807,13 @@ namespace PoorMansTSqlFormatterLib.Parsers
                                         {
                                             //If this is in an "Else", we should skip its parent "IF" altogether, and go to the next singlestatementcontainer candidate.
                                             //singlestatementcontainer.else.if.clause.statement.NEWCANDIDATE
-                                            currentNode = currentNode.Parent!.Parent!.Parent!.Parent!.Parent;
+                                            currentNode = currentNode!.Parent!.Parent!.Parent!.Parent!.Parent;
                                         }
                                         else if (sqlTree.PathNameMatches(currentNode, 1, SqlStructureConstants.ENAME_WHILE_LOOP))
                                         {
                                             //If this is in a "While", we should skip to the next singlestatementcontainer candidate.
                                             //singlestatementcontainer.while.clause.statement.NEWCANDIDATE
-                                            currentNode = currentNode.Parent!.Parent!.Parent!.Parent;
+                                            currentNode = currentNode!.Parent!.Parent!.Parent!.Parent;
                                         }
                                         else
                                         {
@@ -893,7 +893,7 @@ namespace PoorMansTSqlFormatterLib.Parsers
 
                             if (sqlTree.PathNameMatches(0, SqlStructureConstants.ENAME_SQL_CLAUSE))
                             {
-                                Node firstStatementClause = sqlTree.GetFirstNonWhitespaceNonCommentChildElement(sqlTree.CurrentContainer.Parent);
+                                Node? firstStatementClause = sqlTree.GetFirstNonWhitespaceNonCommentChildElement(sqlTree.CurrentContainer.Parent!);
 
                                 bool isPrecededByInsertStatement = false;
                                 foreach (Node clause in sqlTree.CurrentContainer.Parent!.ChildrenByName(SqlStructureConstants.ENAME_SQL_CLAUSE))
@@ -925,7 +925,7 @@ namespace PoorMansTSqlFormatterLib.Parsers
                                         selectShouldntTryToStartNewStatement = true;
                                 }
 
-                                Node firstEntryOfThisClause = sqlTree.GetFirstNonWhitespaceNonCommentChildElement(sqlTree.CurrentContainer);
+                                Node? firstEntryOfThisClause = sqlTree.GetFirstNonWhitespaceNonCommentChildElement(sqlTree.CurrentContainer);
                                 if (firstEntryOfThisClause != null && firstEntryOfThisClause.Name.Equals(SqlStructureConstants.ENAME_SET_OPERATOR_CLAUSE))
                                     selectShouldntTryToStartNewStatement = true;
                             }
@@ -997,7 +997,7 @@ namespace PoorMansTSqlFormatterLib.Parsers
                         }
                         else if (significantTokensString.StartsWith("SET "))
                         {
-                            Node firstNonCommentSibling2 = sqlTree.GetFirstNonWhitespaceNonCommentChildElement(sqlTree.CurrentContainer);
+                            Node? firstNonCommentSibling2 = sqlTree.GetFirstNonWhitespaceNonCommentChildElement(sqlTree.CurrentContainer);
                             if (!(
                                     firstNonCommentSibling2 != null
                                     && firstNonCommentSibling2.Name.Equals(SqlStructureConstants.ENAME_OTHERKEYWORD)
@@ -1218,9 +1218,9 @@ namespace PoorMansTSqlFormatterLib.Parsers
         }
 
         //TODO: move into parse tree
-        private static bool ContentStartsWithKeyword(Node providedContainer, string contentToMatch)
+        private static bool ContentStartsWithKeyword(Node providedContainer, string? contentToMatch)
         {
-            Node firstEntryOfProvidedContainer = ((ParseTree)providedContainer.RootContainer()).GetFirstNonWhitespaceNonCommentChildElement(providedContainer);
+            Node? firstEntryOfProvidedContainer = ((ParseTree)providedContainer.RootContainer()!).GetFirstNonWhitespaceNonCommentChildElement(providedContainer);
             bool targetFound = false;
             string? keywordUpperValue = null;
 
@@ -1535,7 +1535,7 @@ namespace PoorMansTSqlFormatterLib.Parsers
                 else
                     uppercaseText = latestContentNode.TextValue!.ToUpperInvariant();
 
-                return (
+                return uppercaseText != null && (
                     uppercaseText.Equals("NVARCHAR")
                     || uppercaseText.Equals("VARCHAR")
                     || uppercaseText.Equals("DECIMAL")

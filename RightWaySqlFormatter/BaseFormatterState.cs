@@ -39,7 +39,7 @@ namespace PoorMansTSqlFormatterLib
             AddOutputContent(content, null);
         }
 
-        public virtual void AddOutputContent(string content, string htmlClassName)
+        public virtual void AddOutputContent(string content, string? htmlClassName)
         {
             if (HtmlOutput)
             {

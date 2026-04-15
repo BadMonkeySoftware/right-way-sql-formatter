@@ -49,14 +49,13 @@ namespace PoorMansTSqlFormatterTests
 
         private TSqlStandardFormatter GetFormatter(string configString)
         {
-            TSqlStandardFormatter outFormatter;
-            if (!_formatters.TryGetValue(configString, out outFormatter))
+            if (!_formatters.TryGetValue(configString, out TSqlStandardFormatter? outFormatter))
             {
                 var options = new TSqlStandardFormatterOptions(configString);
                 outFormatter = new TSqlStandardFormatter(options);
                 _formatters.Add(configString, outFormatter);
             }
-            return outFormatter;
+            return outFormatter!;
         }
 
         [Test, TestCaseSource(typeof(Utils), "GetInputSqlFileNames")]
