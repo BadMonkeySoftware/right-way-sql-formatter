@@ -225,8 +225,11 @@ function buildArgs(): string[] {
         }
     };
 
-    str('indentString',            'indent-string',              '    ');
-    num('spacesPerTab',            'spaces-per-tab',             4);
+    // Indent string: build literal value from enum + size
+    const indentType = cfg.get<string>('indentString', 'space');
+    const indentSize = cfg.get<number>('indentSize', 4);
+    const indentStr = indentType === 'tab' ? '\t' : ' '.repeat(indentSize);
+    args.push(`--indent-string=${indentStr}`);
     num('maxLineWidth',            'max-line-width',             999);
     num('newStatementLineBreaks',  'statement-breaks',           2);
     num('newClauseLineBreaks',     'clause-breaks',              1);

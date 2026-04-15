@@ -65,13 +65,14 @@
         },
         "rightWaySqlFormatter.indentString": {
           "type": "string",
-          "default": "    ",
-          "description": "String to use for each level of indentation. Use \\s for a space and \\t for a tab. Examples: \\s\\s\\s\\s (4 spaces, default), \\t (single tab), \\s\\s (2 spaces)."
+          "enum": ["space", "tab"],
+          "default": "space",
+          "description": "Indent character to use. 'space' uses spaces (count set by indentSize), 'tab' uses a literal tab character."
         },
-        "rightWaySqlFormatter.spacesPerTab": {
+        "rightWaySqlFormatter.indentSize": {
           "type": "number",
           "default": 4,
-          "description": "Number of spaces per tab (used when indent string is a tab)."
+          "description": "Number of spaces per indent level when indentString is 'space', or tab display width when indentString is 'tab'."
         },
         "rightWaySqlFormatter.maxLineWidth": {
           "type": "number",
