@@ -1,0 +1,4 @@
+-- Test for AlignColumnDefinitions combined with ColumnAliasStyle=EqualSign
+SELECT c.CustomerID AS ID, c.Name AS CustomerName, c.IsActive AS ActiveFlag
+FROM Customers c
+WHERE c.IsActive = 1
