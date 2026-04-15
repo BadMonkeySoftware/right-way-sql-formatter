@@ -1,0 +1,60 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      // -----------------------------------------------------------------------
+      // PRIMARY: Launch Extension Development Host
+      // -----------------------------------------------------------------------
+      // Press F5 with this selected to open a new VS Code window with the
+      // extension loaded. You can then open any .sql file and test formatting.
+      //
+      // Prerequisites:
+      //   - Run "npm run build" at least once to populate out/ and bin/
+      //   - Or use the "build" task (Ctrl+Shift+B) before launching
+      // -----------------------------------------------------------------------
+      "name": "Run Extension",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}"
+      ],
+      "outFiles": [
+        "${workspaceFolder}/out/**/*.js"
+      ],
+      "preLaunchTask": "compile:ts",
+      "sourceMaps": true
+    },
+    {
+      // -----------------------------------------------------------------------
+      // ATTACH: Attach debugger to a running Extension Development Host
+      // -----------------------------------------------------------------------
+      // Use this if you already have a Dev Host window open and want to
+      // attach without relaunching. Useful when iterating quickly.
+      // -----------------------------------------------------------------------
+      "name": "Attach to Extension",
+      "type": "extensionHost",
+      "request": "attach",
+      "port": 9229
+    },
+    {
+      // -----------------------------------------------------------------------
+      // DEBUG: Launch Extension + pause on first line (for startup debugging)
+      // -----------------------------------------------------------------------
+      // Same as "Run Extension" but stops at the first line of activate().
+      // Helpful when debugging extension initialization issues.
+      // -----------------------------------------------------------------------
+      "name": "Run Extension (debug activate)",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}"
+      ],
+      "outFiles": [
+        "${workspaceFolder}/out/**/*.js"
+      ],
+      "preLaunchTask": "compile:ts",
+      "sourceMaps": true,
+      "stopOnEntry": true
+    }
+  ]
+}

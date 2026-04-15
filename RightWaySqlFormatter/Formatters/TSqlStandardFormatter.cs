@@ -194,13 +194,16 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 case SqlStructureConstants.ENAME_CONTAINER_CLOSE:
                 case SqlStructureConstants.ENAME_WHILE_LOOP:
                 case SqlStructureConstants.ENAME_IF_STATEMENT:
-                case SqlStructureConstants.ENAME_SELECTIONTARGET:
                 case SqlStructureConstants.ENAME_CONTAINER_GENERALCONTENT:
                 case SqlStructureConstants.ENAME_CTE_WITH_CLAUSE:
                 case SqlStructureConstants.ENAME_PERMISSIONS_BLOCK:
                 case SqlStructureConstants.ENAME_PERMISSIONS_DETAIL:
                 case SqlStructureConstants.ENAME_MERGE_CLAUSE:
                 case SqlStructureConstants.ENAME_MERGE_TARGET:
+                    ProcessSqlNodeList(contentElement.Children, state);
+                    break;
+
+                case SqlStructureConstants.ENAME_SELECTIONTARGET:
                     ProcessSqlNodeList(contentElement.Children, state);
                     break;
 
@@ -627,6 +630,12 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     state.SetRecentKeyword(contentElement.TextValue);
                     state.AddOutputContent(FormatKeyword(contentElement.TextValue), SqlHtmlConstants.CLASS_KEYWORD);
                     state.WordSeparatorExpected = true;
+                    // When SelectFirstColumnOnNewLine is on and this is a SELECT keyword,
+                    // request a line break so the first column lands on a new line.
+                    if (Options.SelectFirstColumnOnNewLine
+                        && Options.ExpandCommaLists
+                        && contentElement.TextValue.ToUpperInvariant() == "SELECT")
+                        state.BreakExpected = true;
                     break;
 
                 case SqlStructureConstants.ENAME_PSEUDONAME:

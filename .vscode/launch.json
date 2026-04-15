@@ -1,0 +1,54 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      // -----------------------------------------------------------------------
+      // Run the CLI formatter (debug build) — useful for testing formatting
+      // output directly without going through the VS Code extension.
+      //
+      // The "args" array is passed to SqlFormatter. Edit to test different SQL.
+      // -----------------------------------------------------------------------
+      "name": "SqlFormatter CLI (debug)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "dotnet: build",
+      "program": "${workspaceFolder}/PoorMansTSqlFormatterCmdLine/bin/Debug/net10.0/SqlFormatter",
+      "args": [],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "stopAtEntry": false
+    },
+    {
+      // -----------------------------------------------------------------------
+      // Run the test suite with the debugger attached.
+      // Set breakpoints in test files or library code and press F5.
+      // -----------------------------------------------------------------------
+      "name": "Run Tests (debug)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "dotnet: build",
+      "program": "${workspaceFolder}/PoorMansTSqlFormatterTest/bin/Debug/net10.0/RightWaySqlFormatterTests",
+      "args": [],
+      "cwd": "${workspaceFolder}/PoorMansTSqlFormatterTest",
+      "console": "integratedTerminal",
+      "stopAtEntry": false
+    },
+    {
+      // -----------------------------------------------------------------------
+      // Launch the VS Code Extension Development Host from the repo root.
+      // Requires the extension to have been built first:
+      //   cd vscode-extension && npm run build
+      // -----------------------------------------------------------------------
+      "name": "Run VS Code Extension",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/vscode-extension"
+      ],
+      "outFiles": [
+        "${workspaceFolder}/vscode-extension/out/**/*.js"
+      ],
+      "sourceMaps": true
+    }
+  ]
+}

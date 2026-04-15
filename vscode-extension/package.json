@@ -93,6 +93,11 @@
           "default": true,
           "description": "Expand comma-separated lists onto separate lines."
         },
+        "rightWaySqlFormatter.selectFirstColumnOnNewLine": {
+          "type": "boolean",
+          "default": false,
+          "description": "When expanding comma lists, break the first SELECT column to a new line instead of keeping it inline with the SELECT keyword."
+        },
         "rightWaySqlFormatter.expandInLists": {
           "type": "boolean",
           "default": true,

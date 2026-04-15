@@ -41,6 +41,9 @@ expandCase.AddAlias("-ecs");
 var expandCommaLists = new Option<bool>("--expand-comma-lists", () => true, "Expand comma lists");
 expandCommaLists.AddAlias("-ecl");
 
+var selectFirstColumnOnNewLine = new Option<bool>("--select-first-column-newline", () => false, "Break first SELECT column to new line (requires --expand-comma-lists)");
+selectFirstColumnOnNewLine.AddAlias("-sfcn");
+
 var expandInLists = new Option<bool>("--expand-in-lists", () => true, "Expand IN lists");
 expandInLists.AddAlias("-eil");
 
@@ -65,7 +68,7 @@ var rootCommand = new RootCommand("Right Way SQL Formatter - formats T-SQL files
 {
     indentString, spacesPerTab, maxLineWidth, statementBreaks, clauseBreaks,
     trailingCommas, spaceAfterExpandedComma, expandBetween, expandBoolean,
-    expandCase, expandCommaLists, expandInLists, breakJoin,
+    expandCase, expandCommaLists, selectFirstColumnOnNewLine, expandInLists, breakJoin,
     uppercaseKeywords, standardizeKeywords, allowParsingErrors,
     outputFile, inputFile
 };
@@ -85,6 +88,7 @@ rootCommand.SetHandler(async (context) =>
         ExpandBooleanExpressions = context.ParseResult.GetValueForOption(expandBoolean),
         ExpandCaseStatements = context.ParseResult.GetValueForOption(expandCase),
         ExpandCommaLists = context.ParseResult.GetValueForOption(expandCommaLists),
+        SelectFirstColumnOnNewLine = context.ParseResult.GetValueForOption(selectFirstColumnOnNewLine),
         ExpandInLists = context.ParseResult.GetValueForOption(expandInLists),
         BreakJoinOnSections = context.ParseResult.GetValueForOption(breakJoin),
         UppercaseKeywords = context.ParseResult.GetValueForOption(uppercaseKeywords),

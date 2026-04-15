@@ -233,6 +233,7 @@ function buildArgs(): string[] {
     bool('uppercaseKeywords',      'uppercase-keywords',         true);
     bool('standardizeKeywords',    'standardize-keywords',       true);
     bool('expandCommaLists',       'expand-comma-lists',         true);
+    bool('selectFirstColumnOnNewLine', 'select-first-column-newline', false);
     bool('expandInLists',          'expand-in-lists',            true);
     bool('trailingCommas',         'trailing-commas',            false);
     bool('expandBooleanExpressions','expand-boolean',            true);

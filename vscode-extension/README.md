@@ -35,8 +35,12 @@ That's it. `npm run build` will:
 
 ### 2. Install the extension (dev mode)
 
-Open the `vscode-extension/` folder in VS Code and press `F5` to launch an Extension Development Host.
-Or open the repo root and use the Remote SSH workflow from the Mac Mini.
+Open the **`vscode-extension/` folder** in VS Code (not the repo root — the folder itself).
+
+Then press `F5`. VS Code will launch an Extension Development Host window with the extension loaded.
+Open any `.sql` file in that window and right-click to format.
+
+> Tip: You need to open the `vscode-extension/` folder directly. If you open the repo root, `F5` won't find the extension manifest.
 
 ### 3. Package for install
 

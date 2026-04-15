@@ -47,6 +47,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
 			ExpandInLists = true;
 			NewClauseLineBreaks = 1;
 			NewStatementLineBreaks = 2;
+            SelectFirstColumnOnNewLine = false;
 		}
 
         //Doesn't particularly need to be lazy-loaded, and doesn't need to be threadsafe.
@@ -80,8 +81,9 @@ namespace PoorMansTSqlFormatterLib.Formatters
 				else if (key == "HTMLColoring") HTMLColoring = Convert.ToBoolean(value);
 				else if (key == "KeywordStandardization") KeywordStandardization = Convert.ToBoolean(value);
 				else if (key == "ExpandInLists") ExpandInLists = Convert.ToBoolean(value);
-				else if (key == "NewClauseLineBreaks") NewClauseLineBreaks = Convert.ToInt32(value);
+			else if (key == "NewClauseLineBreaks") NewClauseLineBreaks = Convert.ToInt32(value);
 				else if (key == "NewStatementLineBreaks") NewStatementLineBreaks = Convert.ToInt32(value);
+				else if (key == "SelectFirstColumnOnNewLine") SelectFirstColumnOnNewLine = Convert.ToBoolean(value);
 				else throw new ArgumentException("Unknown option: " + key);
             }
 
@@ -110,7 +112,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
 			if (ExpandInLists != _defaultOptions.ExpandInLists) overrides.Add("ExpandInLists", ExpandInLists.ToString());
 			if (NewClauseLineBreaks != _defaultOptions.NewClauseLineBreaks) overrides.Add("NewClauseLineBreaks", NewClauseLineBreaks.ToString());
 			if (NewStatementLineBreaks != _defaultOptions.NewStatementLineBreaks) overrides.Add("NewStatementLineBreaks", NewStatementLineBreaks.ToString());
-			NewStatementLineBreaks = 2;
+			if (SelectFirstColumnOnNewLine != _defaultOptions.SelectFirstColumnOnNewLine) overrides.Add("SelectFirstColumnOnNewLine", SelectFirstColumnOnNewLine.ToString());
     
             if (overrides.Count == 0) return string.Empty;
             return string.Join(",", overrides.Select((kvp) => kvp.Key + "=" + kvp.Value).ToArray());
@@ -145,6 +147,13 @@ namespace PoorMansTSqlFormatterLib.Formatters
 		public bool ExpandInLists { get; set; }
 		public int NewClauseLineBreaks { get; set; }
 		public int NewStatementLineBreaks { get; set; }
+
+        /// <summary>
+        /// When true and ExpandCommaLists is also true, the first column in a SELECT
+        /// list breaks to a new line instead of staying inline with the SELECT keyword.
+        /// e.g.: SELECT\n\tcol1\n\t,col2  instead of  SELECT col1\n\t,col2
+        /// </summary>
+        public bool SelectFirstColumnOnNewLine { get; set; }
 
     }
 }

@@ -1,0 +1,46 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      // Full build: publishes self-contained SqlFormatter binary + compiles TypeScript.
+      // Run this before pressing F5 for the first time, or after any .NET changes.
+      "label": "build",
+      "type": "npm",
+      "script": "build",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": ["$tsc"],
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared"
+      }
+    },
+    {
+      // TypeScript-only compile — fast, skips the .NET publish step.
+      // Use this when you've only changed extension.ts and the CLI hasn't changed.
+      "label": "compile:ts",
+      "type": "npm",
+      "script": "compile",
+      "problemMatcher": ["$tsc"],
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared"
+      }
+    },
+    {
+      // Watch mode: recompiles TypeScript automatically on save.
+      // Useful during active extension development.
+      "label": "watch",
+      "type": "npm",
+      "script": "watch",
+      "isBackground": true,
+      "problemMatcher": ["$tsc-watch"],
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared"
+      }
+    }
+  ]
+}
