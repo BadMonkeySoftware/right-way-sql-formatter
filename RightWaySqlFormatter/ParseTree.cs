@@ -34,7 +34,7 @@ namespace PoorMansTSqlFormatterLib
             CurrentContainer = this;
         }
 
-        private Node _currentContainer;
+        private Node _currentContainer = null!;
         internal Node CurrentContainer
         {
             get
@@ -112,7 +112,7 @@ namespace PoorMansTSqlFormatterLib
         internal Node SaveNewElementAsPriorSibling(string newElementName, string newElementValue, Node nodeToSaveBefore)
         {
             Node newElement = NodeFactory.CreateNode(newElementName, newElementValue);
-            nodeToSaveBefore.Parent.InsertChildBefore(newElement, nodeToSaveBefore);
+            nodeToSaveBefore.Parent!.InsertChildBefore(newElement, nodeToSaveBefore);
             return newElement;
         }
 
@@ -209,18 +209,18 @@ namespace PoorMansTSqlFormatterLib
                         && PathNameMatches(2, SqlStructureConstants.ENAME_CONTAINER_SINGLESTATEMENT)
                         )
                     {
-                        Node currentSingleContainer = CurrentContainer.Parent.Parent;
+                        Node currentSingleContainer = CurrentContainer.Parent!.Parent!;
                         if (PathNameMatches(currentSingleContainer, 1, SqlStructureConstants.ENAME_ELSE_CLAUSE))
                         {
                             //we just ended the one and only statement in an else clause, and need to pop out to the same level as its parent if
                             // singleContainer.else.if.CANDIDATE
-                            CurrentContainer = currentSingleContainer.Parent.Parent.Parent;
+                            CurrentContainer = currentSingleContainer.Parent!.Parent!.Parent!;
                         }
                         else
                         {
                             //we just ended the one statement of an if or while, and need to pop out the same level as that if or while
                             // singleContainer.(if or while).CANDIDATE
-                            CurrentContainer = currentSingleContainer.Parent.Parent;
+                            CurrentContainer = currentSingleContainer.Parent!.Parent!;
                         }
                     }
                     else
@@ -243,7 +243,7 @@ namespace PoorMansTSqlFormatterLib
                 MoveToAncestorContainer(5);
         }
 
-        private Node EscapeAndLocateNextStatementContainer(bool escapeEmptyContainer)
+        private Node? EscapeAndLocateNextStatementContainer(bool escapeEmptyContainer)
         {
             EscapeAnySingleOrPartialStatementContainers();
 
@@ -260,7 +260,7 @@ namespace PoorMansTSqlFormatterLib
                 && PathNameMatches(1, SqlStructureConstants.ENAME_SQL_STATEMENT)
                 && (escapeEmptyContainer || HasNonWhiteSpaceNonSingleCommentContent(CurrentContainer))
                 )
-                return CurrentContainer.Parent.Parent;
+                return CurrentContainer.Parent!.Parent;
             else
                 return null;
         }
@@ -268,7 +268,7 @@ namespace PoorMansTSqlFormatterLib
         private void MigrateApplicableCommentsFromContainer(Node previousContainerElement)
         {
             Node migrationContext = previousContainerElement;
-            Node migrationCandidate = previousContainerElement.Children.Last();
+            Node? migrationCandidate = previousContainerElement.Children.Last();
 
             //keep track of where we're going to be prepending - this will change as we go moving stuff.
             Node insertBeforeNode = CurrentContainer;
@@ -282,23 +282,23 @@ namespace PoorMansTSqlFormatterLib
                 }
                 else if (migrationCandidate.PreviousSibling() != null
                     && SqlStructureConstants.ENAMELIST_COMMENT.Contains(migrationCandidate.Name)
-                    && SqlStructureConstants.ENAMELIST_NONCONTENT.Contains(migrationCandidate.PreviousSibling().Name)
+                    && SqlStructureConstants.ENAMELIST_NONCONTENT.Contains(migrationCandidate.PreviousSibling()!.Name)
                     )
                 {
-                    if (migrationCandidate.PreviousSibling().Name.Equals(SqlStructureConstants.ENAME_WHITESPACE)
-                        && Regex.IsMatch(migrationCandidate.PreviousSibling().TextValue, @"(\r|\n)+")
+                    if (migrationCandidate.PreviousSibling()!.Name.Equals(SqlStructureConstants.ENAME_WHITESPACE)
+                        && Regex.IsMatch(migrationCandidate.PreviousSibling()!.TextValue!, @"(\r|\n)+")
                         )
                     {
                         //we have a match, so migrate everything considered so far (backwards from the end). need to keep track of where we're inserting.
                         while (!migrationContext.Children.Last().Equals(migrationCandidate))
                         {
                             Node movingNode = migrationContext.Children.Last();
-                            movingNode.Parent.RemoveChild(movingNode);
-                            CurrentContainer.Parent.InsertChildBefore(movingNode, insertBeforeNode);
+                            movingNode.Parent!.RemoveChild(movingNode);
+                            CurrentContainer.Parent!.InsertChildBefore(movingNode, insertBeforeNode);
                             insertBeforeNode = movingNode;
                         }
-                        migrationCandidate.Parent.RemoveChild(migrationCandidate);
-                        CurrentContainer.Parent.InsertChildBefore(migrationCandidate, insertBeforeNode);
+                        migrationCandidate.Parent!.RemoveChild(migrationCandidate);
+                        CurrentContainer.Parent!.InsertChildBefore(migrationCandidate, insertBeforeNode);
                         insertBeforeNode = migrationCandidate;
 
                         //move on to the next candidate element for consideration.
@@ -334,7 +334,7 @@ namespace PoorMansTSqlFormatterLib
             Node previousContainerElement = CurrentContainer;
 
             //context might change AND suitable ancestor selected
-            Node nextStatementContainer = EscapeAndLocateNextStatementContainer(false);
+            Node? nextStatementContainer = EscapeAndLocateNextStatementContainer(false);
 
             //if suitable ancestor found, start statement and migrate in-between comments to the new statement
             if (nextStatementContainer != null)
@@ -390,7 +390,7 @@ namespace PoorMansTSqlFormatterLib
 
         internal bool FindValidBatchEnd()
         {
-            Node nextStatementContainer = EscapeAndLocateNextStatementContainer(true);
+            Node? nextStatementContainer = EscapeAndLocateNextStatementContainer(true);
             return nextStatementContainer != null
                 && (nextStatementContainer.Name.Equals(SqlStructureConstants.ENAME_SQL_ROOT)
                     || (nextStatementContainer.Name.Equals(SqlStructureConstants.ENAME_CONTAINER_GENERALCONTENT)
@@ -406,10 +406,10 @@ namespace PoorMansTSqlFormatterLib
 
         internal bool PathNameMatches(Node targetNode, int levelsUp, string nameToMatch)
         {
-            Node currentNode = targetNode;
+            Node? currentNode = targetNode;
             while (levelsUp > 0)
             {
-                currentNode = currentNode.Parent;
+                currentNode = currentNode?.Parent;
                 levelsUp--;
             }
             return currentNode != null && currentNode.Name.Equals(nameToMatch);
@@ -449,12 +449,12 @@ namespace PoorMansTSqlFormatterLib
         {
             MoveToAncestorContainer(levelsUp, null);
         }
-        internal void MoveToAncestorContainer(int levelsUp, string targetContainerName)
+        internal void MoveToAncestorContainer(int levelsUp, string? targetContainerName)
         {
             Node candidateContainer = CurrentContainer;
             while (levelsUp > 0)
             {
-                candidateContainer = candidateContainer.Parent;
+                candidateContainer = candidateContainer.Parent!;
                 levelsUp--;
             }
             if (string.IsNullOrEmpty(targetContainerName) || candidateContainer.Name.Equals(targetContainerName))

@@ -59,7 +59,7 @@ namespace PoorMansTSqlFormatterLib
             return this.GetRange(fromIndex, toIndex - fromIndex + 1);
         }
 
-        public IToken MarkerToken { get; set; }
+        public IToken? MarkerToken { get; set; }
 
         public long? MarkerPosition { get; set; }
     }

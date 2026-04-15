@@ -24,7 +24,7 @@ namespace PoorMansTSqlFormatterLib
 {
     public static class Utils
     {
-        public static string HtmlEncode(string raw)
+        public static string? HtmlEncode(string? raw)
         {
             /*
              * This is a "Roll Your Own" implementation of HtmlEncode, which was necessary in the end because people want
@@ -45,7 +45,7 @@ namespace PoorMansTSqlFormatterLib
 
             foreach (char c in raw)
             {
-                string replacementString = null;
+                string? replacementString = null;
 
                 switch (c)
                 {

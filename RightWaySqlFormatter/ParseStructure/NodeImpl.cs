@@ -32,9 +32,9 @@ namespace PoorMansTSqlFormatterLib.ParseStructure
             Children = new List<Node>();
         }
 
-        public string Name { get; set; }
-        public string TextValue { get; set; }
-        public Node Parent { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string? TextValue { get; set; }
+        public Node? Parent { get; set; }
 
         public IDictionary<string, string> Attributes { get; private set; }
         public IEnumerable<Node> Children { get; private set; }
@@ -68,9 +68,9 @@ namespace PoorMansTSqlFormatterLib.ParseStructure
         }
 
 
-        public string GetAttributeValue(string aName)
+        public string? GetAttributeValue(string aName)
         {
-            string outVal = null;
+            string? outVal = null;
             Attributes.TryGetValue(aName, out outVal);
             return outVal;
         }

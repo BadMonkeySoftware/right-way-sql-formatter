@@ -137,12 +137,12 @@ namespace PoorMansTSqlFormatterLib.Formatters
            
         }
 
-        private string _indentString;
+        private string? _indentString;
         public string IndentString
         {
             get
             {
-                return _indentString;
+                return _indentString ?? string.Empty;
             }
             set
             {
