@@ -2193,6 +2193,38 @@ namespace PoorMansTSqlFormatterLib.Parsers
             KeywordList.Add("XLOCK", KeywordType.OtherKeyword);
             KeywordList.Add("XML", KeywordType.DataTypeKeyword);
             KeywordList.Add("YEAR", KeywordType.FunctionKeyword);
+
+            // Keywords added in SQL Server 2012+ (post-original-library)
+            KeywordList.Add("THROW", KeywordType.OtherKeyword);
+            KeywordList.Add("IIF", KeywordType.FunctionKeyword);
+            KeywordList.Add("CHOOSE", KeywordType.FunctionKeyword);
+            KeywordList.Add("TRY_CONVERT", KeywordType.FunctionKeyword);
+            KeywordList.Add("TRY_CAST", KeywordType.FunctionKeyword);
+            KeywordList.Add("TRY_PARSE", KeywordType.FunctionKeyword);
+            KeywordList.Add("FORMAT", KeywordType.FunctionKeyword);
+            KeywordList.Add("EOMONTH", KeywordType.FunctionKeyword);
+            KeywordList.Add("DATEFROMPARTS", KeywordType.FunctionKeyword);
+            KeywordList.Add("TIMEFROMPARTS", KeywordType.FunctionKeyword);
+            KeywordList.Add("DATETIMEFROMPARTS", KeywordType.FunctionKeyword);
+            KeywordList.Add("DATETIME2FROMPARTS", KeywordType.FunctionKeyword);
+            KeywordList.Add("SMALLDATETIMEFROMPARTS", KeywordType.FunctionKeyword);
+            KeywordList.Add("COMPRESS", KeywordType.FunctionKeyword);
+            KeywordList.Add("DECOMPRESS", KeywordType.FunctionKeyword);
+            KeywordList.Add("STRING_SPLIT", KeywordType.FunctionKeyword);
+            KeywordList.Add("STRING_AGG", KeywordType.FunctionKeyword);
+            KeywordList.Add("TRIM", KeywordType.FunctionKeyword);
+            KeywordList.Add("CONCAT_WS", KeywordType.FunctionKeyword);
+            KeywordList.Add("TRANSLATE", KeywordType.FunctionKeyword);
+            KeywordList.Add("APPROX_COUNT_DISTINCT", KeywordType.FunctionKeyword);
+            KeywordList.Add("OPENJSON", KeywordType.FunctionKeyword);
+            KeywordList.Add("JSON_VALUE", KeywordType.FunctionKeyword);
+            KeywordList.Add("JSON_QUERY", KeywordType.FunctionKeyword);
+            KeywordList.Add("JSON_MODIFY", KeywordType.FunctionKeyword);
+            KeywordList.Add("WITHIN", KeywordType.OtherKeyword);
+            KeywordList.Add("AT", KeywordType.OtherKeyword);
+            KeywordList.Add("OFFSET", KeywordType.OtherKeyword);
+            KeywordList.Add("ROWS", KeywordType.OtherKeyword);
+            // ONLY already exists in the keyword list
         }
 
         public enum KeywordType

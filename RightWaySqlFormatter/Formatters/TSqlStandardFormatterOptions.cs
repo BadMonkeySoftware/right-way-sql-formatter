@@ -48,6 +48,12 @@ namespace PoorMansTSqlFormatterLib.Formatters
 			NewClauseLineBreaks = 1;
 			NewStatementLineBreaks = 2;
             SelectFirstColumnOnNewLine = false;
+            ColumnAliasStyle = ColumnAliasStyle.AsKeyword;
+            AlignColumnDefinitions = false;
+            IndentJoinOnClause = false;
+            IndentWhereAndOrConditions = false;
+            AlignColumnDefinitionsInDDL = false;
+            DDLConstraintsOnNewLine = false;
 		}
 
         //Doesn't particularly need to be lazy-loaded, and doesn't need to be threadsafe.
@@ -83,7 +89,13 @@ namespace PoorMansTSqlFormatterLib.Formatters
 				else if (key == "ExpandInLists") ExpandInLists = Convert.ToBoolean(value);
 			else if (key == "NewClauseLineBreaks") NewClauseLineBreaks = Convert.ToInt32(value);
 				else if (key == "NewStatementLineBreaks") NewStatementLineBreaks = Convert.ToInt32(value);
-				else if (key == "SelectFirstColumnOnNewLine") SelectFirstColumnOnNewLine = Convert.ToBoolean(value);
+			else if (key == "SelectFirstColumnOnNewLine") SelectFirstColumnOnNewLine = Convert.ToBoolean(value);
+				else if (key == "ColumnAliasStyle") ColumnAliasStyle = (ColumnAliasStyle)Enum.Parse(typeof(ColumnAliasStyle), value);
+				else if (key == "AlignColumnDefinitions") AlignColumnDefinitions = Convert.ToBoolean(value);
+				else if (key == "IndentJoinOnClause") IndentJoinOnClause = Convert.ToBoolean(value);
+				else if (key == "IndentWhereAndOrConditions") IndentWhereAndOrConditions = Convert.ToBoolean(value);
+				else if (key == "AlignColumnDefinitionsInDDL") AlignColumnDefinitionsInDDL = Convert.ToBoolean(value);
+				else if (key == "DDLConstraintsOnNewLine") DDLConstraintsOnNewLine = Convert.ToBoolean(value);
 				else throw new ArgumentException("Unknown option: " + key);
             }
 
@@ -113,6 +125,12 @@ namespace PoorMansTSqlFormatterLib.Formatters
 			if (NewClauseLineBreaks != _defaultOptions.NewClauseLineBreaks) overrides.Add("NewClauseLineBreaks", NewClauseLineBreaks.ToString());
 			if (NewStatementLineBreaks != _defaultOptions.NewStatementLineBreaks) overrides.Add("NewStatementLineBreaks", NewStatementLineBreaks.ToString());
 			if (SelectFirstColumnOnNewLine != _defaultOptions.SelectFirstColumnOnNewLine) overrides.Add("SelectFirstColumnOnNewLine", SelectFirstColumnOnNewLine.ToString());
+			if (ColumnAliasStyle != _defaultOptions.ColumnAliasStyle) overrides.Add("ColumnAliasStyle", ColumnAliasStyle.ToString());
+			if (AlignColumnDefinitions != _defaultOptions.AlignColumnDefinitions) overrides.Add("AlignColumnDefinitions", AlignColumnDefinitions.ToString());
+			if (IndentJoinOnClause != _defaultOptions.IndentJoinOnClause) overrides.Add("IndentJoinOnClause", IndentJoinOnClause.ToString());
+			if (IndentWhereAndOrConditions != _defaultOptions.IndentWhereAndOrConditions) overrides.Add("IndentWhereAndOrConditions", IndentWhereAndOrConditions.ToString());
+			if (AlignColumnDefinitionsInDDL != _defaultOptions.AlignColumnDefinitionsInDDL) overrides.Add("AlignColumnDefinitionsInDDL", AlignColumnDefinitionsInDDL.ToString());
+			if (DDLConstraintsOnNewLine != _defaultOptions.DDLConstraintsOnNewLine) overrides.Add("DDLConstraintsOnNewLine", DDLConstraintsOnNewLine.ToString());
     
             if (overrides.Count == 0) return string.Empty;
             return string.Join(",", overrides.Select((kvp) => kvp.Key + "=" + kvp.Value).ToArray());
@@ -155,5 +173,65 @@ namespace PoorMansTSqlFormatterLib.Formatters
         /// </summary>
         public bool SelectFirstColumnOnNewLine { get; set; }
 
+        // ----------------------------------------------------------------
+        // Task 2: Column alias style
+        // ----------------------------------------------------------------
+        /// <summary>
+        /// Controls the style used for column aliases in SELECT lists.
+        /// AsKeyword (default): col AS alias
+        /// EqualSign: alias = col
+        /// </summary>
+        public ColumnAliasStyle ColumnAliasStyle { get; set; }
+
+        // ----------------------------------------------------------------
+        // Task 3: Column alignment
+        // ----------------------------------------------------------------
+        /// <summary>
+        /// When true and ExpandCommaLists is true, pads column expressions so
+        /// AS keywords align vertically in the SELECT list.
+        /// </summary>
+        public bool AlignColumnDefinitions { get; set; }
+
+        // ----------------------------------------------------------------
+        // Task 4: JOIN / WHERE alignment
+        // ----------------------------------------------------------------
+        /// <summary>
+        /// When true, indents the ON clause an extra level relative to the
+        /// JOIN keyword, aligning it under the join condition columns.
+        /// </summary>
+        public bool IndentJoinOnClause { get; set; }
+
+        /// <summary>
+        /// When true, AND/OR conditions in a WHERE clause are placed on their
+        /// own lines aligned under the first condition (not the WHERE keyword).
+        /// Default is true to preserve existing formatter behaviour.
+        /// </summary>
+        public bool IndentWhereAndOrConditions { get; set; }
+
+        // ----------------------------------------------------------------
+        // Task 5: DDL formatting
+        // ----------------------------------------------------------------
+        /// <summary>
+        /// When true, in CREATE TABLE statements, aligns column name, data type,
+        /// nullability, and constraints into vertical columns.
+        /// </summary>
+        public bool AlignColumnDefinitionsInDDL { get; set; }
+
+        /// <summary>
+        /// When true (default), in CREATE TABLE statements, each column constraint
+        /// is placed on its own line.
+        /// Default is false to avoid breaking existing tests.
+        /// </summary>
+        public bool DDLConstraintsOnNewLine { get; set; }
+
+    }
+
+    /// <summary>Style used for SELECT column aliases.</summary>
+    public enum ColumnAliasStyle
+    {
+        /// <summary>col AS alias  (default, existing behaviour)</summary>
+        AsKeyword = 0,
+        /// <summary>alias = col</summary>
+        EqualSign = 1
     }
 }

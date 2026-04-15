@@ -137,6 +137,37 @@
           "type": "number",
           "default": 1,
           "description": "Number of blank lines between clauses."
+        },
+        "rightWaySqlFormatter.columnAliasStyle": {
+          "type": "string",
+          "enum": ["as", "equals"],
+          "default": "as",
+          "description": "Column alias style: 'as' (col AS alias) or 'equals' (alias = col)."
+        },
+        "rightWaySqlFormatter.alignColumnDefinitions": {
+          "type": "boolean",
+          "default": false,
+          "description": "Align AS keywords vertically in SELECT column list (requires expandCommaLists)."
+        },
+        "rightWaySqlFormatter.indentJoinOnClause": {
+          "type": "boolean",
+          "default": false,
+          "description": "Indent the ON clause an extra level relative to the JOIN keyword."
+        },
+        "rightWaySqlFormatter.indentWhereAndOrConditions": {
+          "type": "boolean",
+          "default": false,
+          "description": "Indent AND/OR conditions in WHERE onto separate lines aligned under the first condition."
+        },
+        "rightWaySqlFormatter.alignColumnDefinitionsInDDL": {
+          "type": "boolean",
+          "default": false,
+          "description": "In CREATE TABLE, align column name, data type, nullability, and constraints into vertical columns."
+        },
+        "rightWaySqlFormatter.ddlConstraintsOnNewLine": {
+          "type": "boolean",
+          "default": false,
+          "description": "In CREATE TABLE, put each column constraint on its own line."
         }
       }
     }

@@ -44,6 +44,28 @@ expandCommaLists.AddAlias("-ecl");
 var selectFirstColumnOnNewLine = new Option<bool>("--select-first-column-newline", () => false, "Break first SELECT column to new line (requires --expand-comma-lists)");
 selectFirstColumnOnNewLine.AddAlias("-sfcn");
 
+// Task 2: Column alias style
+var aliasStyle = new Option<string>("--alias-style", () => "as", "Column alias style: 'as' (col AS alias) or 'equals' (alias = col)");
+aliasStyle.AddAlias("-as");
+
+// Task 3: Column alignment
+var alignColumns = new Option<bool>("--align-columns", () => false, "Align AS keywords vertically in SELECT column list");
+alignColumns.AddAlias("-ac");
+
+// Task 4: JOIN/WHERE alignment
+var indentJoinOn = new Option<bool>("--indent-join-on", () => false, "Indent ON clause relative to JOIN columns");
+indentJoinOn.AddAlias("-ijo");
+
+var indentWhereAndOr = new Option<bool>("--indent-where-and-or", () => false, "Indent AND/OR in WHERE onto separate lines");
+indentWhereAndOr.AddAlias("-iwo");
+
+// Task 5: DDL formatting
+var alignDdlColumns = new Option<bool>("--align-ddl-columns", () => false, "Align column definitions in CREATE TABLE vertically");
+alignDdlColumns.AddAlias("-adc");
+
+var ddlConstraintsNewLine = new Option<bool>("--ddl-constraints-newline", () => false, "Put each column constraint on its own line in CREATE TABLE");
+ddlConstraintsNewLine.AddAlias("-dcn");
+
 var expandInLists = new Option<bool>("--expand-in-lists", () => true, "Expand IN lists");
 expandInLists.AddAlias("-eil");
 
@@ -70,6 +92,7 @@ var rootCommand = new RootCommand("Right Way SQL Formatter - formats T-SQL files
     trailingCommas, spaceAfterExpandedComma, expandBetween, expandBoolean,
     expandCase, expandCommaLists, selectFirstColumnOnNewLine, expandInLists, breakJoin,
     uppercaseKeywords, standardizeKeywords, allowParsingErrors,
+    aliasStyle, alignColumns, indentJoinOn, indentWhereAndOr, alignDdlColumns, ddlConstraintsNewLine,
     outputFile, inputFile
 };
 
@@ -93,6 +116,14 @@ rootCommand.SetHandler(async (context) =>
         BreakJoinOnSections = context.ParseResult.GetValueForOption(breakJoin),
         UppercaseKeywords = context.ParseResult.GetValueForOption(uppercaseKeywords),
         KeywordStandardization = context.ParseResult.GetValueForOption(standardizeKeywords),
+        ColumnAliasStyle = context.ParseResult.GetValueForOption(aliasStyle) == "equals"
+            ? PoorMansTSqlFormatterLib.Formatters.ColumnAliasStyle.EqualSign
+            : PoorMansTSqlFormatterLib.Formatters.ColumnAliasStyle.AsKeyword,
+        AlignColumnDefinitions = context.ParseResult.GetValueForOption(alignColumns),
+        IndentJoinOnClause = context.ParseResult.GetValueForOption(indentJoinOn),
+        IndentWhereAndOrConditions = context.ParseResult.GetValueForOption(indentWhereAndOr),
+        AlignColumnDefinitionsInDDL = context.ParseResult.GetValueForOption(alignDdlColumns),
+        DDLConstraintsOnNewLine = context.ParseResult.GetValueForOption(ddlConstraintsNewLine),
     };
 
     bool allowErrors = context.ParseResult.GetValueForOption(allowParsingErrors);

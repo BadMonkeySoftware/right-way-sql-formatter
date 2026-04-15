@@ -241,5 +241,22 @@ function buildArgs(): string[] {
     bool('expandBetweenConditions','expand-between',             true);
     bool('breakJoinOnSections',    'break-join-on-sections',     false);
 
+    // Task 2: Column alias style
+    const aliasStyleVal = cfg.get<string>('columnAliasStyle', 'as');
+    if (aliasStyleVal !== 'as') {
+        args.push(`--alias-style=${aliasStyleVal}`);
+    }
+
+    // Task 3: Column alignment
+    bool('alignColumnDefinitions',   'align-columns',              false);
+
+    // Task 4: JOIN/WHERE alignment
+    bool('indentJoinOnClause',       'indent-join-on',             false);
+    bool('indentWhereAndOrConditions','indent-where-and-or',       false);
+
+    // Task 5: DDL formatting
+    bool('alignColumnDefinitionsInDDL', 'align-ddl-columns',      false);
+    bool('ddlConstraintsOnNewLine',   'ddl-constraints-newline',  false);
+
     return args;
 }
