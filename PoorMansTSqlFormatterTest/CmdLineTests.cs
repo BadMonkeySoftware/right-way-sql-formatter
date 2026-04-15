@@ -66,6 +66,10 @@ namespace PoorMansTSqlFormatterTests
             TestFormattingFlags("SELECT in (1,2)", "select in (1, 2)", "--expand-in-lists=false --uppercase-keywords=false");
             TestFormattingFlags("SELECT NATIONAL CHARACTER VARYING", "SELECT NVARCHAR", "");
             TestFormattingFlags("SELECT NATIONAL CHARACTER VARYING", "SELECT NATIONAL CHARACTER VARYING", "--standardize-keywords=false");
+            // Bug regression: uppercaseKeywords=false must be respected even when standardizeKeywords=true.
+            // When KeywordStandardization maps JOIN → INNER JOIN, FormatKeyword must still apply lowercasing.
+            TestFormattingFlags("SELECT 1 FROM t JOIN u ON 1=1", "select 1\nfrom t\ninner join u on 1=1", "--uppercase-keywords=false --standardize-keywords=true");
+            TestFormattingFlags("SELECT NATIONAL CHARACTER VARYING", "select nvarchar", "--uppercase-keywords=false --standardize-keywords=true");
         }
 
         [Test]

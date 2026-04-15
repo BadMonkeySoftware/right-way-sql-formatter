@@ -66,7 +66,7 @@
         "rightWaySqlFormatter.indentString": {
           "type": "string",
           "default": "    ",
-          "description": "String to use for each level of indentation (default: 4 spaces)."
+          "description": "String to use for each level of indentation. Use \\s for a space and \\t for a tab. Examples: \\s\\s\\s\\s (4 spaces, default), \\t (single tab), \\s\\s (2 spaces)."
         },
         "rightWaySqlFormatter.spacesPerTab": {
           "type": "number",

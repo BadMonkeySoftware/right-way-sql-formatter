@@ -94,7 +94,7 @@ SqlFormatter --output formatted.sql myquery.sql
 ### Common flags
 
 ```
---indent-string="\t"        Indentation (default: tab)
+--indent-string="\t"        Indentation (default: 4 spaces). Use \s for space, \t for tab.
 --uppercase-keywords=true   Uppercase keywords (default: true)
 --standardize-keywords=true Normalize synonyms, e.g. NVARCHAR (default: true)
 --expand-comma-lists=true   Expand column lists onto separate lines (default: true)
@@ -110,8 +110,11 @@ Run `SqlFormatter --help` for the full list.
 ### Examples
 
 ```bash
-# Format with spaces instead of tabs
-echo "select 1,2,3" | SqlFormatter --indent-string="    "
+# Format with 4 spaces for indent (using escape sequences)
+echo "select 1,2,3" | SqlFormatter --indent-string="\s\s\s\s"
+
+# Format with single tab
+echo "select 1,2,3" | SqlFormatter --indent-string="\t"
 
 # Lowercase keywords
 echo "SELECT 1" | SqlFormatter --uppercase-keywords=false
