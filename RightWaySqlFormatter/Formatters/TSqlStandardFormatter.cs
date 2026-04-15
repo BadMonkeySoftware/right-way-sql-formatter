@@ -131,13 +131,390 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 else
                     state.AddOutputContentRaw(tempFormatter.FormatSQLTree(skippedXml));
             }
-            return state.DumpOutput();
+            string output = state.DumpOutput();
+
+            // Post-processing passes for SELECT column formatting.
+            if (!Options.HTMLColoring)
+            {
+                if (Options.ColumnAliasStyle == ColumnAliasStyle.EqualSign)
+                    output = RewriteAliasesToEqualSign(output);
+                if (Options.AlignColumnDefinitions)
+                    output = AlignSelectColumns(output);
+            }
+
+            return output;
         }
 
         private void ProcessSqlNodeList(IEnumerable<Node> rootList, TSqlStandardFormattingState state)
         {
             foreach (Node contentElement in rootList)
                 ProcessSqlNode(contentElement, state);
+        }
+
+        // ----------------------------------------------------------------
+        // Helpers for column-alignment features
+        // ----------------------------------------------------------------
+
+        /// <summary>
+        /// Returns the indent-adjusted text length of a single token node as it would be emitted,
+        /// without actually writing to any output.  Used for pre-measurement passes.
+        /// Only measures leaf content tokens — whitespace and structural nodes return 0.
+        /// </summary>
+        /// <summary>
+        /// Returns a helper that knows whether a node is inside a DDL column list
+        /// (i.e. a DDL_PARENS or DDLDETAIL_PARENS context).
+        /// </summary>
+        private static bool IsInsideDdlDetailParens(Node node)
+        {
+            var p = node.Parent;
+            while (p != null)
+            {
+                if (p.Name == SqlStructureConstants.ENAME_DDL_PARENS
+                    || p.Name == SqlStructureConstants.ENAME_DDLDETAIL_PARENS)
+                    return true;
+                if (p.Name == SqlStructureConstants.ENAME_SQL_ROOT ||
+                    p.Name == SqlStructureConstants.ENAME_SQL_STATEMENT)
+                    return false;
+                p = p.Parent;
+            }
+            return false;
+        }
+
+        // ----------------------------------------------------------------
+        // Post-processing helpers for output-string transformations
+        // ----------------------------------------------------------------
+
+        /// <summary>
+        /// Rewrites "expr AS alias" to "alias = expr" for SELECT column list lines in the output.
+        /// Only handles lines that are between a SELECT keyword line and the next clause keyword.
+        /// </summary>
+        private string RewriteAliasesToEqualSign(string output)
+        {
+            var lines = output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+            bool inSelectList = false;
+
+            for (int i = 0; i < lines.Length; i++)
+            {
+                string line = lines[i];
+                string trimmed = line.TrimStart();
+                string trimmedUpper = trimmed.ToUpperInvariant();
+
+                // Detect start of SELECT column list: line begins with SELECT (possibly with leading comma)
+                if (trimmedUpper.StartsWith("SELECT ") || trimmedUpper == "SELECT")
+                {
+                    inSelectList = true;
+                    // The SELECT line itself may have the first column on the same line as SELECT
+                    // Only transform if " AS " appears after SELECT
+                    int selectEnd = trimmed.IndexOf(' ');
+                    if (selectEnd >= 0)
+                    {
+                        string afterSelect = trimmed.Substring(selectEnd + 1).TrimStart();
+                        // Check for TOP N prefix
+                        if (afterSelect.ToUpperInvariant().StartsWith("TOP "))
+                        {
+                            // Skip to after the TOP N token — don't rewrite the SELECT+TOP line
+                        }
+                        else
+                        {
+                            string indent = line.Substring(0, line.Length - trimmed.Length);
+                            string rewritten = TryRewriteColumnLine(afterSelect);
+                            if (rewritten != afterSelect)
+                                lines[i] = indent + "SELECT " + rewritten;
+                        }
+                    }
+                    continue;
+                }
+
+                // Detect end of SELECT list: unindented clause keyword
+                if (inSelectList)
+                {
+                    // A line ending the SELECT list has no leading comma and starts with a keyword
+                    bool startsWithComma = trimmed.StartsWith(",");
+                    if (!startsWithComma && IsClauseStartLine(trimmedUpper))
+                    {
+                        inSelectList = false;
+                        continue;
+                    }
+
+                    if (startsWithComma)
+                    {
+                        // Leading comma style: ,expr AS alias
+                        string afterComma = trimmed.Substring(1).TrimStart();
+                        string rewritten = TryRewriteColumnLine(afterComma);
+                        if (rewritten != afterComma)
+                        {
+                            string indent = line.Substring(0, line.Length - trimmed.Length);
+                            lines[i] = indent + "," + rewritten;
+                        }
+                    }
+                    else
+                    {
+                        // Trailing comma or single column style
+                        string trimmedLine = trimmed.TrimEnd(',');
+                        bool hadTrailingComma = trimmed.EndsWith(",");
+                        string rewritten = TryRewriteColumnLine(trimmedLine);
+                        if (rewritten != trimmedLine)
+                        {
+                            string indent = line.Substring(0, line.Length - trimmed.Length);
+                            lines[i] = indent + rewritten + (hadTrailingComma ? "," : "");
+                        }
+                    }
+                }
+            }
+
+            return string.Join(Environment.NewLine, lines);
+        }
+
+        private static bool IsClauseStartLine(string trimmedUpper)
+        {
+            return trimmedUpper.StartsWith("FROM ") || trimmedUpper == "FROM"
+                || trimmedUpper.StartsWith("WHERE ") || trimmedUpper == "WHERE"
+                || trimmedUpper.StartsWith("GROUP ") || trimmedUpper == "GROUP"
+                || trimmedUpper.StartsWith("ORDER ") || trimmedUpper == "ORDER"
+                || trimmedUpper.StartsWith("HAVING ") || trimmedUpper == "HAVING"
+                || trimmedUpper.StartsWith("UNION ") || trimmedUpper.StartsWith("INTERSECT ")
+                || trimmedUpper.StartsWith("EXCEPT ")
+                || trimmedUpper.StartsWith("INTO ")
+                || trimmedUpper.StartsWith(")") // subquery end
+                ;
+        }
+
+        /// <summary>
+        /// Rewrites a single column expression "expr AS alias" to "alias = expr".
+        /// Returns the original string if no " AS " is found at the top level.
+        /// </summary>
+        private static string TryRewriteColumnLine(string col)
+        {
+            int asPos = FindAsOutsideParens(col);
+            if (asPos < 0) return col;
+            string expr = col.Substring(0, asPos).TrimEnd();
+            string alias = col.Substring(asPos + 4).Trim();
+            if (string.IsNullOrEmpty(alias) || string.IsNullOrEmpty(expr)) return col;
+            return alias + " = " + expr;
+        }
+
+        /// <summary>
+        /// Finds the position of a top-level " AS " (case-insensitive) in a string,
+        /// ignoring occurrences inside parentheses or string literals.
+        /// Returns -1 if not found.
+        /// </summary>
+        private static int FindAsOutsideParens(string s)
+        {
+            int depth = 0;
+            bool inString = false;
+            for (int i = 0; i < s.Length; i++)
+            {
+                char c = s[i];
+                if (inString)
+                {
+                    if (c == '\'') inString = false;
+                    continue;
+                }
+                if (c == '\'')
+                {
+                    inString = true;
+                    continue;
+                }
+                if (c == '(') { depth++; continue; }
+                if (c == ')') { depth--; continue; }
+                if (depth == 0 && i + 4 <= s.Length)
+                {
+                    string sub = s.Substring(i, 4);
+                    if (sub.Equals(" AS ", StringComparison.OrdinalIgnoreCase))
+                        return i;
+                }
+            }
+            return -1;
+        }
+
+        /// <summary>
+        /// Pads column expressions in SELECT lists so that AS keywords align vertically.
+        /// Works on the full formatted output, only affecting SELECT column list lines.
+        /// </summary>
+        private string AlignSelectColumns(string output)
+        {
+            var lines = output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+
+            // Find runs of SELECT column lines and align each run.
+            int i = 0;
+            while (i < lines.Length)
+            {
+                string trimmed = lines[i].TrimStart().ToUpperInvariant();
+                if (trimmed.StartsWith("SELECT ") || trimmed == "SELECT")
+                {
+                    // Collect the range of lines that are SELECT column list lines.
+                    int start = i;
+                    // The SELECT line itself may have the first column inline.
+                    // Column lines continue until we hit a non-column line.
+                    while (i < lines.Length)
+                    {
+                        string t = lines[i].TrimStart();
+                        string tu = t.ToUpperInvariant();
+                        if (i > start && !t.StartsWith(",") && IsClauseStartLine(tu))
+                            break;
+                        i++;
+                    }
+                    // lines[start..i) is the SELECT block.
+                    AlignBlockAsKeywords(lines, start, i);
+                    continue; // don't increment i again
+                }
+                i++;
+            }
+
+            return string.Join(Environment.NewLine, lines);
+        }
+
+        private void AlignBlockAsKeywords(string[] lines, int start, int end)
+        {
+            // For each line in the block, find the position of " AS " (outside parens).
+            // Measure the max expression width and pad.
+            var items = new List<(int lineIdx, string indent, string comma, string expr, string alias)>();
+
+            for (int i = start; i < end; i++)
+            {
+                string line = lines[i];
+                string trimmed = line.TrimStart();
+                string indent = line.Substring(0, line.Length - trimmed.Length);
+
+                // Handle SELECT keyword on first line
+                string content;
+                string prefix;
+                if (trimmed.ToUpperInvariant().StartsWith("SELECT "))
+                {
+                    content = trimmed.Substring(7).TrimStart(); // after "SELECT "
+                    prefix = indent + "SELECT ";
+                }
+                else if (trimmed.StartsWith(","))
+                {
+                    content = trimmed.Substring(1).TrimStart();
+                    prefix = indent + ",";
+                }
+                else
+                {
+                    content = trimmed;
+                    prefix = indent;
+                }
+
+                int asPos = FindAsOutsideParens(content);
+                if (asPos >= 0)
+                {
+                    string expr = content.Substring(0, asPos).TrimEnd();
+                    string alias = content.Substring(asPos + 4).Trim();
+                    items.Add((i, prefix, "", expr, alias));
+                }
+            }
+
+            if (items.Count < 2) return;
+
+            int maxExprLen = items.Max(it => it.expr.Length);
+
+            foreach (var (lineIdx, prefix, _, expr, alias) in items)
+            {
+                string padding = new string(' ', maxExprLen - expr.Length);
+                lines[lineIdx] = prefix + expr + padding + " AS " + alias;
+            }
+        }
+
+        /// <summary>
+        /// Aligns DDL column definitions so that column names, data types, and nullability
+        /// are in vertical columns.  Input is the formatted content of a DDLDETAIL_PARENS block
+        /// (without the surrounding parens).
+        /// Each row: indent + [comma] + colname + datatype + [constraint...]
+        /// We align: colname and datatype into two columns.
+        /// </summary>
+        private string AlignDdlColumns(string ddlContent)
+        {
+            var lines = ddlContent.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+
+            // Each "column definition" line has: indent + optional-comma + name + type + rest
+            // We identify lines that look like a column definition (first token is an identifier, second is a data type).
+            // For simplicity: lines that aren't blank and don't start with a keyword that's a constraint.
+            var colLines = new List<int>();
+            var colNames = new List<string>();
+            var afterNames = new List<string>();
+
+            for (int i = 0; i < lines.Length; i++)
+            {
+                string line = lines[i];
+                if (string.IsNullOrWhiteSpace(line)) continue;
+
+                // Strip indent and optional comma
+                int pos = 0;
+                while (pos < line.Length && (line[pos] == '\t' || line[pos] == ' ')) pos++;
+                if (pos >= line.Length) continue;
+
+                bool hasComma = line[pos] == ',';
+                if (hasComma) { pos++; while (pos < line.Length && line[pos] == ' ') pos++; }
+
+                // First token: identifier (column name) or bracket-quoted
+                string firstToken = ExtractFirstToken(line, pos, out int afterFirst);
+                if (string.IsNullOrEmpty(firstToken)) continue;
+
+                // Skip constraint lines (CONSTRAINT, PRIMARY, UNIQUE, etc.)
+                string upper = firstToken.TrimStart('[').TrimEnd(']').ToUpperInvariant();
+                if (upper == "CONSTRAINT" || upper == "PRIMARY" || upper == "UNIQUE"
+                    || upper == "CHECK" || upper == "FOREIGN" || upper == "DEFAULT"
+                    || upper == ")") continue;
+
+                colLines.Add(i);
+                int indentAndComma = pos;
+                colNames.Add(line.Substring(0, afterFirst)); // full prefix including indent+comma+name
+                afterNames.Add(line.Substring(afterFirst));
+            }
+
+            if (colLines.Count < 2) return ddlContent;
+
+            // Measure max name length (just the name token width, excluding indent+comma)
+            int maxNameLen = 0;
+            for (int i = 0; i < colLines.Count; i++)
+            {
+                string fullPrefix = colNames[i];
+                // Find just the name part (after last space before the name)
+                int nameStart = fullPrefix.Length - 1;
+                while (nameStart > 0 && fullPrefix[nameStart - 1] != ' ' && fullPrefix[nameStart - 1] != ','
+                    && fullPrefix[nameStart - 1] != '\t')
+                    nameStart--;
+                string namePart = fullPrefix.Substring(nameStart);
+                maxNameLen = Math.Max(maxNameLen, namePart.TrimEnd().Length);
+            }
+
+            for (int i = 0; i < colLines.Count; i++)
+            {
+                string fullPrefix = colNames[i];
+                int nameStart = fullPrefix.Length - 1;
+                while (nameStart > 0 && fullPrefix[nameStart - 1] != ' ' && fullPrefix[nameStart - 1] != ','
+                    && fullPrefix[nameStart - 1] != '\t')
+                    nameStart--;
+                string beforeName = fullPrefix.Substring(0, nameStart);
+                string namePart = fullPrefix.Substring(nameStart).TrimEnd();
+                string padding = new string(' ', Math.Max(1, maxNameLen - namePart.Length + 1));
+                lines[colLines[i]] = beforeName + namePart + padding + afterNames[i].TrimStart();
+            }
+
+            return string.Join(Environment.NewLine, lines);
+        }
+
+        private static string ExtractFirstToken(string line, int startPos, out int endPos)
+        {
+            endPos = startPos;
+            if (startPos >= line.Length) return string.Empty;
+
+            if (line[startPos] == '[')
+            {
+                int end = line.IndexOf(']', startPos);
+                if (end < 0) { endPos = line.Length; return line.Substring(startPos); }
+                endPos = end + 1;
+                while (endPos < line.Length && line[endPos] == ' ') endPos++;
+                return line.Substring(startPos, end - startPos + 1);
+            }
+
+            int tokenEnd = startPos;
+            while (tokenEnd < line.Length && line[tokenEnd] != ' ' && line[tokenEnd] != '\t')
+                tokenEnd++;
+            string token = line.Substring(startPos, tokenEnd - startPos);
+            endPos = tokenEnd;
+            while (endPos < line.Length && line[endPos] == ' ') endPos++;
+            return token;
         }
 
         private void ProcessSqlNode(Node contentElement, TSqlStandardFormattingState state)
@@ -160,10 +537,10 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     state.UnIndentInitialBreak = true;
                     ProcessSqlNodeList(contentElement.Children, state.IncrementIndent());
                     state.DecrementIndent();
-					if (Options.NewClauseLineBreaks > 0)
-	                    state.BreakExpected = true;
-					if (Options.NewClauseLineBreaks > 1)
-						state.AdditionalBreaksExpected = Options.NewClauseLineBreaks - 1;
+                    if (Options.NewClauseLineBreaks > 0)
+                        state.BreakExpected = true;
+                    if (Options.NewClauseLineBreaks > 1)
+                        state.AdditionalBreaksExpected = Options.NewClauseLineBreaks - 1;
                     break;
 
                 case SqlStructureConstants.ENAME_SET_OPERATOR_CLAUSE:
@@ -262,7 +639,14 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     ProcessSqlNodeList(contentElement.ChildrenByName(SqlStructureConstants.ENAME_CONTAINER_OPEN), state);
                     if (Options.BreakJoinOnSections)
                         state.IncrementIndent();
+                    if (Options.IndentJoinOnClause)
+                    {
+                        state.BreakExpected = true;
+                        state.IncrementIndent();
+                    }
                     ProcessSqlNodeList(contentElement.ChildrenByName(SqlStructureConstants.ENAME_CONTAINER_GENERALCONTENT), state);
+                    if (Options.IndentJoinOnClause)
+                        state.DecrementIndent();
                     if (Options.BreakJoinOnSections)
                         state.DecrementIndent();
                     break;
@@ -347,7 +731,16 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     {
                         if (!innerState.StartsWithBreak)
                             state.WhiteSpace_BreakToNextLine();
-                        state.Assimilate(innerState);
+                        // Apply DDL column alignment post-processing if enabled.
+                        if (Options.AlignColumnDefinitionsInDDL
+                            && contentElement.Name == SqlStructureConstants.ENAME_DDL_PARENS)
+                        {
+                            state.AddOutputContentRaw(AlignDdlColumns(innerState.DumpOutput()));
+                        }
+                        else
+                        {
+                            state.Assimilate(innerState);
+                        }
                         state.WhiteSpace_BreakToNextLine();
                     }
                     else
@@ -408,7 +801,11 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 case SqlStructureConstants.ENAME_OR_OPERATOR:
                     if (Options.ExpandBooleanExpressions)
                         state.BreakExpected = true;
+                    if (Options.IndentWhereAndOrConditions)
+                        state.IncrementIndent();
                     ProcessSqlNode(contentElement.ChildByName(SqlStructureConstants.ENAME_OTHERKEYWORD), state);
+                    if (Options.IndentWhereAndOrConditions)
+                        state.DecrementIndent();
                     break;
 
                 case SqlStructureConstants.ENAME_COMMENT_MULTILINE:
@@ -626,17 +1023,41 @@ namespace PoorMansTSqlFormatterLib.Formatters
 
                 case SqlStructureConstants.ENAME_OTHERKEYWORD:
                 case SqlStructureConstants.ENAME_DATATYPE_KEYWORD:
+                {
+                    string kwUpper = contentElement.TextValue.ToUpperInvariant();
+
+                    // DDLConstraintsOnNewLine: force a line break before constraint-starting keywords
+                    // inside a DDL column list (DDL_PARENS context), but only when the keyword is
+                    // NOT the first content item on the line (skip table-level constraints that
+                    // already start on their own comma-separated line).
+                    if (Options.DDLConstraintsOnNewLine
+                        && (kwUpper == "CONSTRAINT" || kwUpper == "CHECK"
+                            || kwUpper == "DEFAULT" || kwUpper == "REFERENCES")
+                        && IsInsideDdlDetailParens(contentElement))
+                    {
+                        // Don't add extra break if the nearest preceding non-whitespace sibling is a comma
+                        // (that means this constraint is already on its own comma-separated line).
+                        Node prev = contentElement.PreviousSibling();
+                        while (prev != null && prev.Name == SqlStructureConstants.ENAME_WHITESPACE)
+                            prev = prev.PreviousSibling();
+                        if (prev == null || prev.Name != SqlStructureConstants.ENAME_COMMA)
+                            state.BreakExpected = true;
+                    }
+
                     WhiteSpace_SeparateWords(state);
                     state.SetRecentKeyword(contentElement.TextValue);
                     state.AddOutputContent(FormatKeyword(contentElement.TextValue), SqlHtmlConstants.CLASS_KEYWORD);
                     state.WordSeparatorExpected = true;
+
                     // When SelectFirstColumnOnNewLine is on and this is a SELECT keyword,
                     // request a line break so the first column lands on a new line.
                     if (Options.SelectFirstColumnOnNewLine
                         && Options.ExpandCommaLists
-                        && contentElement.TextValue.ToUpperInvariant() == "SELECT")
+                        && kwUpper == "SELECT")
                         state.BreakExpected = true;
+
                     break;
+                }
 
                 case SqlStructureConstants.ENAME_PSEUDONAME:
                     WhiteSpace_SeparateWords(state);
