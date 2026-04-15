@@ -118,18 +118,24 @@ namespace PoorMansTSqlFormatterLib.Formatters
             //someone forgot to close a "[noformat]" or "[minify]" region... we'll assume that's ok
             if (state.SpecialRegionActive == SpecialRegionType.NoFormat)
             {
-                Node skippedXml = NodeExtensions.ExtractStructureBetween(state.RegionStartNode, sqlTreeDoc);
-                TSqlIdentityFormatter tempFormatter = new TSqlIdentityFormatter(Options.HTMLColoring);
-                state.AddOutputContentRaw(tempFormatter.FormatSQLTree(skippedXml));
+                Node? skippedXml = NodeExtensions.ExtractStructureBetween(state.RegionStartNode, sqlTreeDoc);
+                if (skippedXml != null)
+                {
+                    TSqlIdentityFormatter tempFormatter = new TSqlIdentityFormatter(Options.HTMLColoring);
+                    state.AddOutputContentRaw(tempFormatter.FormatSQLTree(skippedXml));
+                }
             }
             else if (state.SpecialRegionActive == SpecialRegionType.Minify)
             {
-                Node skippedXml = NodeExtensions.ExtractStructureBetween(state.RegionStartNode, sqlTreeDoc);
-                TSqlObfuscatingFormatter tempFormatter = new TSqlObfuscatingFormatter();
-                if (HTMLFormatted)
-                    state.AddOutputContentRaw(Utils.HtmlEncode(tempFormatter.FormatSQLTree(skippedXml)));
-                else
-                    state.AddOutputContentRaw(tempFormatter.FormatSQLTree(skippedXml));
+                Node? skippedXml = NodeExtensions.ExtractStructureBetween(state.RegionStartNode, sqlTreeDoc);
+                if (skippedXml != null)
+                {
+                    TSqlObfuscatingFormatter tempFormatter = new TSqlObfuscatingFormatter();
+                    if (HTMLFormatted)
+                        state.AddOutputContentRaw(Utils.HtmlEncode(tempFormatter.FormatSQLTree(skippedXml)));
+                    else
+                        state.AddOutputContentRaw(tempFormatter.FormatSQLTree(skippedXml));
+                }
             }
             string output = state.DumpOutput();
 
@@ -882,7 +888,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 case SqlStructureConstants.ENAME_COMMENT_MULTILINE:
                     if (state.SpecialRegionActive == SpecialRegionType.NoFormat && contentElement.TextValue.ToUpperInvariant().Contains("[/NOFORMAT]"))
                     {
-                        Node skippedXml = NodeExtensions.ExtractStructureBetween(state.RegionStartNode, contentElement);
+                        Node? skippedXml = NodeExtensions.ExtractStructureBetween(state.RegionStartNode, contentElement);
                         if (skippedXml != null)
                         {
                             TSqlIdentityFormatter tempFormatter = new TSqlIdentityFormatter(Options.HTMLColoring);
@@ -895,7 +901,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     }
                     else if (state.SpecialRegionActive == SpecialRegionType.Minify && contentElement.TextValue.ToUpperInvariant().Contains("[/MINIFY]"))
                     {
-                        Node skippedXml = NodeExtensions.ExtractStructureBetween(state.RegionStartNode, contentElement);
+                        Node? skippedXml = NodeExtensions.ExtractStructureBetween(state.RegionStartNode, contentElement);
                         if (skippedXml != null)
                         {
                             TSqlObfuscatingFormatter tempFormatter = new TSqlObfuscatingFormatter();
@@ -944,7 +950,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 case SqlStructureConstants.ENAME_COMMENT_SINGLELINE_CSTYLE:
                     if (state.SpecialRegionActive == SpecialRegionType.NoFormat && contentElement.TextValue.ToUpperInvariant().Contains("[/NOFORMAT]"))
                     {
-                        Node skippedXml = NodeExtensions.ExtractStructureBetween(state.RegionStartNode, contentElement);
+                        Node? skippedXml = NodeExtensions.ExtractStructureBetween(state.RegionStartNode, contentElement);
                         if (skippedXml != null)
                         {
                             TSqlIdentityFormatter tempFormatter = new TSqlIdentityFormatter(Options.HTMLColoring);
@@ -957,7 +963,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     }
                     else if (state.SpecialRegionActive == SpecialRegionType.Minify && contentElement.TextValue.ToUpperInvariant().Contains("[/MINIFY]"))
                     {
-                        Node skippedXml = NodeExtensions.ExtractStructureBetween(state.RegionStartNode, contentElement);
+                        Node? skippedXml = NodeExtensions.ExtractStructureBetween(state.RegionStartNode, contentElement);
                         if (skippedXml != null)
                         {
                             TSqlObfuscatingFormatter tempFormatter = new TSqlObfuscatingFormatter();
