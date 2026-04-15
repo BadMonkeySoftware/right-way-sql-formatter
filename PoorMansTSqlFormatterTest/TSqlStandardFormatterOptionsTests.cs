@@ -39,7 +39,7 @@ namespace PoorMansTSqlFormatterTests
         {
             var options = new TSqlStandardFormatterOptions();
 
-            Assert.That(options.IndentString, Is.EqualTo("\t"));
+            Assert.That(options.IndentString, Is.EqualTo("    "));
             Assert.That(options.SpacesPerTab, Is.EqualTo(4));
             Assert.That(options.MaxLineWidth, Is.EqualTo(999));
             Assert.That(options.ExpandCommaLists, Is.True);

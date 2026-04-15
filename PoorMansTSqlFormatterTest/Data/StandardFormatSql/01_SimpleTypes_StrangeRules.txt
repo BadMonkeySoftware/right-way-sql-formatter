@@ -1,4 +1,4 @@
-﻿--Miscellaneous tokenization challenges:
+--Miscellaneous tokenization challenges:
 SELECT 'Tom''s Test' AS "Test ""Testing"" tests"
 
 SELECT 1 AS [[Test]]]
@@ -24,14 +24,14 @@ SELECT 1e+1 IsTen
 -- John Arnott's "T-SQL Parsing Crazy Eights" question
 --  from SQLServerCentral's Question Of The Day quiz:
 SELECT 1.8 E
-	,1.8e
-	,1.e ight
-	,3 + 8e8 Eight
-	,3 + 8 E8E
-	,'Six' + 'Seven' 'Eight'
-	,'Six' + 'Seven' + 'Eight'
-	,8.8e ight
-	,'Six''Seven' 'Eight'
+    ,1.8e
+    ,1.e ight
+    ,3 + 8e8 Eight
+    ,3 + 8 E8E
+    ,'Six' + 'Seven' 'Eight'
+    ,'Six' + 'Seven' + 'Eight'
+    ,8.8e ight
+    ,'Six''Seven' 'Eight'
 
 --Interestingly, the SSMS (2005) syntax highlighter gets 
 -- this one wrong, misses the AS... but it does fine if you 
@@ -52,7 +52,7 @@ SELECT 0.e- AS A
 -- parenthesis expression, nor another number". Not sure it's 
 -- worth handling this...
 SELECT .0 + - 1.0 Test
-	,- 1e0 "2nd"
+    ,- 1e0 "2nd"
 
 --playing silly buggers with negative exponents
 SELECT 1.1 * .1e-1 'ExponentionallyComplex'
@@ -80,11 +80,11 @@ SET @Test *= 10
 SET @Test %= 10
 
 IF A >= B
-	AND B <= A
-	SET @Test |= 10
+    AND B <= A
+    SET @Test |= 10
 
 IF A == B
-	SET @Test ^= 10
+    SET @Test ^= 10
 
 IF A != B
-	SET @Test &= 10
+    SET @Test &= 10

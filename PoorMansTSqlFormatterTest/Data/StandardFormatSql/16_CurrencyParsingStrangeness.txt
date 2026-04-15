@@ -1,4 +1,4 @@
-﻿--Unquoted euros aren't considered part of names/words, like most 
+--Unquoted euros aren't considered part of names/words, like most 
 -- currency symbols recognized
 SELECT €0 EurosApparently
 
@@ -7,8 +7,8 @@ SELECT - $0 DollarIsValidInName$SeeHighOsAreTooº
 
 --Thankfully, the meaning of commas does not magically change when parsing money.
 SELECT $5
-	,420.00 AS ActuallyJust420
-	,23.14 AS AnotherNumber
+    ,420.00 AS ActuallyJust420
+    ,23.14 AS AnotherNumber
 
 --Currency indicator processing is broken in T-SQL (2005). It appears to be the 
 -- one place where a distinction is made between spaces and linebreaks. I can't 

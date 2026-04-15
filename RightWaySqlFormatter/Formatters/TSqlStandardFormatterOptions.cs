@@ -31,7 +31,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
     {
         public TSqlStandardFormatterOptions()
         {
-            IndentString = "\t";
+            IndentString = "    ";
             SpacesPerTab = 4;
             MaxLineWidth = 999;
             ExpandCommaLists = true;

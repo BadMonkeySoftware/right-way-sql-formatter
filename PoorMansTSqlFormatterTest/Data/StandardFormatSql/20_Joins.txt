@@ -1,4 +1,4 @@
-﻿SELECT *
+SELECT *
 FROM Someplace S
 OUTER APPLY dbo.fn_GetAllPlaces(S.PlaceID)
 GO
@@ -26,18 +26,18 @@ GO
 SELECT *
 FROM Someplace S
 FULL OUTER JOIN Elsewhere AS E WITH (
-		HOLDLOCK
-		,INDEX (IX_TEST)
-		) ON 1 = 1
+        HOLDLOCK
+        ,INDEX (IX_TEST)
+        ) ON 1 = 1
 GO
 
 SELECT *
 FROM Someplace S
 CROSS JOIN Elsewhere AS E ON 1 = 1
 OPTION (
-	LOOP JOIN
-	,FORCE ORDER
-	)
+    LOOP JOIN
+    ,FORCE ORDER
+    )
 GO
 
 

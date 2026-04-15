@@ -225,7 +225,7 @@ function buildArgs(): string[] {
         }
     };
 
-    str('indentString',            'indent-string',              '\t');
+    str('indentString',            'indent-string',              '    ');
     num('spacesPerTab',            'spaces-per-tab',             4);
     num('maxLineWidth',            'max-line-width',             999);
     num('newStatementLineBreaks',  'statement-breaks',           2);

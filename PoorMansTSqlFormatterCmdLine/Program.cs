@@ -8,7 +8,7 @@ using System.CommandLine;
 using System.Text;
 using PoorMansTSqlFormatterLib.Formatters;
 
-var indentString = new Option<string>("--indent-string", () => "\t", "String to use for indentation");
+var indentString = new Option<string>("--indent-string", () => "    ", "String to use for indentation");
 indentString.AddAlias("-is");
 
 var spacesPerTab = new Option<int>("--spaces-per-tab", () => 4, "Number of spaces per tab");

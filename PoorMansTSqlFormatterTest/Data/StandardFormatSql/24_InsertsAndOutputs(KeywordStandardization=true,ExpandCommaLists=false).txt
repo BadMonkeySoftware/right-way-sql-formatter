@@ -22,25 +22,25 @@ CREATE TABLE #Test2 (TestCol INT)
 INSERT INTO #Test2
 SELECT *
 FROM (
-	INSERT INTO #Test1
-	OUTPUT INSERTED.*
-	SELECT 1
-	) AS TEST1
+    INSERT INTO #Test1
+    OUTPUT INSERTED.*
+    SELECT 1
+    ) AS TEST1
 
 INSERT INTO #Test2
 SELECT *
 FROM (
-	DELETE #Test1
-	OUTPUT 2 AS Whatever
-	) AS TEST1
+    DELETE #Test1
+    OUTPUT 2 AS Whatever
+    ) AS TEST1
 
 INSERT INTO #Test2
 SELECT *
 FROM (
-	UPDATE #Test2
-	SET TestCol = TestCol - 1
-	OUTPUT deleted.TestCol + 500 AS Whatever
-	) AS TEST1
+    UPDATE #Test2
+    SET TestCol = TestCol - 1
+    OUTPUT deleted.TestCol + 500 AS Whatever
+    ) AS TEST1
 
 DELETE #Test2
 OUTPUT deleted.*
@@ -64,8 +64,8 @@ INSERT INTO @Test1
 OUTPUT INSERTED.*
 SELECT Value2
 FROM (
-	SELECT 2 AS Value2
-	) AS SampleData
+    SELECT 2 AS Value2
+    ) AS SampleData
 GO
 
 --But remember that the OUTPUT keyword also has other uses!

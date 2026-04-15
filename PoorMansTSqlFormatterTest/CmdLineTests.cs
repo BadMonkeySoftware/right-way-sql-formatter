@@ -47,21 +47,21 @@ namespace PoorMansTSqlFormatterTests
         [Test]
         public void TestCmdLineFormattingSwitches()
         {
-            TestFormattingFlags("SELECT 1, 2", "SELECT 1\n\t,2", "");
+            TestFormattingFlags("SELECT 1, 2", "SELECT 1\n    ,2", "");
             TestFormattingFlags("SELECT 1, 2", "SELECT 1, 2", "--expand-comma-lists=false");
             TestFormattingFlags("SELECT 1, 2", "SELECT 1\n ,2", "--indent-string=\" \"");
-            TestFormattingFlags("SELECT 1, 2", "SELECT 1\n\t, 2", "--space-after-expanded-comma");
-            TestFormattingFlags("SELECT 1, 2", "SELECT 1,\n\t2", "--trailing-commas");
-            TestFormattingFlags("SELECT BETWEEN 1 and 2", "SELECT BETWEEN 1\n\t\tAND 2", "");
+            TestFormattingFlags("SELECT 1, 2", "SELECT 1\n    , 2", "--space-after-expanded-comma");
+            TestFormattingFlags("SELECT 1, 2", "SELECT 1,\n    2", "--trailing-commas");
+            TestFormattingFlags("SELECT BETWEEN 1 and 2", "SELECT BETWEEN 1\n        AND 2", "");
             TestFormattingFlags("SELECT BETWEEN 1 and 2", "SELECT BETWEEN 1 AND 2", "--expand-between=false");
             TestFormattingFlags("SELECT SELECT", "SELECT\n\nSELECT", "");
             TestFormattingFlags("SELECT SELECT", "SELECTSELECT", "--statement-breaks=0");
             TestFormattingFlags("SELECT FROM", "SELECT FROM", "--clause-breaks=0", "\n");
-            TestFormattingFlags("SELECT 1 and 2", "SELECT 1\n\tAND 2", "");
+            TestFormattingFlags("SELECT 1 and 2", "SELECT 1\n    AND 2", "");
             TestFormattingFlags("SELECT 1 and 2", "SELECT 1 AND 2", "--expand-boolean=false");
-            TestFormattingFlags("SELECT case 1 when 2 then 3 end", "SELECT CASE 1\n\t\tWHEN 2\n\t\t\tTHEN 3\n\t\tEND", "");
+            TestFormattingFlags("SELECT case 1 when 2 then 3 end", "SELECT CASE 1\n        WHEN 2\n            THEN 3\n        END", "");
             TestFormattingFlags("SELECT case 1 when 2 then 3 end", "SELECT CASE 1 WHEN 2 THEN 3 END", "--expand-case=false");
-            TestFormattingFlags("SELECT in (1,2)", "SELECT IN (\n\t\t1\n\t\t,2\n\t\t)", "");
+            TestFormattingFlags("SELECT in (1,2)", "SELECT IN (\n        1\n        ,2\n        )", "");
             TestFormattingFlags("SELECT in (1,2)", "SELECT IN (1, 2)", "--expand-in-lists=false");
             TestFormattingFlags("SELECT in (1,2)", "select in (1, 2)", "--expand-in-lists=false --uppercase-keywords=false");
             TestFormattingFlags("SELECT NATIONAL CHARACTER VARYING", "SELECT NVARCHAR", "");

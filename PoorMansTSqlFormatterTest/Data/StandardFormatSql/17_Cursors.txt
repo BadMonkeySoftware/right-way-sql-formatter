@@ -1,4 +1,4 @@
-﻿USE master;
+USE master;
 GO
 
 DECLARE @Test INT
@@ -16,11 +16,11 @@ INTO @Test
 
 WHILE @@FETCH_STATUS = 0
 BEGIN
-	PRINT 'I was here!'
+    PRINT 'I was here!'
 
-	FETCH NEXT
-	FROM Test$Me
-	INTO @Test
+    FETCH NEXT
+    FROM Test$Me
+    INTO @Test
 END
 
 CLOSE Test$Me
@@ -29,17 +29,17 @@ DEALLOCATE Test$Me
 GO
 
 CREATE TABLE #CursorFodder (
-	One INT
-	,Two INT
-	)
+    One INT
+    ,Two INT
+    )
 
 SET NOCOUNT ON
 
 INSERT INTO #CursorFodder
 VALUES (
-	1
-	,2
-	)
+    1
+    ,2
+    )
 
 SET NOCOUNT OFF
 
@@ -59,11 +59,11 @@ INTO @Test2
 
 WHILE @@FETCH_STATUS = 0
 BEGIN
-	PRINT 'I was here!'
+    PRINT 'I was here!'
 
-	FETCH NEXT
-	FROM Test$Me_Again_François
-	INTO @Test2
+    FETCH NEXT
+    FROM Test$Me_Again_François
+    INTO @Test2
 END
 
 CLOSE Test$Me_Again_François

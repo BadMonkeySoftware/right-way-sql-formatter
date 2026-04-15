@@ -1,4 +1,4 @@
-﻿-- Retrieved from http://ola.hallengren.com/
+-- Retrieved from http://ola.hallengren.com/
 /*
 Copyright (c) 2010 Ola Hallengren
 

@@ -1,4 +1,4 @@
-﻿-- Sample script from Brent Ozar:
+-- Sample script from Brent Ozar:
 --  http://www.brentozar.com/sql/blitz-minute-sql-server-takeovers/
 /*
 Script:       BLITZ! 60 Minute Server Takeovers by Brent Ozar
@@ -17,14 +17,14 @@ Description:  Shows what I look for when I take over existing servers.
    scripts, check http://ola.hallengren.com.
 */
 SELECT d.name
-	,MAX(b.backup_finish_date) AS last_backup_finish_date
+    ,MAX(b.backup_finish_date) AS last_backup_finish_date
 FROM master.sys.databases d
 LEFT OUTER JOIN msdb.dbo.backupset b ON d.name = b.database_name
-	AND b.type = 'D'
+    AND b.type = 'D'
 WHERE d.database_id NOT IN (
-		2
-		,3
-		) -- Bonus points if you know what that means
+        2
+        ,3
+        ) -- Bonus points if you know what that means
 GROUP BY d.name
 ORDER BY 2 DESC
 
@@ -39,7 +39,7 @@ ORDER BY 2 DESC
 	http://www.brentozar.com/sql/backup-best-practices/
 */
 SELECT TOP 100 physical_device_name
-	,*
+    ,*
 FROM msdb.dbo.backupmediafamily
 ORDER BY media_set_id DESC
 
@@ -49,44 +49,44 @@ ORDER BY media_set_id DESC
    simple recovery mode or doing t-log backups.
 */
 SELECT d.name
-	,d.recovery_model
-	,d.recovery_model_desc
+    ,d.recovery_model
+    ,d.recovery_model_desc
 FROM master.sys.databases d
 LEFT OUTER JOIN msdb.dbo.backupset b ON d.name = b.database_name
-	AND b.type = 'L'
+    AND b.type = 'L'
 WHERE d.recovery_model IN (
-		1
-		,2
-		)
-	AND b.type IS NULL
-	AND d.database_id NOT IN (
-		2
-		,3
-		)
+        1
+        ,2
+        )
+    AND b.type IS NULL
+    AND d.database_id NOT IN (
+        2
+        ,3
+        )
 
 /*
    If there are any databases in full recovery mode with no t-log backups,
    show the filesize of the according ldf.
 */
 SELECT d.name AS [db_name]
-	,f.name AS [ldf_name]
-	,f.physical_name
-	,f.size * 8 / 1024.00 AS [size_in_mb]
-	,d.recovery_model_desc
+    ,f.name AS [ldf_name]
+    ,f.physical_name
+    ,f.size * 8 / 1024.00 AS [size_in_mb]
+    ,d.recovery_model_desc
 FROM sys.master_files f
 JOIN sys.databases d ON f.database_id = d.database_id
 LEFT OUTER JOIN msdb.dbo.backupset b ON d.name = b.database_name
-	AND b.type = 'L'
+    AND b.type = 'L'
 WHERE d.recovery_model IN (
-		1
-		,2
-		)
-	AND b.type IS NULL
-	AND d.database_id NOT IN (
-		2
-		,3
-		)
-	AND f.type = 1 -- only show log files
+        1
+        ,2
+        )
+    AND b.type IS NULL
+    AND d.database_id NOT IN (
+        2
+        ,3
+        )
+    AND f.type = 1 -- only show log files
 ORDER BY f.size DESC
 
 /* 
@@ -97,7 +97,7 @@ ORDER BY f.size DESC
    http://www.brentozar.com/archive/2009/09/checking-your-msdb-cleanup-jobs/
 */
 SELECT TOP 1 backup_start_date
-	,*
+    ,*
 FROM msdb.dbo.backupset
 ORDER BY backup_set_id ASC
 
@@ -109,49 +109,49 @@ ORDER BY backup_set_id ASC
     
 */
 CREATE TABLE #temp (
-	ParentObject VARCHAR(255)
-	,[Object] VARCHAR(255)
-	,Field VARCHAR(255)
-	,[Value] VARCHAR(255)
-	)
+    ParentObject VARCHAR(255)
+    ,[Object] VARCHAR(255)
+    ,Field VARCHAR(255)
+    ,[Value] VARCHAR(255)
+    )
 
 CREATE TABLE #DBCCResults (
-	ServerName VARCHAR(255)
-	,DBName VARCHAR(255)
-	,LastCleanDBCCDate DATETIME
-	)
+    ServerName VARCHAR(255)
+    ,DBName VARCHAR(255)
+    ,LastCleanDBCCDate DATETIME
+    )
 
 EXEC master.dbo.sp_MSforeachdb @command1 = 'USE [?] INSERT INTO #temp EXECUTE (''DBCC DBINFO WITH TABLERESULTS'')'
-	,@command2 = 'INSERT INTO #DBCCResults SELECT @@SERVERNAME, ''?'', Value FROM #temp WHERE Field = ''dbi_dbccLastKnownGood'''
-	,@command3 = 'TRUNCATE TABLE #temp'
-	--Delete duplicates due to a bug in SQL Server 2008
-	;
+    ,@command2 = 'INSERT INTO #DBCCResults SELECT @@SERVERNAME, ''?'', Value FROM #temp WHERE Field = ''dbi_dbccLastKnownGood'''
+    ,@command3 = 'TRUNCATE TABLE #temp'
+    --Delete duplicates due to a bug in SQL Server 2008
+    ;
 
 WITH DBCC_CTE
 AS (
-	SELECT ROW_NUMBER() OVER (
-			PARTITION BY ServerName
-			,DBName
-			,LastCleanDBCCDate ORDER BY LastCleanDBCCDate
-			) RowID
-	FROM #DBCCResults
-	)
+    SELECT ROW_NUMBER() OVER (
+            PARTITION BY ServerName
+            ,DBName
+            ,LastCleanDBCCDate ORDER BY LastCleanDBCCDate
+            ) RowID
+    FROM #DBCCResults
+    )
 DELETE
 FROM DBCC_CTE
 WHERE RowID > 1;
 
 SELECT ServerName
-	,DBName
-	,CASE LastCleanDBCCDate
-		WHEN '1900-01-01 00:00:00.000'
-			THEN 'Never ran DBCC CHECKDB'
-		ELSE CAST(LastCleanDBCCDate AS VARCHAR)
-		END AS LastCleanDBCCDate
+    ,DBName
+    ,CASE LastCleanDBCCDate
+        WHEN '1900-01-01 00:00:00.000'
+            THEN 'Never ran DBCC CHECKDB'
+        ELSE CAST(LastCleanDBCCDate AS VARCHAR)
+        END AS LastCleanDBCCDate
 FROM #DBCCResults
 ORDER BY 3
 
 DROP TABLE #temp
-	,#DBCCResults;
+    ,#DBCCResults;
 
 /*
 	If any databases have never experienced the magic of DBCC, consider doing that
@@ -173,20 +173,20 @@ DECLARE @MaxLength INT
 SET @MaxLength = 50
 
 DECLARE @xp_results TABLE (
-	job_id UNIQUEIDENTIFIER NOT NULL
-	,last_run_date NVARCHAR(20) NOT NULL
-	,last_run_time NVARCHAR(20) NOT NULL
-	,next_run_date NVARCHAR(20) NOT NULL
-	,next_run_time NVARCHAR(20) NOT NULL
-	,next_run_schedule_id INT NOT NULL
-	,requested_to_run INT NOT NULL
-	,request_source INT NOT NULL
-	,request_source_id SYSNAME COLLATE database_default NULL
-	,running INT NOT NULL
-	,current_step INT NOT NULL
-	,current_retry_attempt INT NOT NULL
-	,job_state INT NOT NULL
-	)
+    job_id UNIQUEIDENTIFIER NOT NULL
+    ,last_run_date NVARCHAR(20) NOT NULL
+    ,last_run_time NVARCHAR(20) NOT NULL
+    ,next_run_date NVARCHAR(20) NOT NULL
+    ,next_run_time NVARCHAR(20) NOT NULL
+    ,next_run_schedule_id INT NOT NULL
+    ,requested_to_run INT NOT NULL
+    ,request_source INT NOT NULL
+    ,request_source_id SYSNAME COLLATE database_default NULL
+    ,running INT NOT NULL
+    ,current_step INT NOT NULL
+    ,current_retry_attempt INT NOT NULL
+    ,job_state INT NOT NULL
+    )
 DECLARE @job_owner SYSNAME
 DECLARE @is_sysadmin INT
 
@@ -195,56 +195,56 @@ SET @job_owner = suser_sname()
 
 INSERT INTO @xp_results
 EXECUTE sys.xp_sqlagent_enum_jobs @is_sysadmin
-	,@job_owner
+    ,@job_owner
 
 UPDATE @xp_results
 SET last_run_time = right('000000' + last_run_time, 6)
-	,next_run_time = right('000000' + next_run_time, 6)
+    ,next_run_time = right('000000' + next_run_time, 6)
 
 SELECT j.name AS JobName
-	,j.enabled AS Enabled
-	,sl.name AS OwnerName
-	,CASE x.running
-		WHEN 1
-			THEN 'Running'
-		ELSE CASE h.run_status
-				WHEN 2
-					THEN 'Inactive'
-				WHEN 4
-					THEN 'Inactive'
-				ELSE 'Completed'
-				END
-		END AS CurrentStatus
-	,coalesce(x.current_step, 0) AS CurrentStepNbr
-	,CASE 
-		WHEN x.last_run_date > 0
-			THEN convert(DATETIME, substring(x.last_run_date, 1, 4) + '-' + substring(x.last_run_date, 5, 2) + '-' + substring(x.last_run_date, 7, 2) + ' ' + substring(x.last_run_time, 1, 2) + ':' + substring(x.last_run_time, 3, 2) + ':' + substring(x.last_run_time, 5, 2) + '.000', 121)
-		ELSE NULL
-		END AS LastRunTime
-	,CASE h.run_status
-		WHEN 0
-			THEN 'Fail'
-		WHEN 1
-			THEN 'Success'
-		WHEN 2
-			THEN 'Retry'
-		WHEN 3
-			THEN 'Cancel'
-		WHEN 4
-			THEN 'In progress'
-		END AS LastRunOutcome
-	,CASE 
-		WHEN h.run_duration > 0
-			THEN (h.run_duration / 1000000) * (3600 * 24) + (h.run_duration / 10000 % 100) * 3600 + (h.run_duration / 100 % 100) * 60 + (h.run_duration % 100)
-		ELSE NULL
-		END AS LastRunDuration
+    ,j.enabled AS Enabled
+    ,sl.name AS OwnerName
+    ,CASE x.running
+        WHEN 1
+            THEN 'Running'
+        ELSE CASE h.run_status
+                WHEN 2
+                    THEN 'Inactive'
+                WHEN 4
+                    THEN 'Inactive'
+                ELSE 'Completed'
+                END
+        END AS CurrentStatus
+    ,coalesce(x.current_step, 0) AS CurrentStepNbr
+    ,CASE 
+        WHEN x.last_run_date > 0
+            THEN convert(DATETIME, substring(x.last_run_date, 1, 4) + '-' + substring(x.last_run_date, 5, 2) + '-' + substring(x.last_run_date, 7, 2) + ' ' + substring(x.last_run_time, 1, 2) + ':' + substring(x.last_run_time, 3, 2) + ':' + substring(x.last_run_time, 5, 2) + '.000', 121)
+        ELSE NULL
+        END AS LastRunTime
+    ,CASE h.run_status
+        WHEN 0
+            THEN 'Fail'
+        WHEN 1
+            THEN 'Success'
+        WHEN 2
+            THEN 'Retry'
+        WHEN 3
+            THEN 'Cancel'
+        WHEN 4
+            THEN 'In progress'
+        END AS LastRunOutcome
+    ,CASE 
+        WHEN h.run_duration > 0
+            THEN (h.run_duration / 1000000) * (3600 * 24) + (h.run_duration / 10000 % 100) * 3600 + (h.run_duration / 100 % 100) * 60 + (h.run_duration % 100)
+        ELSE NULL
+        END AS LastRunDuration
 FROM @xp_results x
 LEFT JOIN msdb.dbo.sysjobs j ON x.job_id = j.job_id
 LEFT OUTER JOIN msdb.dbo.syscategories c ON j.category_id = c.category_id
 LEFT OUTER JOIN msdb.dbo.sysjobhistory h ON x.job_id = h.job_id
-	AND x.last_run_date = h.run_date
-	AND x.last_run_time = h.run_time
-	AND h.step_id = 0
+    AND x.last_run_date = h.run_date
+    AND x.last_run_time = h.run_time
+    AND h.step_id = 0
 LEFT OUTER JOIN sys.syslogins sl ON j.owner_sid = sl.sid
 
 /*
@@ -257,16 +257,16 @@ LEFT OUTER JOIN sys.syslogins sl ON j.owner_sid = sl.sid
 	Think of them as users who can get you fired.
 */
 SELECT l.name
-	,l.denylogin
-	,l.isntname
-	,l.isntgroup
-	,l.isntuser
+    ,l.denylogin
+    ,l.isntname
+    ,l.isntgroup
+    ,l.isntuser
 FROM master.sys.syslogins l
 WHERE l.sysadmin = 1
-	OR l.securityadmin = 1
+    OR l.securityadmin = 1
 ORDER BY l.isntgroup
-	,l.isntname
-	,l.isntuser
+    ,l.isntname
+    ,l.isntuser
 
 /*
 	Now would be an excellent time to open up a Word doc and start documenting
@@ -280,7 +280,7 @@ ORDER BY l.isntgroup
 	Let's review some server-level security & configuration settings.
 */
 EXEC dbo.sp_configure 'show advanced options'
-	,1
+    ,1
 GO
 
 RECONFIGURE
@@ -378,8 +378,8 @@ FROM sys.servers
 
 */
 EXEC msdb.dbo.sp_send_dbmail @recipients = 'email@domain.com'
-	,@body = @@SERVERNAME
-	,@subject = 'Testing SQL Server Database Mail - see body for server name';
+    ,@body = @@SERVERNAME
+    ,@subject = 'Testing SQL Server Database Mail - see body for server name';
 GO
 
 /*
@@ -393,174 +393,174 @@ USE [msdb]
 GO
 
 EXEC msdb.dbo.sp_add_operator @name = N'The Database Administrator'
-	,@enabled = 1
-	,@weekday_pager_start_time = 0
-	,@weekday_pager_end_time = 235959
-	,@saturday_pager_start_time = 0
-	,@saturday_pager_end_time = 235959
-	,@sunday_pager_start_time = 0
-	,@sunday_pager_end_time = 235959
-	,@pager_days = 127
-	,@email_address = N'YourEmailAddress@Hotmail.com'
-	,@pager_address = N'8005551212@cingularme.com'
-	,@category_name = N'[Uncategorized]'
+    ,@enabled = 1
+    ,@weekday_pager_start_time = 0
+    ,@weekday_pager_end_time = 235959
+    ,@saturday_pager_start_time = 0
+    ,@saturday_pager_end_time = 235959
+    ,@sunday_pager_start_time = 0
+    ,@sunday_pager_end_time = 235959
+    ,@pager_days = 127
+    ,@email_address = N'YourEmailAddress@Hotmail.com'
+    ,@pager_address = N'8005551212@cingularme.com'
+    ,@category_name = N'[Uncategorized]'
 GO
 
 EXEC msdb.dbo.sp_add_alert @name = N'Severity 016'
-	,@message_id = 0
-	,@severity = 16
-	,@enabled = 1
-	,@delay_between_responses = 60
-	,@include_event_description_in = 1
-	,@job_id = N'00000000-0000-0000-0000-000000000000'
+    ,@message_id = 0
+    ,@severity = 16
+    ,@enabled = 1
+    ,@delay_between_responses = 60
+    ,@include_event_description_in = 1
+    ,@job_id = N'00000000-0000-0000-0000-000000000000'
 GO
 
 EXEC msdb.dbo.sp_add_notification @alert_name = N'Severity 016'
-	,@operator_name = N'The Database Administrator'
-	,@notification_method = 7
+    ,@operator_name = N'The Database Administrator'
+    ,@notification_method = 7
 GO
 
 EXEC msdb.dbo.sp_add_alert @name = N'Severity 017'
-	,@message_id = 0
-	,@severity = 17
-	,@enabled = 1
-	,@delay_between_responses = 60
-	,@include_event_description_in = 1
-	,@job_id = N'00000000-0000-0000-0000-000000000000'
+    ,@message_id = 0
+    ,@severity = 17
+    ,@enabled = 1
+    ,@delay_between_responses = 60
+    ,@include_event_description_in = 1
+    ,@job_id = N'00000000-0000-0000-0000-000000000000'
 GO
 
 EXEC msdb.dbo.sp_add_notification @alert_name = N'Severity 017'
-	,@operator_name = N'The Database Administrator'
-	,@notification_method = 7
+    ,@operator_name = N'The Database Administrator'
+    ,@notification_method = 7
 GO
 
 EXEC msdb.dbo.sp_add_alert @name = N'Severity 018'
-	,@message_id = 0
-	,@severity = 18
-	,@enabled = 1
-	,@delay_between_responses = 60
-	,@include_event_description_in = 1
-	,@job_id = N'00000000-0000-0000-0000-000000000000'
+    ,@message_id = 0
+    ,@severity = 18
+    ,@enabled = 1
+    ,@delay_between_responses = 60
+    ,@include_event_description_in = 1
+    ,@job_id = N'00000000-0000-0000-0000-000000000000'
 GO
 
 EXEC msdb.dbo.sp_add_notification @alert_name = N'Severity 018'
-	,@operator_name = N'The Database Administrator'
-	,@notification_method = 7
+    ,@operator_name = N'The Database Administrator'
+    ,@notification_method = 7
 GO
 
 EXEC msdb.dbo.sp_add_alert @name = N'Severity 019'
-	,@message_id = 0
-	,@severity = 19
-	,@enabled = 1
-	,@delay_between_responses = 60
-	,@include_event_description_in = 1
-	,@job_id = N'00000000-0000-0000-0000-000000000000'
+    ,@message_id = 0
+    ,@severity = 19
+    ,@enabled = 1
+    ,@delay_between_responses = 60
+    ,@include_event_description_in = 1
+    ,@job_id = N'00000000-0000-0000-0000-000000000000'
 GO
 
 EXEC msdb.dbo.sp_add_notification @alert_name = N'Severity 019'
-	,@operator_name = N'The Database Administrator'
-	,@notification_method = 7
+    ,@operator_name = N'The Database Administrator'
+    ,@notification_method = 7
 GO
 
 EXEC msdb.dbo.sp_add_alert @name = N'Severity 020'
-	,@message_id = 0
-	,@severity = 20
-	,@enabled = 1
-	,@delay_between_responses = 60
-	,@include_event_description_in = 1
-	,@job_id = N'00000000-0000-0000-0000-000000000000'
+    ,@message_id = 0
+    ,@severity = 20
+    ,@enabled = 1
+    ,@delay_between_responses = 60
+    ,@include_event_description_in = 1
+    ,@job_id = N'00000000-0000-0000-0000-000000000000'
 GO
 
 EXEC msdb.dbo.sp_add_notification @alert_name = N'Severity 020'
-	,@operator_name = N'The Database Administrator'
-	,@notification_method = 7
+    ,@operator_name = N'The Database Administrator'
+    ,@notification_method = 7
 GO
 
 EXEC msdb.dbo.sp_add_alert @name = N'Severity 021'
-	,@message_id = 0
-	,@severity = 21
-	,@enabled = 1
-	,@delay_between_responses = 60
-	,@include_event_description_in = 1
-	,@job_id = N'00000000-0000-0000-0000-000000000000'
+    ,@message_id = 0
+    ,@severity = 21
+    ,@enabled = 1
+    ,@delay_between_responses = 60
+    ,@include_event_description_in = 1
+    ,@job_id = N'00000000-0000-0000-0000-000000000000'
 GO
 
 EXEC msdb.dbo.sp_add_notification @alert_name = N'Severity 021'
-	,@operator_name = N'The Database Administrator'
-	,@notification_method = 7
+    ,@operator_name = N'The Database Administrator'
+    ,@notification_method = 7
 GO
 
 EXEC msdb.dbo.sp_add_alert @name = N'Severity 022'
-	,@message_id = 0
-	,@severity = 22
-	,@enabled = 1
-	,@delay_between_responses = 60
-	,@include_event_description_in = 1
-	,@job_id = N'00000000-0000-0000-0000-000000000000'
+    ,@message_id = 0
+    ,@severity = 22
+    ,@enabled = 1
+    ,@delay_between_responses = 60
+    ,@include_event_description_in = 1
+    ,@job_id = N'00000000-0000-0000-0000-000000000000'
 GO
 
 EXEC msdb.dbo.sp_add_notification @alert_name = N'Severity 022'
-	,@operator_name = N'The Database Administrator'
-	,@notification_method = 7
+    ,@operator_name = N'The Database Administrator'
+    ,@notification_method = 7
 GO
 
 EXEC msdb.dbo.sp_add_alert @name = N'Severity 023'
-	,@message_id = 0
-	,@severity = 23
-	,@enabled = 1
-	,@delay_between_responses = 60
-	,@include_event_description_in = 1
-	,@job_id = N'00000000-0000-0000-0000-000000000000'
+    ,@message_id = 0
+    ,@severity = 23
+    ,@enabled = 1
+    ,@delay_between_responses = 60
+    ,@include_event_description_in = 1
+    ,@job_id = N'00000000-0000-0000-0000-000000000000'
 GO
 
 EXEC msdb.dbo.sp_add_notification @alert_name = N'Severity 023'
-	,@operator_name = N'The Database Administrator'
-	,@notification_method = 7
+    ,@operator_name = N'The Database Administrator'
+    ,@notification_method = 7
 GO
 
 EXEC msdb.dbo.sp_add_alert @name = N'Severity 024'
-	,@message_id = 0
-	,@severity = 24
-	,@enabled = 1
-	,@delay_between_responses = 60
-	,@include_event_description_in = 1
-	,@job_id = N'00000000-0000-0000-0000-000000000000'
+    ,@message_id = 0
+    ,@severity = 24
+    ,@enabled = 1
+    ,@delay_between_responses = 60
+    ,@include_event_description_in = 1
+    ,@job_id = N'00000000-0000-0000-0000-000000000000'
 GO
 
 EXEC msdb.dbo.sp_add_notification @alert_name = N'Severity 024'
-	,@operator_name = N'The Database Administrator'
-	,@notification_method = 7
+    ,@operator_name = N'The Database Administrator'
+    ,@notification_method = 7
 GO
 
 EXEC msdb.dbo.sp_add_alert @name = N'Severity 025'
-	,@message_id = 0
-	,@severity = 25
-	,@enabled = 1
-	,@delay_between_responses = 60
-	,@include_event_description_in = 1
-	,@job_id = N'00000000-0000-0000-0000-000000000000'
+    ,@message_id = 0
+    ,@severity = 25
+    ,@enabled = 1
+    ,@delay_between_responses = 60
+    ,@include_event_description_in = 1
+    ,@job_id = N'00000000-0000-0000-0000-000000000000'
 GO
 
 EXEC msdb.dbo.sp_add_notification @alert_name = N'Severity 025'
-	,@operator_name = N'The Database Administrator'
-	,@notification_method = 7
+    ,@operator_name = N'The Database Administrator'
+    ,@notification_method = 7
 GO
 
 /* Specific Alert for Error 825 
 http://www.sqlskills.com/BLOGS/PAUL/post/A-little-known-sign-of-impending-doom-error-825.aspx
 */
 EXEC msdb.dbo.sp_add_alert @name = N'Error 825'
-	,@message_id = 825
-	,@severity = 0
-	,@enabled = 1
-	,@delay_between_responses = 60
-	,@include_event_description_in = 1
-	,@job_id = N'00000000-0000-0000-0000-000000000000'
+    ,@message_id = 825
+    ,@severity = 0
+    ,@enabled = 1
+    ,@delay_between_responses = 60
+    ,@include_event_description_in = 1
+    ,@job_id = N'00000000-0000-0000-0000-000000000000'
 GO
 
 EXEC msdb.dbo.sp_add_notification @alert_name = N'Error 825'
-	,@operator_name = N'The Database Administrator'
-	,@notification_method = 7
+    ,@operator_name = N'The Database Administrator'
+    ,@notification_method = 7
 GO
 
 /*
@@ -577,20 +577,20 @@ GO
 SELECT *
 FROM master.sys.tables
 WHERE name NOT IN (
-		'spt_fallback_db'
-		,'spt_fallback_dev'
-		,'spt_fallback_usg'
-		,'spt_monitor'
-		,'spt_values'
-		,'MSreplication_options'
-		)
+        'spt_fallback_db'
+        ,'spt_fallback_dev'
+        ,'spt_fallback_usg'
+        ,'spt_monitor'
+        ,'spt_values'
+        ,'MSreplication_options'
+        )
 
 SELECT *
 FROM master.sys.procedures
 WHERE name NOT IN (
-		'sp_MSrepl_startup'
-		,'sp_MScleanupmergepublisher'
-		)
+        'sp_MSrepl_startup'
+        ,'sp_MScleanupmergepublisher'
+        )
 
 SELECT *
 FROM model.sys.tables
@@ -617,7 +617,7 @@ FROM sys.databases
 	cert and the password to unlock it, then the database can't be restored.
 */
 SELECT d.name
-	,k.*
+    ,k.*
 FROM sys.dm_database_encryption_keys k
 INNER JOIN sys.databases d ON k.database_id = d.database_id
 ORDER BY d.name
@@ -638,7 +638,7 @@ EXEC dbo.sp_MSforeachdb 'SELECT ''[?]'' AS DatabaseName, * FROM [?].sys.dm_db_pe
 	In the results, also check the number of data and log files for all databases.
 */
 SELECT db_name(database_id)
-	,*
+    ,*
 FROM sys.master_files
 
 /*
@@ -656,7 +656,7 @@ EXEC dbo.sp_MSforeachdb 'SELECT ''[?]'' AS database_name, o.name AS table_name, 
 	http://sqlserverpedia.com/wiki/Wait_Types
 */
 SELECT *
-	,(wait_time_ms - signal_wait_time_ms) AS real_wait_time_ms
+    ,(wait_time_ms - signal_wait_time_ms) AS real_wait_time_ms
 FROM sys.dm_os_wait_stats
 ORDER BY (wait_time_ms - signal_wait_time_ms) DESC
 
@@ -666,46 +666,46 @@ ORDER BY (wait_time_ms - signal_wait_time_ms) DESC
 	you want to check, and it's extremely fast.
 */
 SELECT t.name AS tableName
-	,p.*
+    ,p.*
 FROM sys.tables AS t
 INNER JOIN sys.indexes AS i1 ON i1.object_id = t.object_id
 CROSS APPLY (
-	SELECT TOP 1 *
-	FROM sys.indexes AS i
-	WHERE i.object_id = i1.object_id
-		AND i.index_id > i1.index_id
-		AND i.type_desc <> 'xml'
-	ORDER BY i.index_id
-	) AS i2
+    SELECT TOP 1 *
+    FROM sys.indexes AS i
+    WHERE i.object_id = i1.object_id
+        AND i.index_id > i1.index_id
+        AND i.type_desc <> 'xml'
+    ORDER BY i.index_id
+    ) AS i2
 CROSS APPLY (
-	SELECT min(a.index_id) AS ind1
-		,min(b.index_id) AS ind2
-	FROM (
-		SELECT ic.*
-		FROM sys.index_columns ic
-		WHERE ic.object_id = i1.object_id
-			AND ic.index_id = i1.index_id
-			AND ic.is_included_column = 0
-		) AS a
-	FULL OUTER JOIN (
-		SELECT *
-		FROM sys.index_columns AS ic
-		WHERE ic.object_id = i2.object_id
-			AND ic.index_id = i2.index_id
-			AND ic.is_included_column = 0
-		) AS b ON a.index_column_id = b.index_column_id
-		AND a.column_id = b.column_id
-		AND a.key_ordinal = b.key_ordinal
-	HAVING count(CASE 
-				WHEN a.index_id IS NULL
-					THEN 1
-				END) = 0
-		AND count(CASE 
-				WHEN b.index_id IS NULL
-					THEN 1
-				END) = 0
-		AND count(a.index_id) = count(b.index_id)
-	) AS p
+    SELECT min(a.index_id) AS ind1
+        ,min(b.index_id) AS ind2
+    FROM (
+        SELECT ic.*
+        FROM sys.index_columns ic
+        WHERE ic.object_id = i1.object_id
+            AND ic.index_id = i1.index_id
+            AND ic.is_included_column = 0
+        ) AS a
+    FULL OUTER JOIN (
+        SELECT *
+        FROM sys.index_columns AS ic
+        WHERE ic.object_id = i2.object_id
+            AND ic.index_id = i2.index_id
+            AND ic.is_included_column = 0
+        ) AS b ON a.index_column_id = b.index_column_id
+        AND a.column_id = b.column_id
+        AND a.key_ordinal = b.key_ordinal
+    HAVING count(CASE 
+                WHEN a.index_id IS NULL
+                    THEN 1
+                END) = 0
+        AND count(CASE 
+                WHEN b.index_id IS NULL
+                    THEN 1
+                END) = 0
+        AND count(a.index_id) = count(b.index_id)
+    ) AS p
 WHERE i1.type_desc <> 'xml'
 
 /*
@@ -727,24 +727,24 @@ WHERE i1.type_desc <> 'xml'
 	http://sqlserverpedia.com/wiki/Index_Maintenance
 */
 SELECT db.name AS databaseName
-	,SCHEMA_NAME(obj.schema_id) AS schemaName
-	,OBJECT_NAME(ps.OBJECT_ID) AS tableName
-	,ps.OBJECT_ID AS objectID
-	,ps.index_id AS indexID
-	,ps.partition_number AS partitionNumber
-	,ps.avg_fragmentation_in_percent AS fragmentation
-	,ps.page_count
+    ,SCHEMA_NAME(obj.schema_id) AS schemaName
+    ,OBJECT_NAME(ps.OBJECT_ID) AS tableName
+    ,ps.OBJECT_ID AS objectID
+    ,ps.index_id AS indexID
+    ,ps.partition_number AS partitionNumber
+    ,ps.avg_fragmentation_in_percent AS fragmentation
+    ,ps.page_count
 FROM sys.databases db
 INNER JOIN sys.dm_db_index_physical_stats(DB_ID(), NULL, NULL, NULL, N'Limited') ps ON db.database_id = ps.database_id
 INNER JOIN sys.objects obj ON ps.object_id = obj.object_id
 WHERE ps.index_id > 0
-	AND ps.page_count > 100
-	AND ps.avg_fragmentation_in_percent > 30
+    AND ps.page_count > 100
+    AND ps.avg_fragmentation_in_percent > 30
 ORDER BY databaseName
-	,schemaName
-	,tableName
+    ,schemaName
+    ,tableName
 OPTION (MAXDOP 1);
-	/*
+    /*
 	Finally, let's go back to the users and ask questions:
 	- Can the business operate if this server is down?
 	- How many employees have to stop working if this server goes down?
