@@ -1019,6 +1019,31 @@ namespace PoorMansTSqlFormatterLib.Formatters
         }
 
         /// <summary>
+        /// Finds the position of a top-level standalone '=' outside parentheses and string literals.
+        /// Excludes !=, >=, &lt;= compound operators. Returns -1 if not found.
+        /// </summary>
+        private static int FindEqualSignOutsideParens(string s)
+        {
+            int depth = 0;
+            bool inString = false;
+            for (int i = 0; i < s.Length; i++)
+            {
+                char c = s[i];
+                if (inString) { if (c == '\'') inString = false; continue; }
+                if (c == '\'') { inString = true; continue; }
+                if (c == '(') { depth++; continue; }
+                if (c == ')') { depth--; continue; }
+                if (depth == 0 && c == '=')
+                {
+                    if (i > 0 && (s[i - 1] == '!' || s[i - 1] == '>' || s[i - 1] == '<')) continue;
+                    if (i + 1 < s.Length && s[i + 1] == '=') continue;
+                    return i;
+                }
+            }
+            return -1;
+        }
+
+        /// <summary>
         /// Pads column expressions in SELECT lists so that AS keywords align vertically.
         /// Works on the full formatted output, only affecting SELECT column list lines.
         /// </summary>
@@ -1162,22 +1187,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
             }
         }
 
-        private int FindEqualSignOutsideParens(string content)
-        {
-            int depth = 0;
-            for (int i = 0; i < content.Length; i++)
-            {
-                if (content[i] == '(')
-                    depth++;
-                else if (content[i] == ')')
-                    depth--;
-                else if (content[i] == '=' && depth == 0)
-                    return i;
-            }
-            return -1;
-        }
-
-        /// <summary>
+/// <summary>
         /// Aligns DDL column definitions so that column names, data types, and nullability
         /// are in vertical columns.  Input is the formatted content of a DDLDETAIL_PARENS block
         /// (without the surrounding parens).
