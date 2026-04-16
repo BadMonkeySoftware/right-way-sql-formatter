@@ -259,6 +259,12 @@ namespace PoorMansTSqlFormatterLib.Formatters
         /// </summary>
         private void AlignFromJoinBlock(string[] lines, int start, int end, int indentSize)
         {
+            // Keyword tokens that we inject — respect UppercaseKeywords setting.
+            bool uc = Options.UppercaseKeywords;
+            string KW_AS  = uc ? "AS"  : "as";
+            string KW_ON  = uc ? "ON"  : "on";
+            string KW_AND = uc ? "AND" : "and";
+
             // ---- Pass 1: parse each FROM/JOIN line --------------------------
             // For each line extract: indent, keyword (e.g. "FROM", "INNER JOIN"), table, alias, on-clause.
             var items = new List<JoinLineItem>();
@@ -327,7 +333,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 string tablepad = new string(' ', targetTableCol - kwTableLen);
 
                 string aliasPad = new string(' ', maxAliasLen - item.Alias.Length);
-                string asPart = "AS " + item.Alias + aliasPad;
+                string asPart = KW_AS + " " + item.Alias + aliasPad;
 
                 string newLine;
                 if (string.IsNullOrEmpty(item.OnClause))
@@ -337,17 +343,17 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 }
                 else
                 {
-                    string onFull = item.Indent + kwTable + tablepad + asPart + " ON " + item.OnClause;
+                    string onFull = item.Indent + kwTable + tablepad + asPart + " " + KW_ON + " " + item.OnClause;
                     // Check if it fits within 100 chars; if not, check further if multi-condition
                     if (onFull.Length > 100 && item.OnClause.Contains(" AND ", StringComparison.OrdinalIgnoreCase))
                     {
                         // Split conditions and wrap extras.
-                        string onBase = item.Indent + kwTable + tablepad + asPart + " ON ";
+                        string onBase = item.Indent + kwTable + tablepad + asPart + " " + KW_ON + " ";
                         // AND continuation lines align WITH the ON keyword (same column as ON, not after it)
                         string onIndent = new string(' ', targetOnCol);
                         var conditions = SplitOnConditions(item.OnClause);
                         string firstCond = conditions[0];
-                        var rest = conditions.Skip(1).Select(c => item.Indent + onIndent + "AND " + c);
+                        var rest = conditions.Skip(1).Select(c => item.Indent + onIndent + KW_AND + " " + c);
                         newLine = onBase + firstCond + (rest.Any() ? Environment.NewLine + string.Join(Environment.NewLine, rest) : "");
                     }
                     else
