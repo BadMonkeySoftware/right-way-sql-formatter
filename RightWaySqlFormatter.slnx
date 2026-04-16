@@ -2,6 +2,11 @@
   <Folder Name="/PoorMansTSqlFormatterTest/">
     <Project Path="PoorMansTSqlFormatterTest/PoorMansTSqlFormatterTests.csproj" />
   </Folder>
+  <Folder Name="/SSMS Plugin/">
+    <Project Path="PoorMansTSqlFormatterPluginShared/PoorMansTSqlFormatterPluginShared.csproj" />
+    <Project Path="PoorMansTSqlFormatterSSMSLib/PoorMansTSqlFormatterSSMSLib.csproj" />
+    <Project Path="PoorMansTSqlFormatterSSMSPackage/PoorMansTSqlFormatterSSMSPackage.csproj" />
+  </Folder>
   <Project Path="PoorMansTSqlFormatterCmdLine/PoorMansTSqlFormatterCmdLine.csproj" />
   <Project Path="RightWaySqlFormatter/RightWaySqlFormatter.csproj" />
 </Solution>

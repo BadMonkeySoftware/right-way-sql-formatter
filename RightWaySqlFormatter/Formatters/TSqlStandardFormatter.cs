@@ -345,7 +345,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 {
                     string onFull = item.Indent + kwTable + tablepad + asPart + " " + KW_ON + " " + item.OnClause;
                     // Check if it fits within 100 chars; if not, check further if multi-condition
-                    if (onFull.Length > 100 && item.OnClause.Contains(" AND ", StringComparison.OrdinalIgnoreCase))
+                    if (onFull.Length > 100 && item.OnClause.IndexOf(" AND ", StringComparison.OrdinalIgnoreCase) >= 0)
                     {
                         // Split conditions and wrap extras.
                         string onBase = item.Indent + kwTable + tablepad + asPart + " " + KW_ON + " ";
@@ -382,7 +382,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
         {
             // Keywords: FROM, JOIN, INNER JOIN, LEFT JOIN, LEFT OUTER JOIN, RIGHT JOIN,
             //           RIGHT OUTER JOIN, FULL JOIN, FULL OUTER JOIN, CROSS JOIN
-            string[] keywords = [
+            string[] keywords = new string[] {
                 "LEFT OUTER JOIN", "RIGHT OUTER JOIN", "FULL OUTER JOIN",
                 "INNER JOIN", "LEFT JOIN", "RIGHT JOIN", "FULL JOIN", "CROSS JOIN",
                 "JOIN", "FROM"
@@ -639,7 +639,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
             if (expr.IndexOfAny(new[] { '(', ')', ' ', '\t', '+', '-', '/', '%' }) >= 0)
                 return false;
             // Allow * only as part of dereference (already handled above for wildcards)
-            if (expr.Contains('*')) return false;
+            if (expr.IndexOf('*') >= 0) return false;
             // Must look like: word, word.word, [word], [word].[word], schema.table.col, etc.
             // Split on '.' and check each segment is a valid identifier (possibly bracket-quoted).
             foreach (string segment in expr.Split('.'))
