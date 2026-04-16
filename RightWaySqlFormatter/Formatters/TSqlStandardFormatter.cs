@@ -537,14 +537,15 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     if (selectEnd >= 0)
                     {
                         string afterSelect = trimmed.Substring(selectEnd + 1).TrimStart();
-                        // Handle TOP N prefix — skip this line if TOP present
-                        if (!afterSelect.ToUpperInvariant().StartsWith("TOP "))
+                        // Strip SELECT modifiers (TOP N / DISTINCT) before alias processing
+                        var (modPrefix1, colPart1, modOnly1) = StripSelectModifierPrefix(afterSelect);
+                        if (!modOnly1)
                         {
                             string indent = line.Substring(0, line.Length - trimmed.Length);
-                            var (rewritten, newCounter) = EnsureAlias(afterSelect, autoAliasCounter);
+                            var (rewritten, newCounter) = EnsureAlias(colPart1, autoAliasCounter);
                             autoAliasCounter = newCounter;
-                            if (rewritten != afterSelect)
-                                lines[i] = indent + "SELECT " + rewritten;
+                            if (rewritten != colPart1)
+                                lines[i] = indent + "SELECT " + modPrefix1 + rewritten;
                         }
                     }
                     continue;
@@ -574,16 +575,16 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     }
                     else if (!string.IsNullOrWhiteSpace(trimmed))
                     {
-                        // Trailing-comma or bare expression line
-                        string trimmedLine = trimmed.TrimEnd(',');
                         bool hadTrailingComma = trimmed.EndsWith(",");
-                        var (rewritten, newCounter) = EnsureAlias(trimmedLine, autoAliasCounter);
+                        var (modPrefix2, colExpr2, modOnly2) = StripSelectModifierPrefix(trimmed.TrimEnd(','));
+                        if (modOnly2)
+                            continue; // pure TOP N or DISTINCT line — not a column, leave as-is
+
+                        var (rewritten, newCounter) = EnsureAlias(colExpr2, autoAliasCounter);
                         autoAliasCounter = newCounter;
-                        if (rewritten != trimmedLine)
-                        {
-                            string indent = line.Substring(0, line.Length - trimmed.Length);
-                            lines[i] = indent + rewritten + (hadTrailingComma ? "," : "");
-                        }
+                        string indent2 = line.Substring(0, line.Length - trimmed.Length);
+                        if (rewritten != colExpr2 || modPrefix2.Length > 0)
+                            lines[i] = indent2 + modPrefix2 + rewritten + (hadTrailingComma ? "," : "");
                     }
                 }
             }
@@ -675,36 +676,30 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 string trimmed = line.TrimStart();
                 string trimmedUpper = trimmed.ToUpperInvariant();
 
-                // Detect start of SELECT column list: line begins with SELECT (possibly with leading comma)
+                // Detect start of SELECT column list
                 if (trimmedUpper.StartsWith("SELECT ") || trimmedUpper == "SELECT")
                 {
                     inSelectList = true;
-                    // The SELECT line itself may have the first column on the same line as SELECT
-                    // Only transform if " AS " appears after SELECT
                     int selectEnd = trimmed.IndexOf(' ');
                     if (selectEnd >= 0)
                     {
                         string afterSelect = trimmed.Substring(selectEnd + 1).TrimStart();
-                        // Check for TOP N prefix
-                        if (afterSelect.ToUpperInvariant().StartsWith("TOP "))
-                        {
-                            // Skip to after the TOP N token — don't rewrite the SELECT+TOP line
-                        }
-                        else
+                        // Strip SELECT modifiers (TOP N / DISTINCT) before rewriting
+                        var (modPfx1, colPart1, modOnly1) = StripSelectModifierPrefix(afterSelect);
+                        if (!modOnly1)
                         {
                             string indent = line.Substring(0, line.Length - trimmed.Length);
-                            string rewritten = TryRewriteColumnLine(afterSelect);
-                            if (rewritten != afterSelect)
-                                lines[i] = indent + "SELECT " + rewritten;
+                            string rewritten = TryRewriteColumnLine(colPart1);
+                            if (rewritten != colPart1)
+                                lines[i] = indent + "SELECT " + modPfx1 + rewritten;
                         }
                     }
                     continue;
                 }
 
-                // Detect end of SELECT list: unindented clause keyword
+                // Detect end of SELECT list
                 if (inSelectList)
                 {
-                    // A line ending the SELECT list has no leading comma and starts with a keyword
                     bool startsWithComma = trimmed.StartsWith(",");
                     if (!startsWithComma && IsClauseStartLine(trimmedUpper))
                     {
@@ -723,17 +718,17 @@ namespace PoorMansTSqlFormatterLib.Formatters
                             lines[i] = indent + "," + rewritten;
                         }
                     }
-                    else
+                    else if (!string.IsNullOrWhiteSpace(trimmed))
                     {
-                        // Trailing comma or single column style
-                        string trimmedLine = trimmed.TrimEnd(',');
                         bool hadTrailingComma = trimmed.EndsWith(",");
-                        string rewritten = TryRewriteColumnLine(trimmedLine);
-                        if (rewritten != trimmedLine)
-                        {
-                            string indent = line.Substring(0, line.Length - trimmed.Length);
-                            lines[i] = indent + rewritten + (hadTrailingComma ? "," : "");
-                        }
+                        var (modPfx2, colExpr2, modOnly2) = StripSelectModifierPrefix(trimmed.TrimEnd(','));
+                        if (modOnly2)
+                            continue; // pure TOP N or DISTINCT line — not a column, leave as-is
+
+                        string rewritten = TryRewriteColumnLine(colExpr2);
+                        string indent2 = line.Substring(0, line.Length - trimmed.Length);
+                        if (rewritten != colExpr2 || modPfx2.Length > 0)
+                            lines[i] = indent2 + modPfx2 + rewritten + (hadTrailingComma ? "," : "");
                     }
                 }
             }
@@ -753,6 +748,61 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 || trimmedUpper.StartsWith("INTO ")
                 || trimmedUpper.StartsWith(")") // subquery end
                 ;
+        }
+
+        /// <summary>
+        /// Strips a TOP N or DISTINCT prefix from a SELECT column expression.
+        /// Returns (prefix, remainder, modifierOnly) where:
+        /// - prefix: the stripped modifier text (e.g. "TOP (1000) ") — empty if none
+        /// - remainder: the column expression after the modifier
+        /// - modifierOnly: true when the line contains only the modifier with no column following
+        /// </summary>
+        private static (string prefix, string remainder, bool modifierOnly) StripSelectModifierPrefix(string expr)
+        {
+            string upper = expr.ToUpperInvariant().TrimStart();
+            string trimmed = expr.TrimStart();
+            int leadingSpaces = expr.Length - trimmed.Length;
+            string lead = expr.Substring(0, leadingSpaces);
+
+            // DISTINCT
+            if (upper.StartsWith("DISTINCT "))
+            {
+                string rest = trimmed.Substring("DISTINCT ".Length).TrimStart();
+                return (lead + "DISTINCT ", rest, string.IsNullOrWhiteSpace(rest));
+            }
+            if (upper == "DISTINCT")
+                return (lead + "DISTINCT", "", true);
+
+            // TOP (N) or TOP N
+            if (upper.StartsWith("TOP ") || upper.StartsWith("TOP("))
+            {
+                int pos = trimmed.IndexOf(' '); // skip "TOP"
+                string afterTop = trimmed.Substring(pos).TrimStart();
+                string rest;
+                string topToken;
+                if (afterTop.StartsWith("("))
+                {
+                    int close = afterTop.IndexOf(')');
+                    topToken = afterTop.Substring(0, close + 1);
+                    rest = close >= 0 ? afterTop.Substring(close + 1).TrimStart() : "";
+                }
+                else
+                {
+                    int spaceAfterN = afterTop.IndexOf(' ');
+                    topToken = spaceAfterN >= 0 ? afterTop.Substring(0, spaceAfterN) : afterTop;
+                    rest = spaceAfterN >= 0 ? afterTop.Substring(spaceAfterN + 1).TrimStart() : "";
+                }
+                string prefix = lead + "TOP " + topToken + (string.IsNullOrWhiteSpace(rest) ? "" : " ");
+                // Handle PERCENT / WITH TIES
+                string restUpper = rest.ToUpperInvariant();
+                if (restUpper.StartsWith("PERCENT ")) { prefix += "PERCENT "; rest = rest.Substring("PERCENT ".Length).TrimStart(); }
+                else if (restUpper == "PERCENT") return (prefix + "PERCENT", "", true);
+                restUpper = rest.ToUpperInvariant();
+                if (restUpper.StartsWith("WITH TIES")) return (prefix + "WITH TIES", "", true);
+                return (prefix, rest, string.IsNullOrWhiteSpace(rest));
+            }
+
+            return ("", expr, false);
         }
 
         /// <summary>
