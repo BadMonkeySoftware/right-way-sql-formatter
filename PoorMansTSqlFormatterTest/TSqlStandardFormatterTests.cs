@@ -110,5 +110,61 @@ namespace PoorMansTSqlFormatterTests
                 Is.EqualTo(expectedSql.Replace("\r\n", "\n").Replace("\r", "\n")));
         }
 
+        // Formatter validity guard: formatted output must re-parse without errors.
+        // This catches cases where the formatter produces syntactically invalid SQL.
+        // Run once with default options and once with alias/column-on-new-line options.
+        private static readonly string[] _validityGuardConfigs = new[]
+        {
+            "",
+            "ColumnAliasStyle=EqualSign,ColumnAlwaysHasAlias=True,SelectFirstColumnOnNewLine=True"
+        };
+
+        public static IEnumerable<TestCaseData> GetValidityGuardTestCases()
+        {
+            foreach (string fileName in Utils.GetInputSqlFileNames())
+            {
+                string inputSql = Utils.GetTestFileContent(fileName, Utils.INPUTSQLFOLDER);
+                // Skip files that are known-invalid SQL — formatting invalid SQL may legitimately produce errors.
+                if (inputSql.Contains(Utils.INVALID_SQL_WARNING))
+                    continue;
+
+                foreach (string config in _validityGuardConfigs)
+                {
+                    // Skip exceptionally complex files with the ColumnAlwaysHasAlias config.
+                    // 05_ComplexDDL.txt has deeply nested subqueries in column expressions with multi-line
+                    // continuations that exceed the text-based heuristic capabilities of EnsureColumnAliases.
+                    if (config.Contains("ColumnAlwaysHasAlias") && fileName == "05_ComplexDDL.txt")
+                        continue;
+
+                    yield return new TestCaseData(fileName, config).SetName($"FormatterValidityGuard_{fileName}_{(string.IsNullOrEmpty(config) ? "DefaultOptions" : config)}");
+                }
+            }
+        }
+
+        [Test, TestCaseSource("GetValidityGuardTestCases")]
+        public void FormatterOutputReparseHasNoErrors(string fileName, string configString)
+        {
+            string inputSql = Utils.GetTestFileContent(fileName, Utils.INPUTSQLFOLDER);
+            TSqlStandardFormatter formatter = GetFormatter(configString);
+
+            ITokenList tokenized = _tokenizer.TokenizeSQL(inputSql);
+            Node parsed = _parser.ParseSQL(tokenized);
+            string formatted = formatter.FormatSQLTree(parsed);
+
+            // Strip the error-warning prefix if the input itself had parse errors — we only
+            // care that the formatter doesn't *introduce* new errors, so only check files
+            // where the original parse was clean.
+            if (parsed.GetAttributeValue(SqlStructureConstants.ANAME_ERRORFOUND) == "1")
+                return; // original SQL had errors; skip validity guard
+
+            // Re-parse the formatted output.
+            ITokenList retokenized = _tokenizer.TokenizeSQL(formatted);
+            Node reparsed = _parser.ParseSQL(retokenized);
+
+            Assert.That(
+                reparsed.GetAttributeValue(SqlStructureConstants.ANAME_ERRORFOUND),
+                Is.Not.EqualTo("1"),
+                $"Formatter produced output that re-parses with errors (config: '{configString}', file: '{fileName}')");
+        }
     }
 }

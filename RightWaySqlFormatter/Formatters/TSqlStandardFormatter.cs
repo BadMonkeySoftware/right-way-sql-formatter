@@ -519,6 +519,8 @@ namespace PoorMansTSqlFormatterLib.Formatters
             var lines = output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
             bool inSelectList = false;
             int autoAliasCounter = 0;
+            int beginDepth = 0; // tracks BEGIN/END nesting depth
+            int parenDepth = 0; // tracks open-paren depth inside a SELECT column expression
 
             for (int i = 0; i < lines.Length; i++)
             {
@@ -526,11 +528,64 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 string trimmed = line.TrimStart();
                 string trimmedUpper = trimmed.ToUpperInvariant();
 
+                // Track BEGIN/END depth to avoid misidentifying block body lines as SELECT columns.
+                // A bare BEGIN (not BEGIN TRANSACTION) increments depth; END decrements.
+                if (trimmedUpper == "BEGIN" || trimmedUpper.StartsWith("BEGIN ") || trimmedUpper.StartsWith("BEGIN\t"))
+                {
+                    // Only count BEGIN that starts a block — not BEGIN TRANSACTION / BEGIN TRAN
+                    string afterBegin = trimmedUpper.Length > 5 ? trimmedUpper.Substring(6).TrimStart() : "";
+                    if (!afterBegin.StartsWith("TRAN") && !afterBegin.StartsWith("DISTRIBUTED"))
+                        beginDepth++;
+                    if (inSelectList) { inSelectList = false; parenDepth = 0; } // BEGIN always ends a SELECT list
+                    continue;
+                }
+                if (trimmedUpper == "END" || trimmedUpper.StartsWith("END ") || trimmedUpper.StartsWith("END\t")
+                    || trimmedUpper.StartsWith("END;") || trimmedUpper.StartsWith("END,") || trimmedUpper.StartsWith("END)"))
+                {
+                    if (beginDepth > 0) beginDepth--;
+                    if (inSelectList) { inSelectList = false; parenDepth = 0; }
+                    continue;
+                }
+
+                // If inside a BEGIN/END block, don't process as SELECT column lines.
+                if (beginDepth > 0)
+                {
+                    // Nested SELECT inside a block: handle separately.
+                    // Allow SELECT detection to reset inSelectList for nested queries.
+                    if (trimmedUpper.StartsWith("SELECT ") || trimmedUpper == "SELECT")
+                    {
+                        inSelectList = true;
+                        autoAliasCounter = 0;
+                        parenDepth = 0;
+                        int selectEnd = trimmed.IndexOf(' ');
+                        if (selectEnd >= 0)
+                        {
+                            string afterSelect = trimmed.Substring(selectEnd + 1).TrimStart();
+                            var (modPrefix1, colPart1, modOnly1) = StripSelectModifierPrefix(afterSelect);
+                            if (!modOnly1)
+                            {
+                                string indent = line.Substring(0, line.Length - trimmed.Length);
+                                var (rewritten, newCounter) = EnsureAlias(colPart1, autoAliasCounter);
+                                autoAliasCounter = newCounter;
+                                if (rewritten != colPart1)
+                                    lines[i] = indent + "SELECT " + modPrefix1 + rewritten;
+                                // Track open parens from the inline column
+                                parenDepth += CountNetParens(rewritten != colPart1 ? rewritten : colPart1);
+                            }
+                        }
+                        continue;
+                    }
+                    // Non-SELECT lines inside a block: if we're tracking a SELECT list, process them;
+                    // otherwise skip.
+                    if (!inSelectList) continue;
+                }
+
                 // --- Detect start of SELECT list ---
                 if (trimmedUpper.StartsWith("SELECT ") || trimmedUpper == "SELECT")
                 {
                     inSelectList = true;
                     autoAliasCounter = 0; // reset counter per query
+                    parenDepth = 0;
 
                     // The SELECT line itself may have first column inline.
                     int selectEnd = trimmed.IndexOf(' ');
@@ -546,6 +601,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
                             autoAliasCounter = newCounter;
                             if (rewritten != colPart1)
                                 lines[i] = indent + "SELECT " + modPrefix1 + rewritten;
+                            parenDepth += CountNetParens(rewritten != colPart1 ? rewritten : colPart1);
                         }
                     }
                     continue;
@@ -554,6 +610,15 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 // --- Detect end of SELECT list ---
                 if (inSelectList)
                 {
+                    // If we're inside an unbalanced open-paren (multi-line expression continuation),
+                    // just track paren depth and skip alias processing for this line.
+                    if (parenDepth > 0)
+                    {
+                        parenDepth += CountNetParens(trimmed);
+                        if (parenDepth < 0) parenDepth = 0;
+                        continue;
+                    }
+
                     bool startsWithComma = trimmed.StartsWith(",");
                     if (!startsWithComma && IsClauseStartLine(trimmedUpper))
                     {
@@ -565,13 +630,21 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     {
                         // Leading-comma style: ,expr  or  ,expr AS alias
                         string afterComma = trimmed.Substring(1).TrimStart();
-                        var (rewritten, newCounter) = EnsureAlias(afterComma, autoAliasCounter);
-                        autoAliasCounter = newCounter;
-                        if (rewritten != afterComma)
+                        int netParens = CountNetParens(afterComma);
+                        // Only alias if the expression is balanced (not a multi-line expression start)
+                        if (netParens <= 0)
                         {
-                            string indent = line.Substring(0, line.Length - trimmed.Length);
-                            lines[i] = indent + "," + rewritten;
+                            var (rewritten, newCounter) = EnsureAlias(afterComma, autoAliasCounter);
+                            autoAliasCounter = newCounter;
+                            if (rewritten != afterComma)
+                            {
+                                string indent = line.Substring(0, line.Length - trimmed.Length);
+                                lines[i] = indent + "," + rewritten;
+                            }
                         }
+                        // Track net parens for multi-line expression detection
+                        parenDepth += netParens;
+                        if (parenDepth < 0) parenDepth = 0;
                     }
                     else if (!string.IsNullOrWhiteSpace(trimmed))
                     {
@@ -580,16 +653,60 @@ namespace PoorMansTSqlFormatterLib.Formatters
                         if (modOnly2)
                             continue; // pure TOP N or DISTINCT line — not a column, leave as-is
 
-                        var (rewritten, newCounter) = EnsureAlias(colExpr2, autoAliasCounter);
-                        autoAliasCounter = newCounter;
-                        string indent2 = line.Substring(0, line.Length - trimmed.Length);
-                        if (rewritten != colExpr2 || modPrefix2.Length > 0)
-                            lines[i] = indent2 + modPrefix2 + rewritten + (hadTrailingComma ? "," : "");
+                        int netParens2 = CountNetParens(colExpr2);
+                        if (netParens2 <= 0)
+                        {
+                            var (rewritten, newCounter) = EnsureAlias(colExpr2, autoAliasCounter);
+                            autoAliasCounter = newCounter;
+                            string indent2 = line.Substring(0, line.Length - trimmed.Length);
+                            if (rewritten != colExpr2 || modPrefix2.Length > 0)
+                                lines[i] = indent2 + modPrefix2 + rewritten + (hadTrailingComma ? "," : "");
+                            parenDepth += netParens2;
+                        }
+                        else
+                        {
+                            parenDepth += netParens2;
+                        }
+                        if (parenDepth < 0) parenDepth = 0;
                     }
                 }
             }
 
             return string.Join(Environment.NewLine, lines);
+        }
+
+        /// <summary>
+        /// Counts net open parens in a string (open minus close), ignoring parens inside string literals.
+        /// Used to detect multi-line expression continuation.
+        /// </summary>
+        private static int CountNetParens(string s)
+        {
+            int depth = 0;
+            bool inSingleQuote = false;
+            bool inBracket = false;
+            for (int i = 0; i < s.Length; i++)
+            {
+                char c = s[i];
+                if (inSingleQuote)
+                {
+                    if (c == '\'' && (i + 1 < s.Length && s[i + 1] == '\'')) { i++; continue; } // escaped quote
+                    if (c == '\'') inSingleQuote = false;
+                    continue;
+                }
+                if (inBracket)
+                {
+                    if (c == ']') inBracket = false;
+                    continue;
+                }
+                switch (c)
+                {
+                    case '\'' : inSingleQuote = true; break;
+                    case '[': inBracket = true; break;
+                    case '(': depth++; break;
+                    case ')': depth--; break;
+                }
+            }
+            return depth;
         }
 
         /// <summary>
@@ -604,8 +721,31 @@ namespace PoorMansTSqlFormatterLib.Formatters
         {
             string trimmed = col.Trim();
 
-            // Already has alias?
+            // Empty or comment-only — skip
+            if (string.IsNullOrEmpty(trimmed)
+                || (trimmed.StartsWith("/*") && trimmed.IndexOf("*/") == trimmed.Length - 2)
+                || trimmed.StartsWith("--"))
+                return (col, counter);
+
+            // Already has AS alias?
             if (FindAsOutsideParens(trimmed) >= 0)
+                return (col, counter);
+
+            // Already has EqualSign-style alias (alias = expr) from input SQL — leave alone
+            // Pattern: simple-identifier = anything (not starting with @, which is a var assignment handled below)
+            if (!trimmed.StartsWith("@"))
+            {
+                int eqPos = FindEqualSignOutsideParens(trimmed);
+                if (eqPos > 0)
+                {
+                    string lhs = trimmed.Substring(0, eqPos).Trim();
+                    if (IsSimpleColumnRef(lhs))
+                        return (col, counter);
+                }
+            }
+
+            // Variable assignment SELECT @var = expr — not a column alias, leave alone
+            if (trimmed.StartsWith("@") && trimmed.IndexOf('=') >= 0)
                 return (col, counter);
 
             // Wildcard — skip
@@ -747,6 +887,12 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 || trimmedUpper.StartsWith("EXCEPT ")
                 || trimmedUpper.StartsWith("INTO ")
                 || trimmedUpper.StartsWith(")") // subquery end
+                // CASE sub-expression keywords — not column expressions
+                || trimmedUpper.StartsWith("WHEN ") || trimmedUpper == "WHEN"
+                || trimmedUpper.StartsWith("THEN ") || trimmedUpper == "THEN"
+                || trimmedUpper.StartsWith("ELSE ") || trimmedUpper == "ELSE"
+                || trimmedUpper == "END" || trimmedUpper.StartsWith("END ")
+                || trimmedUpper.StartsWith("END,") || trimmedUpper.StartsWith("END)")
                 ;
         }
 
@@ -759,50 +905,69 @@ namespace PoorMansTSqlFormatterLib.Formatters
         /// </summary>
         private static (string prefix, string remainder, bool modifierOnly) StripSelectModifierPrefix(string expr)
         {
-            string upper = expr.ToUpperInvariant().TrimStart();
             string trimmed = expr.TrimStart();
             int leadingSpaces = expr.Length - trimmed.Length;
-            string lead = expr.Substring(0, leadingSpaces);
+            string accumulatedPrefix = expr.Substring(0, leadingSpaces);
 
-            // DISTINCT
-            if (upper.StartsWith("DISTINCT "))
+            // Loop: keep stripping TOP and DISTINCT modifiers until neither remains.
+            while (true)
             {
-                string rest = trimmed.Substring("DISTINCT ".Length).TrimStart();
-                return (lead + "DISTINCT ", rest, string.IsNullOrWhiteSpace(rest));
-            }
-            if (upper == "DISTINCT")
-                return (lead + "DISTINCT", "", true);
+                string upper = trimmed.ToUpperInvariant();
 
-            // TOP (N) or TOP N
-            if (upper.StartsWith("TOP ") || upper.StartsWith("TOP("))
-            {
-                int pos = trimmed.IndexOf(' '); // skip "TOP"
-                string afterTop = trimmed.Substring(pos).TrimStart();
-                string rest;
-                string topToken;
-                if (afterTop.StartsWith("("))
+                // DISTINCT
+                if (upper.StartsWith("DISTINCT "))
                 {
-                    int close = afterTop.IndexOf(')');
-                    topToken = afterTop.Substring(0, close + 1);
-                    rest = close >= 0 ? afterTop.Substring(close + 1).TrimStart() : "";
+                    // Preserve original casing from the input string
+                    string modToken = trimmed.Substring(0, "DISTINCT".Length);
+                    string rest = trimmed.Substring("DISTINCT ".Length).TrimStart();
+                    accumulatedPrefix += modToken + " ";
+                    trimmed = rest;
+                    continue;
                 }
-                else
+                if (upper == "DISTINCT")
                 {
-                    int spaceAfterN = afterTop.IndexOf(' ');
-                    topToken = spaceAfterN >= 0 ? afterTop.Substring(0, spaceAfterN) : afterTop;
-                    rest = spaceAfterN >= 0 ? afterTop.Substring(spaceAfterN + 1).TrimStart() : "";
+                    string modToken = trimmed.Substring(0, "DISTINCT".Length);
+                    return (accumulatedPrefix + modToken, "", true);
                 }
-                string prefix = lead + "TOP " + topToken + (string.IsNullOrWhiteSpace(rest) ? "" : " ");
-                // Handle PERCENT / WITH TIES
-                string restUpper = rest.ToUpperInvariant();
-                if (restUpper.StartsWith("PERCENT ")) { prefix += "PERCENT "; rest = rest.Substring("PERCENT ".Length).TrimStart(); }
-                else if (restUpper == "PERCENT") return (prefix + "PERCENT", "", true);
-                restUpper = rest.ToUpperInvariant();
-                if (restUpper.StartsWith("WITH TIES")) return (prefix + "WITH TIES", "", true);
-                return (prefix, rest, string.IsNullOrWhiteSpace(rest));
+
+                // TOP (N) or TOP N
+                if (upper.StartsWith("TOP ") || upper.StartsWith("TOP("))
+                {
+                    // Preserve original casing of "TOP"
+                    string topWord = trimmed.Substring(0, 3); // "TOP" in original case
+                    int pos = trimmed.IndexOf(' '); // index of space after "TOP"
+                    string afterTop = trimmed.Substring(pos).TrimStart();
+                    string rest;
+                    string topToken;
+                    if (afterTop.StartsWith("("))
+                    {
+                        int close = afterTop.IndexOf(')');
+                        topToken = afterTop.Substring(0, close + 1);
+                        rest = close >= 0 ? afterTop.Substring(close + 1).TrimStart() : "";
+                    }
+                    else
+                    {
+                        int spaceAfterN = afterTop.IndexOf(' ');
+                        topToken = spaceAfterN >= 0 ? afterTop.Substring(0, spaceAfterN) : afterTop;
+                        rest = spaceAfterN >= 0 ? afterTop.Substring(spaceAfterN + 1).TrimStart() : "";
+                    }
+                    string topPrefix = topWord + " " + topToken + (string.IsNullOrWhiteSpace(rest) ? "" : " ");
+                    // Handle PERCENT / WITH TIES (these are terminal — no further modifier stripping)
+                    string restUpper = rest.ToUpperInvariant();
+                    if (restUpper.StartsWith("PERCENT ")) { topPrefix += "PERCENT "; rest = rest.Substring("PERCENT ".Length).TrimStart(); }
+                    else if (restUpper == "PERCENT") return (accumulatedPrefix + topPrefix + "PERCENT", "", true);
+                    restUpper = rest.ToUpperInvariant();
+                    if (restUpper.StartsWith("WITH TIES")) return (accumulatedPrefix + topPrefix + "WITH TIES", "", true);
+                    accumulatedPrefix += topPrefix;
+                    trimmed = rest;
+                    continue;
+                }
+
+                // No more modifiers — done.
+                break;
             }
 
-            return ("", expr, false);
+            return (accumulatedPrefix, trimmed, string.IsNullOrWhiteSpace(trimmed));
         }
 
         /// <summary>
