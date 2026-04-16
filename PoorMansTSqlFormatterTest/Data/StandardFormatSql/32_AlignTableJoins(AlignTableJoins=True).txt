@@ -1,3 +1,4 @@
+-- Test: alignTableJoins setting
 SELECT e.EmployeeID
     ,e.FirstName
     ,d.DeptName

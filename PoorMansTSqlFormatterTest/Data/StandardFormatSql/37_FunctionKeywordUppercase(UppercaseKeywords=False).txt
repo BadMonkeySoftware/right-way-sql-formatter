@@ -1,5 +1,5 @@
 -- Test: FUNCTION_KEYWORD tokens respect UppercaseKeywords setting
-select cast(e.Salary AS decimal(10,2))
+select cast(e.Salary as decimal(10,2))
     ,convert(varchar(50), e.HireDate)
     ,isnull(e.ManagerID, 0)
     ,db_name()
@@ -8,4 +8,4 @@ select cast(e.Salary AS decimal(10,2))
     ,object_id('Employees')
     ,schema_name(e.SchemaID)
     ,iif(e.Active = 1, 'Yes', 'No')
-FROM Employees e
+from Employees e

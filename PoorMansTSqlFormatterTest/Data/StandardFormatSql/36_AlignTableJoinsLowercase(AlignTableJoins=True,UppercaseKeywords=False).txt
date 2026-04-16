@@ -1,3 +1,4 @@
+-- Test: alignTableJoins with UppercaseKeywords=false
 select e.EmployeeID
     ,e.FirstName
     ,d.DeptName
