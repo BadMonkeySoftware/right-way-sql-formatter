@@ -1615,7 +1615,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 case SqlStructureConstants.ENAME_FUNCTION_KEYWORD:
                     WhiteSpace_SeparateWords(state);
                     state.SetRecentKeyword(contentElement.TextValue);
-                    state.AddOutputContent(contentElement.TextValue, SqlHtmlConstants.CLASS_FUNCTION);
+                    state.AddOutputContent(FormatKeyword(contentElement.TextValue), SqlHtmlConstants.CLASS_FUNCTION);
                     state.WordSeparatorExpected = true;
                     break;
 
