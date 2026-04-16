@@ -8,11 +8,7 @@ LEFT JOIN Orders o ON c.CustomerID = o.CustomerID
 GROUP BY c.CustomerID
     ,c.Name
 
-SELECT e.* AS ColumnAlias_1
+SELECT e.*
     ,e.Salary * 1.15 AS Bonus
-    ,CASE
-        WHEN e.Salary > 50000 THEN 'Senior'
-        ELSE 'Junior'
-    END AS Level
 FROM Employees e
 WHERE e.Active = 1
