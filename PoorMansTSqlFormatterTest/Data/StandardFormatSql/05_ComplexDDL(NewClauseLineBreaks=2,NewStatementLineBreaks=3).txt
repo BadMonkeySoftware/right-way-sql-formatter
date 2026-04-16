@@ -161,7 +161,7 @@ Modifications:
         ,COLUMN_NAME + ','
         ,'' AS FieldDefinition
         ,CASE 
-            WHEN ic.object_id IS NULL
+            WHEN ic.OBJECT_ID IS NULL
                 THEN 0
             ELSE 1
             END AS IdentityColumn
@@ -185,15 +185,15 @@ Modifications:
     
     FROM INFORMATION_SCHEMA.COLUMNS c
     
-    JOIN sys.columns sc ON OBJECT_ID(c.TABLE_SCHEMA + '.' + c.TABLE_NAME) = sc.object_id
+    JOIN sys.columns sc ON OBJECT_ID(c.TABLE_SCHEMA + '.' + c.TABLE_NAME) = sc.OBJECT_ID
         AND c.COLUMN_NAME = sc.Name
     
-    LEFT JOIN sys.identity_columns ic ON OBJECT_ID(c.TABLE_SCHEMA + '.' + c.TABLE_NAME) = ic.object_id
+    LEFT JOIN sys.identity_columns ic ON OBJECT_ID(c.TABLE_SCHEMA + '.' + c.TABLE_NAME) = ic.OBJECT_ID
         AND c.COLUMN_NAME = ic.Name
     
     JOIN sys.types st ON COALESCE(c.DOMAIN_NAME, c.DATA_TYPE) = st.name
     
-    LEFT OUTER JOIN sys.objects dobj ON dobj.object_id = sc.default_object_id
+    LEFT OUTER JOIN sys.objects dobj ON dobj.OBJECT_ID = sc.default_object_id
         AND dobj.type = 'D'
     
     WHERE c.TABLE_NAME = @TableName
@@ -296,10 +296,10 @@ Modifications:
                                     
                                     FROM sys.foreign_key_columns fkc
                                     
-                                    JOIN sys.columns cp ON fkc.parent_object_id = cp.object_id
+                                    JOIN sys.columns cp ON fkc.parent_object_id = cp.OBJECT_ID
                                         AND fkc.parent_column_id = cp.column_id
                                     
-                                    WHERE fkc.constraint_object_id = fk.object_id
+                                    WHERE fkc.constraint_object_id = fk.OBJECT_ID
                                     
                                     FOR XML PATH('')
                                     )), 2, 8000)) ParentColumns
@@ -308,10 +308,10 @@ Modifications:
                                     
                                     FROM sys.foreign_key_columns fkc
                                     
-                                    JOIN sys.columns cr ON fkc.referenced_object_id = cr.object_id
+                                    JOIN sys.columns cr ON fkc.referenced_object_id = cr.OBJECT_ID
                                         AND fkc.referenced_column_id = cr.column_id
                                     
-                                    WHERE fkc.constraint_object_id = fk.object_id
+                                    WHERE fkc.constraint_object_id = fk.OBJECT_ID
                                     
                                     FOR XML PATH('')
                                     )), 2, 8000)) ReferencedColumns
@@ -333,14 +333,14 @@ Modifications:
 
             INSERT INTO @PKObjectID (ObjectID)
             
-            SELECT DISTINCT PKObject = cco.object_id
+            SELECT DISTINCT PKObject = cco.OBJECT_ID
             
             FROM sys.key_constraints cco
             
-            JOIN sys.index_columns cc ON cco.parent_object_id = cc.object_id
+            JOIN sys.index_columns cc ON cco.parent_object_id = cc.OBJECT_ID
                 AND cco.unique_index_id = cc.index_id
             
-            JOIN sys.indexes i ON cc.object_id = i.object_id
+            JOIN sys.indexes i ON cc.OBJECT_ID = i.OBJECT_ID
                 AND cc.index_id = i.index_id
             
             WHERE OBJECT_NAME(parent_object_id) = @TableName
@@ -350,14 +350,14 @@ Modifications:
 
             INSERT INTO @Uniques (ObjectID)
             
-            SELECT DISTINCT PKObject = cco.object_id
+            SELECT DISTINCT PKObject = cco.OBJECT_ID
             
             FROM sys.key_constraints cco
             
-            JOIN sys.index_columns cc ON cco.parent_object_id = cc.object_id
+            JOIN sys.index_columns cc ON cco.parent_object_id = cc.OBJECT_ID
                 AND cco.unique_index_id = cc.index_id
             
-            JOIN sys.indexes i ON cc.object_id = i.object_id
+            JOIN sys.indexes i ON cc.OBJECT_ID = i.OBJECT_ID
                 AND cc.index_id = i.index_id
             
             WHERE OBJECT_NAME(parent_object_id) = @TableName
@@ -397,26 +397,26 @@ Modifications:
                                 
                                 FROM sys.key_constraints ccok
                                 
-                                LEFT JOIN sys.index_columns cc ON ccok.parent_object_id = cc.object_id
+                                LEFT JOIN sys.index_columns cc ON ccok.parent_object_id = cc.OBJECT_ID
                                     AND cco.unique_index_id = cc.index_id
                                 
-                                LEFT JOIN sys.columns c ON cc.object_id = c.object_id
+                                LEFT JOIN sys.columns c ON cc.OBJECT_ID = c.OBJECT_ID
                                     AND cc.column_id = c.column_id
                                 
-                                LEFT JOIN sys.indexes i ON cc.object_id = i.object_id
+                                LEFT JOIN sys.indexes i ON cc.OBJECT_ID = i.OBJECT_ID
                                     AND cc.index_id = i.index_id
                                 
-                                WHERE i.object_id = ccok.parent_object_id
-                                    AND ccok.object_id = cco.object_id
+                                WHERE i.OBJECT_ID = ccok.parent_object_id
+                                    AND ccok.OBJECT_ID = cco.OBJECT_ID
                                 
                                 FOR XML PATH('')
                                 )), 2, 8000)) + ')'
             
             FROM sys.key_constraints cco
             
-            LEFT JOIN @PKObjectID pk ON cco.object_id = pk.ObjectID
+            LEFT JOIN @PKObjectID pk ON cco.OBJECT_ID = pk.ObjectID
             
-            LEFT JOIN @Uniques u ON cco.object_id = u.objectID
+            LEFT JOIN @Uniques u ON cco.OBJECT_ID = u.objectID
             
             WHERE OBJECT_NAME(cco.parent_object_id) = @TableName
         
@@ -432,7 +432,7 @@ Modifications:
         BEGIN
             INSERT INTO @Definition (FieldValue)
             
-            SELECT 'CREATE ' + type_desc + ' INDEX [' + [name] COLLATE SQL_Latin1_General_CP1_CI_AS + '] ON [' + OBJECT_NAME(object_id) + '] (' + REVERSE(SUBSTRING(REVERSE((
+            SELECT 'CREATE ' + type_desc + ' INDEX [' + [name] COLLATE SQL_Latin1_General_CP1_CI_AS + '] ON [' + OBJECT_NAME(OBJECT_ID) + '] (' + REVERSE(SUBSTRING(REVERSE((
                                 SELECT name + CASE 
                                         WHEN sc.is_descending_key = 1
                                             THEN ' DESC'
@@ -441,11 +441,11 @@ Modifications:
                                 
                                 FROM sys.index_columns sc
                                 
-                                JOIN sys.columns c ON sc.object_id = c.object_id
+                                JOIN sys.columns c ON sc.OBJECT_ID = c.OBJECT_ID
                                     AND sc.column_id = c.column_id
                                 
-                                WHERE OBJECT_NAME(sc.object_id) = @TableName
-                                    AND sc.object_id = i.object_id
+                                WHERE OBJECT_NAME(sc.OBJECT_ID) = @TableName
+                                    AND sc.OBJECT_ID = i.OBJECT_ID
                                     AND sc.index_id = i.index_id
                                 
                                 ORDER BY index_column_id ASC
@@ -455,7 +455,7 @@ Modifications:
             
             FROM sys.indexes i
             
-            WHERE OBJECT_NAME(object_id) = @TableName
+            WHERE OBJECT_NAME(OBJECT_ID) = @TableName
                 AND CASE 
                     WHEN @ClusteredPK = 1
                         AND is_primary_key = 1

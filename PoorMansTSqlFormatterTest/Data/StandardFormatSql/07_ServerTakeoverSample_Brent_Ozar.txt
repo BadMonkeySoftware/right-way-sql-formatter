@@ -190,16 +190,16 @@ DECLARE @xp_results TABLE (
 DECLARE @job_owner SYSNAME
 DECLARE @is_sysadmin INT
 
-SET @is_sysadmin = isnull(is_srvrolemember('sysadmin'), 0)
-SET @job_owner = suser_sname()
+SET @is_sysadmin = ISNULL(IS_SRVROLEMEMBER('sysadmin'), 0)
+SET @job_owner = SUSER_SNAME()
 
 INSERT INTO @xp_results
 EXECUTE sys.xp_sqlagent_enum_jobs @is_sysadmin
     ,@job_owner
 
 UPDATE @xp_results
-SET last_run_time = right('000000' + last_run_time, 6)
-    ,next_run_time = right('000000' + next_run_time, 6)
+SET last_run_time = RIGHT('000000' + last_run_time, 6)
+    ,next_run_time = RIGHT('000000' + next_run_time, 6)
 
 SELECT j.name AS JobName
     ,j.enabled AS Enabled
@@ -215,10 +215,10 @@ SELECT j.name AS JobName
                 ELSE 'Completed'
                 END
         END AS CurrentStatus
-    ,coalesce(x.current_step, 0) AS CurrentStepNbr
+    ,COALESCE(x.current_step, 0) AS CurrentStepNbr
     ,CASE 
         WHEN x.last_run_date > 0
-            THEN convert(DATETIME, substring(x.last_run_date, 1, 4) + '-' + substring(x.last_run_date, 5, 2) + '-' + substring(x.last_run_date, 7, 2) + ' ' + substring(x.last_run_time, 1, 2) + ':' + substring(x.last_run_time, 3, 2) + ':' + substring(x.last_run_time, 5, 2) + '.000', 121)
+            THEN CONVERT(DATETIME, SUBSTRING(x.last_run_date, 1, 4) + '-' + SUBSTRING(x.last_run_date, 5, 2) + '-' + SUBSTRING(x.last_run_date, 7, 2) + ' ' + SUBSTRING(x.last_run_time, 1, 2) + ':' + SUBSTRING(x.last_run_time, 3, 2) + ':' + SUBSTRING(x.last_run_time, 5, 2) + '.000', 121)
         ELSE NULL
         END AS LastRunTime
     ,CASE h.run_status
@@ -637,7 +637,7 @@ EXEC dbo.sp_MSforeachdb 'SELECT ''[?]'' AS DatabaseName, * FROM [?].sys.dm_db_pe
 	http://support.microsoft.com/kb/224071
 	In the results, also check the number of data and log files for all databases.
 */
-SELECT db_name(database_id)
+SELECT DB_NAME(database_id)
     ,*
 FROM sys.master_files
 
@@ -668,43 +668,43 @@ ORDER BY (wait_time_ms - signal_wait_time_ms) DESC
 SELECT t.name AS tableName
     ,p.*
 FROM sys.tables AS t
-INNER JOIN sys.indexes AS i1 ON i1.object_id = t.object_id
+INNER JOIN sys.indexes AS i1 ON i1.OBJECT_ID = t.OBJECT_ID
 CROSS APPLY (
     SELECT TOP 1 *
     FROM sys.indexes AS i
-    WHERE i.object_id = i1.object_id
+    WHERE i.OBJECT_ID = i1.OBJECT_ID
         AND i.index_id > i1.index_id
         AND i.type_desc <> 'xml'
     ORDER BY i.index_id
     ) AS i2
 CROSS APPLY (
-    SELECT min(a.index_id) AS ind1
-        ,min(b.index_id) AS ind2
+    SELECT MIN(a.index_id) AS ind1
+        ,MIN(b.index_id) AS ind2
     FROM (
         SELECT ic.*
         FROM sys.index_columns ic
-        WHERE ic.object_id = i1.object_id
+        WHERE ic.OBJECT_ID = i1.OBJECT_ID
             AND ic.index_id = i1.index_id
             AND ic.is_included_column = 0
         ) AS a
     FULL OUTER JOIN (
         SELECT *
         FROM sys.index_columns AS ic
-        WHERE ic.object_id = i2.object_id
+        WHERE ic.OBJECT_ID = i2.OBJECT_ID
             AND ic.index_id = i2.index_id
             AND ic.is_included_column = 0
         ) AS b ON a.index_column_id = b.index_column_id
         AND a.column_id = b.column_id
         AND a.key_ordinal = b.key_ordinal
-    HAVING count(CASE 
+    HAVING COUNT(CASE 
                 WHEN a.index_id IS NULL
                     THEN 1
                 END) = 0
-        AND count(CASE 
+        AND COUNT(CASE 
                 WHEN b.index_id IS NULL
                     THEN 1
                 END) = 0
-        AND count(a.index_id) = count(b.index_id)
+        AND COUNT(a.index_id) = COUNT(b.index_id)
     ) AS p
 WHERE i1.type_desc <> 'xml'
 
@@ -727,7 +727,7 @@ WHERE i1.type_desc <> 'xml'
 	http://sqlserverpedia.com/wiki/Index_Maintenance
 */
 SELECT db.name AS databaseName
-    ,SCHEMA_NAME(obj.schema_id) AS schemaName
+    ,SCHEMA_NAME(obj.SCHEMA_ID) AS schemaName
     ,OBJECT_NAME(ps.OBJECT_ID) AS tableName
     ,ps.OBJECT_ID AS objectID
     ,ps.index_id AS indexID
@@ -736,7 +736,7 @@ SELECT db.name AS databaseName
     ,ps.page_count
 FROM sys.databases db
 INNER JOIN sys.dm_db_index_physical_stats(DB_ID(), NULL, NULL, NULL, N'Limited') ps ON db.database_id = ps.database_id
-INNER JOIN sys.objects obj ON ps.object_id = obj.object_id
+INNER JOIN sys.objects obj ON ps.OBJECT_ID = obj.OBJECT_ID
 WHERE ps.index_id > 0
     AND ps.page_count > 100
     AND ps.avg_fragmentation_in_percent > 30

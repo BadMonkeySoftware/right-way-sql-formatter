@@ -13,7 +13,7 @@ as (
     union all
     
     -- This section provides values for all nodes except the root
-    select CAST(p.path.ToString() + CAST(C.Num as varchar(30)) + '/' as hierarchyid)
+    select cast(p.path.ToString() + cast(C.Num as varchar(30)) + '/' as hierarchyid)
         ,C.EmployeeID
     from #Children as C
     inner join paths as p on C.ManagerID = P.EmployeeID

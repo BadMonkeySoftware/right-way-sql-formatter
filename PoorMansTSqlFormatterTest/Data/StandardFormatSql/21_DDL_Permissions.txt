@@ -50,7 +50,7 @@ GRANT CREATE VIEW
     WITH GRANT OPTION
 
 --check that subsequent EXECUTE AS is counted as new statement
-EXECUTE AS User = 'tklerks'
+EXECUTE AS USER = 'tklerks'
 GO
 
 DENY VIEW DEFINITION
@@ -70,7 +70,7 @@ REVOKE REFERENCES (SomeColumn)
     CASCADE;
 GO
 
-EXEC AS User = 'SomeUser'
+EXEC AS USER = 'SomeUser'
 
 SELECT 1
 GO

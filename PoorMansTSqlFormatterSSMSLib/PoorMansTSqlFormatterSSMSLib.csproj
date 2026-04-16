@@ -21,8 +21,8 @@
     <PackageReference Include="EnvDTE80" Version="17.6.36" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="GeneralLanguageContent.resx" />
-    <EmbeddedResource Include="GeneralLanguageContent.es.resx" />
-    <EmbeddedResource Include="GeneralLanguageContent.fr.resx" />
+    <EmbeddedResource Update="GeneralLanguageContent.resx" />
+    <EmbeddedResource Update="GeneralLanguageContent.es.resx" />
+    <EmbeddedResource Update="GeneralLanguageContent.fr.resx" />
   </ItemGroup>
 </Project>

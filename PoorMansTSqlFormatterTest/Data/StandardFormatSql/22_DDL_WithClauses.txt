@@ -7,7 +7,7 @@ CREATE PROCEDURE dbo.DummyProc
         ,ENCRYPTION
         ,EXECUTE AS CALLER
 AS
-SELECT user_name();
+SELECT USER_NAME();
 GO
 
 CREATE PROC ClrProc @SomeParameter MyType

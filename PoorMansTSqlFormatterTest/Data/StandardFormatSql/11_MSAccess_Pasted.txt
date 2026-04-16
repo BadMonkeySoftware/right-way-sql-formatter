@@ -10,8 +10,8 @@ FROM (
             ,OrderItem.Filename
             ,OrderItem.ItemCode
             ,Buyer.Country
-            ,Sum(OrderItem.Quantity) AS Quantity
-            ,Avg(OrderItem.Price) AS Price
+            ,SUM(OrderItem.Quantity) AS Quantity
+            ,AVG(OrderItem.Price) AS Price
         FROM OrderItem
         LEFT JOIN OrderShippingAddress ON OrderShippingAddress.MerchantID = OrderItem.MerchantID
             AND OrderShippingAddress.OrderNumber = OrderItem.OrderNumber
@@ -42,8 +42,8 @@ FROM (
             ,OrderItem.Filename
             ,OrderItem.ItemCode
             ,OrderShippingAddress.Country
-            ,Sum(OrderItem.Quantity) AS Quantity
-            ,Avg(OrderItem.Price) AS Price
+            ,SUM(OrderItem.Quantity) AS Quantity
+            ,AVG(OrderItem.Price) AS Price
         FROM OrderItem
         INNER JOIN OrderShippingAddress ON OrderShippingAddress.MerchantID = OrderItem.MerchantID
             AND OrderShippingAddress.OrderNumber = OrderItem.OrderNumber

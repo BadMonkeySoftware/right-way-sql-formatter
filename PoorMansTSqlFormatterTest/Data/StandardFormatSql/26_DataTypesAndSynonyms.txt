@@ -219,5 +219,5 @@ SELECT @result.STAsText();
 DROP TABLE #SpatialTable
 GO
 
-SELECT Count(N)
+SELECT COUNT(N)
 FROM CounterTable

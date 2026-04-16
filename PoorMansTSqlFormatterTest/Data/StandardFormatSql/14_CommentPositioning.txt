@@ -1,7 +1,7 @@
 IF EXISTS (
         SELECT *
         FROM dbo.sysobjects
-        WHERE id = object_id('MyTestProc')
+        WHERE id = OBJECT_ID('MyTestProc')
             AND OBJECTPROPERTY(id, N'IsProcedure') = 1
         )
     DROP PROCEDURE MyTestProc
@@ -29,12 +29,12 @@ This is where some explanation of the proc's purpose and usage might go.
     SET @Var3 = 'Empty'
 
     --then set a variable value with SELECT (not groupable)
-    SELECT @DaysAfterDelivery = Max(Convert(INT, ParameterValue))
+    SELECT @DaysAfterDelivery = MAX(CONVERT(INT, ParameterValue))
     FROM CompanyOrderNotification(NOLOCK)
     WHERE CID = @CID
         AND NotificationID = 43
         AND DATALENGTH(Notificationtext) > 0
-        AND IsNumeric(ParameterValue) = 1 --attach a comment to the end of this
+        AND ISNUMERIC(ParameterValue) = 1 --attach a comment to the end of this
 
     --and place another comment before the cursor
     DECLARE SomeCursor CURSOR READ_ONLY FAST_FORWARD
@@ -57,12 +57,12 @@ This is where some explanation of the proc's purpose and usage might go.
     WHILE @@FETCH_STATUS = 0
     BEGIN
         --another comment explaining something
-        PRINT 'Var 1 is ' + Convert(NVARCHAR(10), @Var1)
+        PRINT 'Var 1 is ' + CONVERT(NVARCHAR(10), @Var1)
         /* A multiline comment on its own 
 			but separated from the previous statement */
         /* a multiline comment attached */
         PRINT 'Var 2 is ' --mid-statement comment
-            + Cast(@Var2 AS NVARCHAR(10))
+            + CAST(@Var2 AS NVARCHAR(10))
 
         FETCH NEXT
         FROM SomeCursor

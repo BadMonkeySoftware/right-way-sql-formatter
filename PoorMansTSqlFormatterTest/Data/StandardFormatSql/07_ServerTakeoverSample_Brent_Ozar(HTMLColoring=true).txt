@@ -190,16 +190,16 @@ Description:  Shows what I look for when I take over existing servers.
 <span class="SQLKeyword">DECLARE</span> @job_owner <span class="SQLKeyword">SYSNAME</span>
 <span class="SQLKeyword">DECLARE</span> @is_sysadmin <span class="SQLKeyword">INT</span>
 
-<span class="SQLKeyword">SET</span> @is_sysadmin <span class="SQLOperator">=</span> <span class="SQLFunction">isnull</span><span class="SQLOperator">(</span><span class="SQLFunction">is_srvrolemember</span><span class="SQLOperator">(</span><span class="SQLString">'sysadmin'</span><span class="SQLOperator">)</span><span class="SQLOperator">,</span> 0<span class="SQLOperator">)</span>
-<span class="SQLKeyword">SET</span> @job_owner <span class="SQLOperator">=</span> <span class="SQLFunction">suser_sname</span><span class="SQLOperator">(</span><span class="SQLOperator">)</span>
+<span class="SQLKeyword">SET</span> @is_sysadmin <span class="SQLOperator">=</span> <span class="SQLFunction">ISNULL</span><span class="SQLOperator">(</span><span class="SQLFunction">IS_SRVROLEMEMBER</span><span class="SQLOperator">(</span><span class="SQLString">'sysadmin'</span><span class="SQLOperator">)</span><span class="SQLOperator">,</span> 0<span class="SQLOperator">)</span>
+<span class="SQLKeyword">SET</span> @job_owner <span class="SQLOperator">=</span> <span class="SQLFunction">SUSER_SNAME</span><span class="SQLOperator">(</span><span class="SQLOperator">)</span>
 
 <span class="SQLKeyword">INSERT INTO</span> @xp_results
 <span class="SQLKeyword">EXECUTE</span> sys<span class="SQLOperator">.</span>xp_sqlagent_enum_jobs @is_sysadmin
     <span class="SQLOperator">,</span>@job_owner
 
 <span class="SQLKeyword">UPDATE</span> @xp_results
-<span class="SQLKeyword">SET</span> last_run_time <span class="SQLOperator">=</span> <span class="SQLFunction">right</span><span class="SQLOperator">(</span><span class="SQLString">'000000'</span> <span class="SQLOperator">+</span> last_run_time<span class="SQLOperator">,</span> 6<span class="SQLOperator">)</span>
-    <span class="SQLOperator">,</span>next_run_time <span class="SQLOperator">=</span> <span class="SQLFunction">right</span><span class="SQLOperator">(</span><span class="SQLString">'000000'</span> <span class="SQLOperator">+</span> next_run_time<span class="SQLOperator">,</span> 6<span class="SQLOperator">)</span>
+<span class="SQLKeyword">SET</span> last_run_time <span class="SQLOperator">=</span> <span class="SQLFunction">RIGHT</span><span class="SQLOperator">(</span><span class="SQLString">'000000'</span> <span class="SQLOperator">+</span> last_run_time<span class="SQLOperator">,</span> 6<span class="SQLOperator">)</span>
+    <span class="SQLOperator">,</span>next_run_time <span class="SQLOperator">=</span> <span class="SQLFunction">RIGHT</span><span class="SQLOperator">(</span><span class="SQLString">'000000'</span> <span class="SQLOperator">+</span> next_run_time<span class="SQLOperator">,</span> 6<span class="SQLOperator">)</span>
 
 <span class="SQLKeyword">SELECT</span> j<span class="SQLOperator">.</span>name <span class="SQLKeyword">AS</span> JobName
     <span class="SQLOperator">,</span>j<span class="SQLOperator">.</span>enabled <span class="SQLKeyword">AS</span> Enabled
@@ -215,10 +215,10 @@ Description:  Shows what I look for when I take over existing servers.
                 <span class="SQLKeyword">ELSE</span> <span class="SQLString">'Completed'</span>
                 <span class="SQLKeyword">END</span>
         <span class="SQLKeyword">END</span> <span class="SQLKeyword">AS</span> CurrentStatus
-    <span class="SQLOperator">,</span><span class="SQLFunction">coalesce</span><span class="SQLOperator">(</span>x<span class="SQLOperator">.</span>current_step<span class="SQLOperator">,</span> 0<span class="SQLOperator">)</span> <span class="SQLKeyword">AS</span> CurrentStepNbr
+    <span class="SQLOperator">,</span><span class="SQLFunction">COALESCE</span><span class="SQLOperator">(</span>x<span class="SQLOperator">.</span>current_step<span class="SQLOperator">,</span> 0<span class="SQLOperator">)</span> <span class="SQLKeyword">AS</span> CurrentStepNbr
     <span class="SQLOperator">,</span><span class="SQLKeyword">CASE</span> 
         <span class="SQLKeyword">WHEN</span> x<span class="SQLOperator">.</span>last_run_date <span class="SQLOperator">&gt;</span> 0
-            <span class="SQLKeyword">THEN</span> <span class="SQLFunction">convert</span><span class="SQLOperator">(</span><span class="SQLKeyword">DATETIME</span><span class="SQLOperator">,</span> <span class="SQLFunction">substring</span><span class="SQLOperator">(</span>x<span class="SQLOperator">.</span>last_run_date<span class="SQLOperator">,</span> 1<span class="SQLOperator">,</span> 4<span class="SQLOperator">)</span> <span class="SQLOperator">+</span> <span class="SQLString">'-'</span> <span class="SQLOperator">+</span> <span class="SQLFunction">substring</span><span class="SQLOperator">(</span>x<span class="SQLOperator">.</span>last_run_date<span class="SQLOperator">,</span> 5<span class="SQLOperator">,</span> 2<span class="SQLOperator">)</span> <span class="SQLOperator">+</span> <span class="SQLString">'-'</span> <span class="SQLOperator">+</span> <span class="SQLFunction">substring</span><span class="SQLOperator">(</span>x<span class="SQLOperator">.</span>last_run_date<span class="SQLOperator">,</span> 7<span class="SQLOperator">,</span> 2<span class="SQLOperator">)</span> <span class="SQLOperator">+</span> <span class="SQLString">' '</span> <span class="SQLOperator">+</span> <span class="SQLFunction">substring</span><span class="SQLOperator">(</span>x<span class="SQLOperator">.</span>last_run_time<span class="SQLOperator">,</span> 1<span class="SQLOperator">,</span> 2<span class="SQLOperator">)</span> <span class="SQLOperator">+</span> <span class="SQLString">':'</span> <span class="SQLOperator">+</span> <span class="SQLFunction">substring</span><span class="SQLOperator">(</span>x<span class="SQLOperator">.</span>last_run_time<span class="SQLOperator">,</span> 3<span class="SQLOperator">,</span> 2<span class="SQLOperator">)</span> <span class="SQLOperator">+</span> <span class="SQLString">':'</span> <span class="SQLOperator">+</span> <span class="SQLFunction">substring</span><span class="SQLOperator">(</span>x<span class="SQLOperator">.</span>last_run_time<span class="SQLOperator">,</span> 5<span class="SQLOperator">,</span> 2<span class="SQLOperator">)</span> <span class="SQLOperator">+</span> <span class="SQLString">'.000'</span><span class="SQLOperator">,</span> 121<span class="SQLOperator">)</span>
+            <span class="SQLKeyword">THEN</span> <span class="SQLFunction">CONVERT</span><span class="SQLOperator">(</span><span class="SQLKeyword">DATETIME</span><span class="SQLOperator">,</span> <span class="SQLFunction">SUBSTRING</span><span class="SQLOperator">(</span>x<span class="SQLOperator">.</span>last_run_date<span class="SQLOperator">,</span> 1<span class="SQLOperator">,</span> 4<span class="SQLOperator">)</span> <span class="SQLOperator">+</span> <span class="SQLString">'-'</span> <span class="SQLOperator">+</span> <span class="SQLFunction">SUBSTRING</span><span class="SQLOperator">(</span>x<span class="SQLOperator">.</span>last_run_date<span class="SQLOperator">,</span> 5<span class="SQLOperator">,</span> 2<span class="SQLOperator">)</span> <span class="SQLOperator">+</span> <span class="SQLString">'-'</span> <span class="SQLOperator">+</span> <span class="SQLFunction">SUBSTRING</span><span class="SQLOperator">(</span>x<span class="SQLOperator">.</span>last_run_date<span class="SQLOperator">,</span> 7<span class="SQLOperator">,</span> 2<span class="SQLOperator">)</span> <span class="SQLOperator">+</span> <span class="SQLString">' '</span> <span class="SQLOperator">+</span> <span class="SQLFunction">SUBSTRING</span><span class="SQLOperator">(</span>x<span class="SQLOperator">.</span>last_run_time<span class="SQLOperator">,</span> 1<span class="SQLOperator">,</span> 2<span class="SQLOperator">)</span> <span class="SQLOperator">+</span> <span class="SQLString">':'</span> <span class="SQLOperator">+</span> <span class="SQLFunction">SUBSTRING</span><span class="SQLOperator">(</span>x<span class="SQLOperator">.</span>last_run_time<span class="SQLOperator">,</span> 3<span class="SQLOperator">,</span> 2<span class="SQLOperator">)</span> <span class="SQLOperator">+</span> <span class="SQLString">':'</span> <span class="SQLOperator">+</span> <span class="SQLFunction">SUBSTRING</span><span class="SQLOperator">(</span>x<span class="SQLOperator">.</span>last_run_time<span class="SQLOperator">,</span> 5<span class="SQLOperator">,</span> 2<span class="SQLOperator">)</span> <span class="SQLOperator">+</span> <span class="SQLString">'.000'</span><span class="SQLOperator">,</span> 121<span class="SQLOperator">)</span>
         <span class="SQLKeyword">ELSE</span> <span class="SQLKeyword">NULL</span>
         <span class="SQLKeyword">END</span> <span class="SQLKeyword">AS</span> LastRunTime
     <span class="SQLOperator">,</span><span class="SQLKeyword">CASE</span> h<span class="SQLOperator">.</span>run_status
@@ -637,7 +637,7 @@ http://www.sqlskills.com/BLOGS/PAUL/post/A-little-known-sign-of-impending-doom-e
 	http://support.microsoft.com/kb/224071
 	In the results, also check the number of data and log files for all databases.
 */</span>
-<span class="SQLKeyword">SELECT</span> <span class="SQLFunction">db_name</span><span class="SQLOperator">(</span>database_id<span class="SQLOperator">)</span>
+<span class="SQLKeyword">SELECT</span> <span class="SQLFunction">DB_NAME</span><span class="SQLOperator">(</span>database_id<span class="SQLOperator">)</span>
     <span class="SQLOperator">,</span><span class="SQLOperator">*</span>
 <span class="SQLKeyword">FROM</span> sys<span class="SQLOperator">.</span>master_files
 
@@ -668,43 +668,43 @@ http://www.sqlskills.com/BLOGS/PAUL/post/A-little-known-sign-of-impending-doom-e
 <span class="SQLKeyword">SELECT</span> t<span class="SQLOperator">.</span>name <span class="SQLKeyword">AS</span> tableName
     <span class="SQLOperator">,</span>p<span class="SQLOperator">.</span><span class="SQLOperator">*</span>
 <span class="SQLKeyword">FROM</span> sys<span class="SQLOperator">.</span>tables <span class="SQLKeyword">AS</span> t
-<span class="SQLKeyword">INNER JOIN</span> sys<span class="SQLOperator">.</span>indexes <span class="SQLKeyword">AS</span> i1 <span class="SQLKeyword">ON</span> i1<span class="SQLOperator">.</span><span class="SQLFunction">object_id</span> <span class="SQLOperator">=</span> t<span class="SQLOperator">.</span><span class="SQLFunction">object_id</span>
+<span class="SQLKeyword">INNER JOIN</span> sys<span class="SQLOperator">.</span>indexes <span class="SQLKeyword">AS</span> i1 <span class="SQLKeyword">ON</span> i1<span class="SQLOperator">.</span><span class="SQLFunction">OBJECT_ID</span> <span class="SQLOperator">=</span> t<span class="SQLOperator">.</span><span class="SQLFunction">OBJECT_ID</span>
 <span class="SQLKeyword">CROSS APPLY</span> <span class="SQLOperator">(</span>
     <span class="SQLKeyword">SELECT</span> <span class="SQLKeyword">TOP</span> 1 <span class="SQLOperator">*</span>
     <span class="SQLKeyword">FROM</span> sys<span class="SQLOperator">.</span>indexes <span class="SQLKeyword">AS</span> i
-    <span class="SQLKeyword">WHERE</span> i<span class="SQLOperator">.</span><span class="SQLFunction">object_id</span> <span class="SQLOperator">=</span> i1<span class="SQLOperator">.</span><span class="SQLFunction">object_id</span>
+    <span class="SQLKeyword">WHERE</span> i<span class="SQLOperator">.</span><span class="SQLFunction">OBJECT_ID</span> <span class="SQLOperator">=</span> i1<span class="SQLOperator">.</span><span class="SQLFunction">OBJECT_ID</span>
         <span class="SQLKeyword">AND</span> i<span class="SQLOperator">.</span>index_id <span class="SQLOperator">&gt;</span> i1<span class="SQLOperator">.</span>index_id
         <span class="SQLKeyword">AND</span> i<span class="SQLOperator">.</span>type_desc <span class="SQLOperator">&lt;&gt;</span> <span class="SQLString">'xml'</span>
     <span class="SQLKeyword">ORDER</span> <span class="SQLKeyword">BY</span> i<span class="SQLOperator">.</span>index_id
     <span class="SQLOperator">)</span> <span class="SQLKeyword">AS</span> i2
 <span class="SQLKeyword">CROSS APPLY</span> <span class="SQLOperator">(</span>
-    <span class="SQLKeyword">SELECT</span> <span class="SQLFunction">min</span><span class="SQLOperator">(</span>a<span class="SQLOperator">.</span>index_id<span class="SQLOperator">)</span> <span class="SQLKeyword">AS</span> ind1
-        <span class="SQLOperator">,</span><span class="SQLFunction">min</span><span class="SQLOperator">(</span>b<span class="SQLOperator">.</span>index_id<span class="SQLOperator">)</span> <span class="SQLKeyword">AS</span> ind2
+    <span class="SQLKeyword">SELECT</span> <span class="SQLFunction">MIN</span><span class="SQLOperator">(</span>a<span class="SQLOperator">.</span>index_id<span class="SQLOperator">)</span> <span class="SQLKeyword">AS</span> ind1
+        <span class="SQLOperator">,</span><span class="SQLFunction">MIN</span><span class="SQLOperator">(</span>b<span class="SQLOperator">.</span>index_id<span class="SQLOperator">)</span> <span class="SQLKeyword">AS</span> ind2
     <span class="SQLKeyword">FROM</span> <span class="SQLOperator">(</span>
         <span class="SQLKeyword">SELECT</span> ic<span class="SQLOperator">.</span><span class="SQLOperator">*</span>
         <span class="SQLKeyword">FROM</span> sys<span class="SQLOperator">.</span>index_columns ic
-        <span class="SQLKeyword">WHERE</span> ic<span class="SQLOperator">.</span><span class="SQLFunction">object_id</span> <span class="SQLOperator">=</span> i1<span class="SQLOperator">.</span><span class="SQLFunction">object_id</span>
+        <span class="SQLKeyword">WHERE</span> ic<span class="SQLOperator">.</span><span class="SQLFunction">OBJECT_ID</span> <span class="SQLOperator">=</span> i1<span class="SQLOperator">.</span><span class="SQLFunction">OBJECT_ID</span>
             <span class="SQLKeyword">AND</span> ic<span class="SQLOperator">.</span>index_id <span class="SQLOperator">=</span> i1<span class="SQLOperator">.</span>index_id
             <span class="SQLKeyword">AND</span> ic<span class="SQLOperator">.</span>is_included_column <span class="SQLOperator">=</span> 0
         <span class="SQLOperator">)</span> <span class="SQLKeyword">AS</span> a
     <span class="SQLKeyword">FULL OUTER JOIN</span> <span class="SQLOperator">(</span>
         <span class="SQLKeyword">SELECT</span> <span class="SQLOperator">*</span>
         <span class="SQLKeyword">FROM</span> sys<span class="SQLOperator">.</span>index_columns <span class="SQLKeyword">AS</span> ic
-        <span class="SQLKeyword">WHERE</span> ic<span class="SQLOperator">.</span><span class="SQLFunction">object_id</span> <span class="SQLOperator">=</span> i2<span class="SQLOperator">.</span><span class="SQLFunction">object_id</span>
+        <span class="SQLKeyword">WHERE</span> ic<span class="SQLOperator">.</span><span class="SQLFunction">OBJECT_ID</span> <span class="SQLOperator">=</span> i2<span class="SQLOperator">.</span><span class="SQLFunction">OBJECT_ID</span>
             <span class="SQLKeyword">AND</span> ic<span class="SQLOperator">.</span>index_id <span class="SQLOperator">=</span> i2<span class="SQLOperator">.</span>index_id
             <span class="SQLKeyword">AND</span> ic<span class="SQLOperator">.</span>is_included_column <span class="SQLOperator">=</span> 0
         <span class="SQLOperator">)</span> <span class="SQLKeyword">AS</span> b <span class="SQLKeyword">ON</span> a<span class="SQLOperator">.</span>index_column_id <span class="SQLOperator">=</span> b<span class="SQLOperator">.</span>index_column_id
         <span class="SQLKeyword">AND</span> a<span class="SQLOperator">.</span>column_id <span class="SQLOperator">=</span> b<span class="SQLOperator">.</span>column_id
         <span class="SQLKeyword">AND</span> a<span class="SQLOperator">.</span>key_ordinal <span class="SQLOperator">=</span> b<span class="SQLOperator">.</span>key_ordinal
-    <span class="SQLKeyword">HAVING</span> <span class="SQLFunction">count</span><span class="SQLOperator">(</span><span class="SQLKeyword">CASE</span> 
+    <span class="SQLKeyword">HAVING</span> <span class="SQLFunction">COUNT</span><span class="SQLOperator">(</span><span class="SQLKeyword">CASE</span> 
                 <span class="SQLKeyword">WHEN</span> a<span class="SQLOperator">.</span>index_id <span class="SQLKeyword">IS</span> <span class="SQLKeyword">NULL</span>
                     <span class="SQLKeyword">THEN</span> 1
                 <span class="SQLKeyword">END</span><span class="SQLOperator">)</span> <span class="SQLOperator">=</span> 0
-        <span class="SQLKeyword">AND</span> <span class="SQLFunction">count</span><span class="SQLOperator">(</span><span class="SQLKeyword">CASE</span> 
+        <span class="SQLKeyword">AND</span> <span class="SQLFunction">COUNT</span><span class="SQLOperator">(</span><span class="SQLKeyword">CASE</span> 
                 <span class="SQLKeyword">WHEN</span> b<span class="SQLOperator">.</span>index_id <span class="SQLKeyword">IS</span> <span class="SQLKeyword">NULL</span>
                     <span class="SQLKeyword">THEN</span> 1
                 <span class="SQLKeyword">END</span><span class="SQLOperator">)</span> <span class="SQLOperator">=</span> 0
-        <span class="SQLKeyword">AND</span> <span class="SQLFunction">count</span><span class="SQLOperator">(</span>a<span class="SQLOperator">.</span>index_id<span class="SQLOperator">)</span> <span class="SQLOperator">=</span> <span class="SQLFunction">count</span><span class="SQLOperator">(</span>b<span class="SQLOperator">.</span>index_id<span class="SQLOperator">)</span>
+        <span class="SQLKeyword">AND</span> <span class="SQLFunction">COUNT</span><span class="SQLOperator">(</span>a<span class="SQLOperator">.</span>index_id<span class="SQLOperator">)</span> <span class="SQLOperator">=</span> <span class="SQLFunction">COUNT</span><span class="SQLOperator">(</span>b<span class="SQLOperator">.</span>index_id<span class="SQLOperator">)</span>
     <span class="SQLOperator">)</span> <span class="SQLKeyword">AS</span> p
 <span class="SQLKeyword">WHERE</span> i1<span class="SQLOperator">.</span>type_desc <span class="SQLOperator">&lt;&gt;</span> <span class="SQLString">'xml'</span>
 
@@ -727,7 +727,7 @@ http://www.sqlskills.com/BLOGS/PAUL/post/A-little-known-sign-of-impending-doom-e
 	http://sqlserverpedia.com/wiki/Index_Maintenance
 */</span>
 <span class="SQLKeyword">SELECT</span> db<span class="SQLOperator">.</span>name <span class="SQLKeyword">AS</span> databaseName
-    <span class="SQLOperator">,</span><span class="SQLFunction">SCHEMA_NAME</span><span class="SQLOperator">(</span>obj<span class="SQLOperator">.</span><span class="SQLFunction">schema_id</span><span class="SQLOperator">)</span> <span class="SQLKeyword">AS</span> schemaName
+    <span class="SQLOperator">,</span><span class="SQLFunction">SCHEMA_NAME</span><span class="SQLOperator">(</span>obj<span class="SQLOperator">.</span><span class="SQLFunction">SCHEMA_ID</span><span class="SQLOperator">)</span> <span class="SQLKeyword">AS</span> schemaName
     <span class="SQLOperator">,</span><span class="SQLFunction">OBJECT_NAME</span><span class="SQLOperator">(</span>ps<span class="SQLOperator">.</span><span class="SQLFunction">OBJECT_ID</span><span class="SQLOperator">)</span> <span class="SQLKeyword">AS</span> tableName
     <span class="SQLOperator">,</span>ps<span class="SQLOperator">.</span><span class="SQLFunction">OBJECT_ID</span> <span class="SQLKeyword">AS</span> objectID
     <span class="SQLOperator">,</span>ps<span class="SQLOperator">.</span>index_id <span class="SQLKeyword">AS</span> indexID
@@ -736,7 +736,7 @@ http://www.sqlskills.com/BLOGS/PAUL/post/A-little-known-sign-of-impending-doom-e
     <span class="SQLOperator">,</span>ps<span class="SQLOperator">.</span>page_count
 <span class="SQLKeyword">FROM</span> sys<span class="SQLOperator">.</span>databases db
 <span class="SQLKeyword">INNER JOIN</span> sys<span class="SQLOperator">.</span>dm_db_index_physical_stats<span class="SQLOperator">(</span><span class="SQLFunction">DB_ID</span><span class="SQLOperator">(</span><span class="SQLOperator">)</span><span class="SQLOperator">,</span> <span class="SQLKeyword">NULL</span><span class="SQLOperator">,</span> <span class="SQLKeyword">NULL</span><span class="SQLOperator">,</span> <span class="SQLKeyword">NULL</span><span class="SQLOperator">,</span> <span class="SQLString">N'Limited'</span><span class="SQLOperator">)</span> ps <span class="SQLKeyword">ON</span> db<span class="SQLOperator">.</span>database_id <span class="SQLOperator">=</span> ps<span class="SQLOperator">.</span>database_id
-<span class="SQLKeyword">INNER JOIN</span> sys<span class="SQLOperator">.</span>objects obj <span class="SQLKeyword">ON</span> ps<span class="SQLOperator">.</span><span class="SQLFunction">object_id</span> <span class="SQLOperator">=</span> obj<span class="SQLOperator">.</span><span class="SQLFunction">object_id</span>
+<span class="SQLKeyword">INNER JOIN</span> sys<span class="SQLOperator">.</span>objects obj <span class="SQLKeyword">ON</span> ps<span class="SQLOperator">.</span><span class="SQLFunction">OBJECT_ID</span> <span class="SQLOperator">=</span> obj<span class="SQLOperator">.</span><span class="SQLFunction">OBJECT_ID</span>
 <span class="SQLKeyword">WHERE</span> ps<span class="SQLOperator">.</span>index_id <span class="SQLOperator">&gt;</span> 0
     <span class="SQLKeyword">AND</span> ps<span class="SQLOperator">.</span>page_count <span class="SQLOperator">&gt;</span> 100
     <span class="SQLKeyword">AND</span> ps<span class="SQLOperator">.</span>avg_fragmentation_in_percent <span class="SQLOperator">&gt;</span> 30

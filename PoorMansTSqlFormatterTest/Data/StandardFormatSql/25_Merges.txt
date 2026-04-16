@@ -205,7 +205,7 @@ DECLARE @SomeValue INT = (
         FROM the place
         WHERE tis found
         )
-DECLARE @SomeOtherValue INT = Convert(INT, '1')
+DECLARE @SomeOtherValue INT = CONVERT(INT, '1')
 
 SELECT 1 AS two
 

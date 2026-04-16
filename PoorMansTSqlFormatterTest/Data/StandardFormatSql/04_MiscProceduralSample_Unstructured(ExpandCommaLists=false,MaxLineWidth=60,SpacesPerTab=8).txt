@@ -7,7 +7,7 @@ SELECT @MonthIDs = '3,5,6,8,11'
 
 SELECT @WorkingString = @MonthIDs
 
-WHILE len(@WorkingString) > 0
+WHILE LEN(@WorkingString) > 0
 BEGIN
     --Printing the current temp string and the position of the first comma in it
     --Print @WorkingString
@@ -15,16 +15,16 @@ BEGIN
     -- Inserting the string before the first comma
     INSERT #ValueTable (Id)
     VALUES (
-        substring(@WorkingString, 1, patindex('%,%', 
+        SUBSTRING(@WorkingString, 1, PATINDEX('%,%', 
                 @WorkingString) - 1)
         )
 
     --resetting the temporary string to start after the first comma in the previous temp string
-    SELECT @WorkingString = substring(@WorkingString, patindex(
-                '%,%', @WorkingString) + 1, Len(@WorkingString))
+    SELECT @WorkingString = SUBSTRING(@WorkingString, PATINDEX(
+                '%,%', @WorkingString) + 1, LEN(@WorkingString))
 
     --Checking if there is no more commas 
-    IF patindex('%,%', @WorkingString) <= 0
+    IF PATINDEX('%,%', @WorkingString) <= 0
     BEGIN
         --Inserting the last ID
         INSERT #ValueTable (Id)
@@ -39,6 +39,6 @@ END
 -- Getting the Employee Data
 SELECT *
 FROM HumanResources.Employee e
-JOIN #ValueTable t ON month(e.BirthDate) = t.Id
+JOIN #ValueTable t ON MONTH(e.BirthDate) = t.Id
 
 DROP TABLE #ValueTable

@@ -1866,7 +1866,8 @@ namespace PoorMansTSqlFormatterLib.Parsers
             KeywordList.Add("GETDESCENDANT", KeywordType.FunctionKeyword);
             KeywordList.Add("GETLEVEL", KeywordType.FunctionKeyword);
             KeywordList.Add("GETREPARENTEDVALUE", KeywordType.FunctionKeyword);
-            KeywordList.Add("GETROOT", KeywordType.FunctionKeyword);
+            // GETROOT is a CLR static method on HIERARCHYID (hierarchyid::GetRoot())
+            // It must preserve original casing — do not add to keyword list.
             KeywordList.Add("GLOBAL", KeywordType.OtherKeyword);
             KeywordList.Add("GO", KeywordType.OtherKeyword);
             KeywordList.Add("GOTO", KeywordType.OtherKeyword);
@@ -1908,7 +1909,7 @@ namespace PoorMansTSqlFormatterLib.Parsers
             KeywordList.Add("IO", KeywordType.OtherKeyword);
             KeywordList.Add("IS", KeywordType.OtherKeyword);
             KeywordList.Add("ISDATE", KeywordType.FunctionKeyword);
-            KeywordList.Add("ISDESCENDANTOF", KeywordType.FunctionKeyword);
+            // ISDESCENDANTOF is a CLR instance method on HIERARCHYID — preserve original casing.
             KeywordList.Add("ISNULL", KeywordType.FunctionKeyword);
             KeywordList.Add("ISNUMERIC", KeywordType.FunctionKeyword);
             KeywordList.Add("ISOLATION", KeywordType.OtherKeyword);
@@ -2141,7 +2142,7 @@ namespace PoorMansTSqlFormatterLib.Parsers
             KeywordList.Add("TINYINT", KeywordType.DataTypeKeyword);
             KeywordList.Add("TO", KeywordType.OtherKeyword);
             KeywordList.Add("TOP", KeywordType.OtherKeyword);
-            KeywordList.Add("TOSTRING", KeywordType.FunctionKeyword);
+            // TOSTRING is a CLR instance method on HIERARCHYID — preserve original casing.
             KeywordList.Add("TRACEOFF", KeywordType.OtherKeyword);
             KeywordList.Add("TRACEON", KeywordType.OtherKeyword);
             KeywordList.Add("TRACESTATUS", KeywordType.OtherKeyword);

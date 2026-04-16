@@ -14,25 +14,25 @@ GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-CREATE PROCEDURE [dbo].[DatabaseBackup] @Databases NVARCHAR(max)
-    ,@Directory NVARCHAR(max) = NULL
-    ,@BackupType NVARCHAR(max)
-    ,@Verify NVARCHAR(max) = 'N'
+CREATE PROCEDURE [dbo].[DatabaseBackup] @Databases NVARCHAR(MAX)
+    ,@Directory NVARCHAR(MAX) = NULL
+    ,@BackupType NVARCHAR(MAX)
+    ,@Verify NVARCHAR(MAX) = 'N'
     ,@CleanupTime INT = NULL
-    ,@Compress NVARCHAR(max) = NULL
-    ,@CopyOnly NVARCHAR(max) = 'N'
-    ,@ChangeBackupType NVARCHAR(max) = 'N'
-    ,@BackupSoftware NVARCHAR(max) = NULL
-    ,@CheckSum NVARCHAR(max) = 'N'
+    ,@Compress NVARCHAR(MAX) = NULL
+    ,@CopyOnly NVARCHAR(MAX) = 'N'
+    ,@ChangeBackupType NVARCHAR(MAX) = 'N'
+    ,@BackupSoftware NVARCHAR(MAX) = NULL
+    ,@CheckSum NVARCHAR(MAX) = 'N'
     ,@BlockSize INT = NULL
     ,@BufferCount INT = NULL
     ,@MaxTransferSize INT = NULL
     ,@NumberOfFiles INT = 1
     ,@CompressionLevel INT = NULL
-    ,@Description NVARCHAR(max) = NULL
+    ,@Description NVARCHAR(MAX) = NULL
     ,@Threads INT = NULL
     ,@Throttle INT = NULL
-    ,@Execute NVARCHAR(max) = 'Y'
+    ,@Execute NVARCHAR(MAX) = 'Y'
 AS
 BEGIN
     ----------------------------------------------------------------------------------------------------
@@ -43,32 +43,32 @@ BEGIN
     ----------------------------------------------------------------------------------------------------
     --// Declare variables                                                                          //--
     ----------------------------------------------------------------------------------------------------
-    DECLARE @StartMessage NVARCHAR(max)
-    DECLARE @EndMessage NVARCHAR(max)
-    DECLARE @DatabaseMessage NVARCHAR(max)
-    DECLARE @ErrorMessage NVARCHAR(max)
+    DECLARE @StartMessage NVARCHAR(MAX)
+    DECLARE @EndMessage NVARCHAR(MAX)
+    DECLARE @DatabaseMessage NVARCHAR(MAX)
+    DECLARE @ErrorMessage NVARCHAR(MAX)
     DECLARE @Version NUMERIC(18, 10)
     DECLARE @DefaultDirectory NVARCHAR(4000)
     DECLARE @CheckDirectory NVARCHAR(4000)
     DECLARE @CurrentID INT
-    DECLARE @CurrentDatabase NVARCHAR(max)
-    DECLARE @CurrentBackupType NVARCHAR(max)
-    DECLARE @CurrentFileExtension NVARCHAR(max)
+    DECLARE @CurrentDatabase NVARCHAR(MAX)
+    DECLARE @CurrentBackupType NVARCHAR(MAX)
+    DECLARE @CurrentFileExtension NVARCHAR(MAX)
     DECLARE @CurrentFileNumber INT
     DECLARE @CurrentDifferentialLSN NUMERIC(25, 0)
     DECLARE @CurrentLogLSN NUMERIC(25, 0)
     DECLARE @CurrentLatestBackup DATETIME
-    DECLARE @CurrentDatabaseFS NVARCHAR(max)
-    DECLARE @CurrentDirectory NVARCHAR(max)
-    DECLARE @CurrentFilePath NVARCHAR(max)
+    DECLARE @CurrentDatabaseFS NVARCHAR(MAX)
+    DECLARE @CurrentDirectory NVARCHAR(MAX)
+    DECLARE @CurrentFilePath NVARCHAR(MAX)
     DECLARE @CurrentDate DATETIME
     DECLARE @CurrentCleanupDate DATETIME
     DECLARE @CurrentIsDatabaseAccessible BIT
-    DECLARE @CurrentMirroringRole NVARCHAR(max)
-    DECLARE @CurrentCommand01 NVARCHAR(max)
-    DECLARE @CurrentCommand02 NVARCHAR(max)
-    DECLARE @CurrentCommand03 NVARCHAR(max)
-    DECLARE @CurrentCommand04 NVARCHAR(max)
+    DECLARE @CurrentMirroringRole NVARCHAR(MAX)
+    DECLARE @CurrentCommand01 NVARCHAR(MAX)
+    DECLARE @CurrentCommand02 NVARCHAR(MAX)
+    DECLARE @CurrentCommand03 NVARCHAR(MAX)
+    DECLARE @CurrentCommand04 NVARCHAR(MAX)
     DECLARE @CurrentCommandOutput01 INT
     DECLARE @CurrentCommandOutput02 INT
     DECLARE @CurrentCommandOutput03 INT
@@ -80,14 +80,14 @@ BEGIN
         )
     DECLARE @tmpDatabases TABLE (
         ID INT IDENTITY PRIMARY KEY
-        ,DatabaseName NVARCHAR(max)
+        ,DatabaseName NVARCHAR(MAX)
         ,Completed BIT
         )
-    DECLARE @CurrentFiles TABLE (CurrentFilePath NVARCHAR(max))
+    DECLARE @CurrentFiles TABLE (CurrentFilePath NVARCHAR(MAX))
     DECLARE @Error INT
 
     SET @Error = 0
-    SET @Version = CAST(LEFT(CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR(max)), CHARINDEX('.', CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR(max))) - 1) + '.' + REPLACE(RIGHT(CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR(max)), LEN(CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR(max))) - CHARINDEX('.', CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR(max)))), '.', '') AS NUMERIC(18, 10))
+    SET @Version = CAST(LEFT(CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR(MAX)), CHARINDEX('.', CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR(MAX))) - 1) + '.' + REPLACE(RIGHT(CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR(MAX)), LEN(CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR(MAX))) - CHARINDEX('.', CAST(SERVERPROPERTY('ProductVersion') AS NVARCHAR(MAX)))), '.', '') AS NUMERIC(18, 10))
     ----------------------------------------------------------------------------------------------------
     --// Log initial information                                                                    //--
     ----------------------------------------------------------------------------------------------------
