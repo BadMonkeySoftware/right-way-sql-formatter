@@ -261,5 +261,8 @@ function buildArgs(): string[] {
     bool('alignColumnDefinitionsInDDL', 'align-ddl-columns',      false);
     bool('ddlConstraintsOnNewLine',   'ddl-constraints-newline',  false);
 
+    // Task 6: Table join alignment
+    bool('alignTableJoins',           'align-table-joins',        false);
+
     return args;
 }

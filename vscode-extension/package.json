@@ -169,6 +169,11 @@
           "type": "boolean",
           "default": false,
           "description": "In CREATE TABLE, put each column constraint on its own line."
+        },
+        "rightWaySqlFormatter.alignTableJoins": {
+          "type": "boolean",
+          "default": false,
+          "description": "Align FROM/JOIN table names, AS aliases, and ON conditions into vertical columns across all joins in a query block."
         }
       }
     }
