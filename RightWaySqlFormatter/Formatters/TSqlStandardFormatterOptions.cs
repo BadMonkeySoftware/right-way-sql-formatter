@@ -54,6 +54,8 @@ namespace PoorMansTSqlFormatterLib.Formatters
             IndentWhereAndOrConditions = false;
             AlignColumnDefinitionsInDDL = false;
             DDLConstraintsOnNewLine = false;
+            AlignTableJoins = false;
+            ColumnAlwaysHasAlias = false;
 		}
 
         //Doesn't particularly need to be lazy-loaded, and doesn't need to be threadsafe.
@@ -94,8 +96,10 @@ namespace PoorMansTSqlFormatterLib.Formatters
 				else if (key == "AlignColumnDefinitions") AlignColumnDefinitions = Convert.ToBoolean(value);
 				else if (key == "IndentJoinOnClause") IndentJoinOnClause = Convert.ToBoolean(value);
 				else if (key == "IndentWhereAndOrConditions") IndentWhereAndOrConditions = Convert.ToBoolean(value);
-				else if (key == "AlignColumnDefinitionsInDDL") AlignColumnDefinitionsInDDL = Convert.ToBoolean(value);
+			else if (key == "AlignColumnDefinitionsInDDL") AlignColumnDefinitionsInDDL = Convert.ToBoolean(value);
 				else if (key == "DDLConstraintsOnNewLine") DDLConstraintsOnNewLine = Convert.ToBoolean(value);
+				else if (key == "AlignTableJoins") AlignTableJoins = Convert.ToBoolean(value);
+				else if (key == "ColumnAlwaysHasAlias") ColumnAlwaysHasAlias = Convert.ToBoolean(value);
 				else throw new ArgumentException("Unknown option: " + key);
             }
 
@@ -131,6 +135,8 @@ namespace PoorMansTSqlFormatterLib.Formatters
 			if (IndentWhereAndOrConditions != _defaultOptions.IndentWhereAndOrConditions) overrides.Add("IndentWhereAndOrConditions", IndentWhereAndOrConditions.ToString());
 			if (AlignColumnDefinitionsInDDL != _defaultOptions.AlignColumnDefinitionsInDDL) overrides.Add("AlignColumnDefinitionsInDDL", AlignColumnDefinitionsInDDL.ToString());
 			if (DDLConstraintsOnNewLine != _defaultOptions.DDLConstraintsOnNewLine) overrides.Add("DDLConstraintsOnNewLine", DDLConstraintsOnNewLine.ToString());
+			if (AlignTableJoins != _defaultOptions.AlignTableJoins) overrides.Add("AlignTableJoins", AlignTableJoins.ToString());
+			if (ColumnAlwaysHasAlias != _defaultOptions.ColumnAlwaysHasAlias) overrides.Add("ColumnAlwaysHasAlias", ColumnAlwaysHasAlias.ToString());
     
             if (overrides.Count == 0) return string.Empty;
             return string.Join(",", overrides.Select((kvp) => kvp.Key + "=" + kvp.Value).ToArray());
@@ -223,6 +229,32 @@ namespace PoorMansTSqlFormatterLib.Formatters
         /// Default is false to avoid breaking existing tests.
         /// </summary>
         public bool DDLConstraintsOnNewLine { get; set; }
+
+        // ----------------------------------------------------------------
+        // Task 6: Table join alignment
+        // ----------------------------------------------------------------
+        /// <summary>
+        /// When true, aligns FROM/JOIN table names, aliases, and ON conditions
+        /// into vertical columns across all joins in a query block.
+        /// - Pads keyword+tablename so all table names end at the same tab stop
+        /// - Adds AS alias if none exists (using the table name as the alias)
+        /// - Vertically aligns the AS keyword and alias across all joins
+        /// - Vertically aligns the ON keyword
+        /// - Long multi-condition ON clauses (> 100 chars) wrap to next line
+        /// </summary>
+        public bool AlignTableJoins { get; set; }
+
+        // ----------------------------------------------------------------
+        // Task 7: Column always has alias
+        // ----------------------------------------------------------------
+        /// <summary>
+        /// When true, every column in a SELECT list is given an explicit alias.
+        /// - Bare column references (e.g. t.ColName, [MyCol]) → alias is the column base name.
+        /// - Complex expressions (functions, arithmetic, CASE, *) → alias is ColumnAlias_N
+        ///   where N is a counter that increments for each auto-generated alias within a query.
+        /// - Columns that already have an alias are left unchanged.
+        /// </summary>
+        public bool ColumnAlwaysHasAlias { get; set; }
 
     }
 

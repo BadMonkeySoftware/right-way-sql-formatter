@@ -264,5 +264,8 @@ function buildArgs(): string[] {
     // Task 6: Table join alignment
     bool('alignTableJoins',           'align-table-joins',        false);
 
+    // Task 7: Column always has alias
+    bool('columnAlwaysHasAlias',      'column-always-has-alias',  false);
+
     return args;
 }

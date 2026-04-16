@@ -174,6 +174,11 @@
           "type": "boolean",
           "default": false,
           "description": "Align FROM/JOIN table names, AS aliases, and ON conditions into vertical columns across all joins in a query block."
+        },
+        "rightWaySqlFormatter.columnAlwaysHasAlias": {
+          "type": "boolean",
+          "default": false,
+          "description": "Ensure every column in a SELECT list has an explicit AS alias. Simple column references use the column name; complex expressions use ColumnAlias_N."
         }
       }
     }

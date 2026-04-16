@@ -142,10 +142,14 @@ namespace PoorMansTSqlFormatterLib.Formatters
             // Post-processing passes for SELECT column formatting.
             if (!Options.HTMLColoring)
             {
+                if (Options.ColumnAlwaysHasAlias)
+                    output = EnsureColumnAliases(output);
                 if (Options.ColumnAliasStyle == ColumnAliasStyle.EqualSign)
                     output = RewriteAliasesToEqualSign(output);
                 if (Options.AlignColumnDefinitions)
                     output = AlignSelectColumns(output);
+                if (Options.AlignTableJoins)
+                    output = AlignFromJoinClauses(output);
             }
 
             return output;
@@ -190,8 +194,467 @@ namespace PoorMansTSqlFormatterLib.Formatters
         // Post-processing helpers for output-string transformations
         // ----------------------------------------------------------------
 
+        // ----------------------------------------------------------------
+        // AlignFromJoinClauses: align FROM/JOIN table names, aliases, and ON
+        // ----------------------------------------------------------------
+
         /// <summary>
-        /// Rewrites "expr AS alias" to "alias = expr" for SELECT column list lines in the output.
+        /// Scans the formatted output for FROM/JOIN blocks and rewrites them so:
+        ///   1. All table names (keyword + tablename) end at the same tab stop.
+        ///   2. Every line has an explicit AS alias (uses table base-name if none).
+        ///   3. AS and alias are vertically aligned across all FROM/JOIN lines.
+        ///   4. ON is vertically aligned at the next tab stop past the longest alias.
+        ///   5. Multi-condition ON clauses that exceed 100 chars wrap to the next line,
+        ///      aligned under the ON keyword.
+        /// </summary>
+        private string AlignFromJoinClauses(string output)
+        {
+            var lines = output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+            int indentSize = Options.SpacesPerTab > 0 ? Options.SpacesPerTab : 4;
+
+            // Find contiguous FROM/JOIN blocks and align each one.
+            int i = 0;
+            while (i < lines.Length)
+            {
+                string trimmed = lines[i].TrimStart();
+                string upper = trimmed.ToUpperInvariant();
+                if (IsFromOrJoinLine(upper))
+                {
+                    int blockStart = i;
+                    while (i < lines.Length)
+                    {
+                        string t = lines[i].TrimStart().ToUpperInvariant();
+                        if (i > blockStart && !IsFromOrJoinLine(t) && !IsJoinContinuationLine(t))
+                            break;
+                        i++;
+                    }
+                    AlignFromJoinBlock(lines, blockStart, i, indentSize);
+                    continue;
+                }
+                i++;
+            }
+
+            return string.Join(Environment.NewLine, lines);
+        }
+
+        private static bool IsFromOrJoinLine(string trimmedUpper)
+        {
+            return trimmedUpper.StartsWith("FROM ") || trimmedUpper == "FROM"
+                || trimmedUpper.StartsWith("INNER JOIN ") || trimmedUpper.StartsWith("LEFT JOIN ")
+                || trimmedUpper.StartsWith("RIGHT JOIN ") || trimmedUpper.StartsWith("FULL JOIN ")
+                || trimmedUpper.StartsWith("FULL OUTER JOIN ") || trimmedUpper.StartsWith("LEFT OUTER JOIN ")
+                || trimmedUpper.StartsWith("RIGHT OUTER JOIN ") || trimmedUpper.StartsWith("CROSS JOIN ")
+                || trimmedUpper.StartsWith("JOIN ");
+        }
+
+        private static bool IsJoinContinuationLine(string trimmedUpper)
+        {
+            // Lines that are AND/OR continuation of a multi-condition ON clause.
+            return trimmedUpper.StartsWith("AND ") || trimmedUpper.StartsWith("OR ");
+        }
+
+        /// <summary>
+        /// Parses one FROM/JOIN block (lines[start..end)) and rewrites all lines
+        /// with aligned table names, aligned AS aliases, and aligned ON conditions.
+        /// </summary>
+        private void AlignFromJoinBlock(string[] lines, int start, int end, int indentSize)
+        {
+            // ---- Pass 1: parse each FROM/JOIN line --------------------------
+            // For each line extract: indent, keyword (e.g. "FROM", "INNER JOIN"), table, alias, on-clause.
+            var items = new List<JoinLineItem>();
+
+            for (int i = start; i < end; i++)
+            {
+                string line = lines[i];
+                string trimmed = line.TrimStart();
+                string trimmedUpper = trimmed.ToUpperInvariant();
+
+                // Skip continuation AND/OR lines — we'll re-attach them later.
+                if (IsJoinContinuationLine(trimmedUpper))
+                    continue;
+
+                string indent = line.Substring(0, line.Length - trimmed.Length);
+                ParseFromJoinLine(trimmed, out string keyword, out string table, out string alias, out string onClause);
+
+                items.Add(new JoinLineItem
+                {
+                    LineIndex = i,
+                    Indent = indent,
+                    Keyword = keyword,
+                    Table = table,
+                    Alias = alias,
+                    OnClause = onClause,
+                });
+            }
+
+            if (items.Count == 0) return;
+
+            // ---- Pass 2: ensure every item has an alias ---------------------
+            foreach (var item in items)
+            {
+                if (string.IsNullOrEmpty(item.Alias))
+                    item.Alias = BaseTableName(item.Table);
+            }
+
+            // ---- Pass 3: compute column positions --------------------------
+            // Col A: end of keyword+table — target = next tab stop after max(keyword.Length + 1 + table.Length)
+            int maxKwTableLen = items.Max(it => it.Keyword.Length + 1 + it.Table.Length);
+            int targetTableCol = ((maxKwTableLen / indentSize) + 1) * indentSize;
+
+            // Col B: end of AS+alias — target = next tab stop after max(alias.Length) + "AS ".Length
+            int maxAliasLen = items.Max(it => it.Alias.Length);
+            // "AS alias" — the AS itself is 3 chars ("AS "). Target col for ON = next tab stop after "AS " + maxAlias.
+            int asAliasLen = 3 + maxAliasLen; // "AS " + alias
+            int targetOnCol = targetTableCol + ((asAliasLen / indentSize) + 1) * indentSize;
+
+            // ---- Pass 4: rewrite lines -------------------------------------
+            int itemIdx = 0;
+            for (int i = start; i < end; i++)
+            {
+                string trimmedUpper = lines[i].TrimStart().ToUpperInvariant();
+                if (IsJoinContinuationLine(trimmedUpper))
+                {
+                    // Re-indent continuation lines to align with ON position.
+                    string contIndent = items[itemIdx > 0 ? itemIdx - 1 : 0].Indent
+                        + new string(' ', targetOnCol);
+                    lines[i] = contIndent + lines[i].TrimStart();
+                    continue;
+                }
+
+                var item = items[itemIdx++];
+                string kwTable = item.Keyword + " " + item.Table;
+                int kwTableLen = kwTable.Length;
+                string tablepad = new string(' ', targetTableCol - kwTableLen);
+
+                string aliasPad = new string(' ', maxAliasLen - item.Alias.Length);
+                string asPart = "AS " + item.Alias + aliasPad;
+
+                string newLine;
+                if (string.IsNullOrEmpty(item.OnClause))
+                {
+                    // FROM line — no ON clause
+                    newLine = item.Indent + kwTable + tablepad + asPart;
+                }
+                else
+                {
+                    string onFull = item.Indent + kwTable + tablepad + asPart + " ON " + item.OnClause;
+                    // Check if it fits within 100 chars; if not, check further if multi-condition
+                    if (onFull.Length > 100 && item.OnClause.Contains(" AND ", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Split conditions and wrap extras.
+                        string onBase = item.Indent + kwTable + tablepad + asPart + " ON ";
+                        string onIndent = new string(' ', onBase.Length - item.Indent.Length);
+                        var conditions = SplitOnConditions(item.OnClause);
+                        string firstCond = conditions[0];
+                        var rest = conditions.Skip(1).Select(c => item.Indent + onIndent + "AND " + c);
+                        newLine = onBase + firstCond + (rest.Any() ? Environment.NewLine + string.Join(Environment.NewLine, rest) : "");
+                    }
+                    else
+                    {
+                        newLine = onFull;
+                    }
+                }
+                lines[i] = newLine;
+            }
+        }
+
+        private sealed class JoinLineItem
+        {
+            public int LineIndex { get; set; }
+            public string Indent { get; set; } = "";
+            public string Keyword { get; set; } = "";
+            public string Table { get; set; } = "";
+            public string Alias { get; set; } = "";
+            public string OnClause { get; set; } = "";
+        }
+
+        /// <summary>
+        /// Parses a single FROM/JOIN trimmed line into its components.
+        /// </summary>
+        private static void ParseFromJoinLine(string trimmed, out string keyword, out string table, out string alias, out string onClause)
+        {
+            // Keywords: FROM, JOIN, INNER JOIN, LEFT JOIN, LEFT OUTER JOIN, RIGHT JOIN,
+            //           RIGHT OUTER JOIN, FULL JOIN, FULL OUTER JOIN, CROSS JOIN
+            string[] keywords = [
+                "LEFT OUTER JOIN", "RIGHT OUTER JOIN", "FULL OUTER JOIN",
+                "INNER JOIN", "LEFT JOIN", "RIGHT JOIN", "FULL JOIN", "CROSS JOIN",
+                "JOIN", "FROM"
+            ];
+
+            keyword = "";
+            string rest = trimmed;
+            string upper = trimmed.ToUpperInvariant();
+            foreach (string kw in keywords)
+            {
+                if (upper.StartsWith(kw + " ") || upper == kw)
+                {
+                    keyword = trimmed.Substring(0, kw.Length); // preserve casing
+                    rest = trimmed.Substring(kw.Length).TrimStart();
+                    break;
+                }
+            }
+
+            if (string.IsNullOrEmpty(keyword))
+            {
+                // Fallback: take first word as keyword
+                int sp = trimmed.IndexOf(' ');
+                keyword = sp >= 0 ? trimmed.Substring(0, sp) : trimmed;
+                rest = sp >= 0 ? trimmed.Substring(sp + 1).TrimStart() : "";
+            }
+
+            // Now rest = "tableName [AS] [alias] [ON ...]" or "tableName [AS] [alias]"
+            // Split on " ON " (case-insensitive, top-level)
+            int onPos = FindTokenOutsideParens(rest, " ON ");
+            onClause = onPos >= 0 ? rest.Substring(onPos + 4).Trim() : "";
+            string tableAndAlias = onPos >= 0 ? rest.Substring(0, onPos).TrimEnd() : rest.TrimEnd();
+
+            // Parse table [AS] alias from tableAndAlias
+            ParseTableAndAlias(tableAndAlias, out table, out alias);
+        }
+
+        private static void ParseTableAndAlias(string tableAndAlias, out string table, out string alias)
+        {
+            // Tokens: tableName [AS] [alias]
+            // Could be: schema.Table, [schema].[Table], tableName, tableName alias, tableName AS alias
+            string upper = tableAndAlias.ToUpperInvariant();
+            int asPos = -1;
+            // Look for " AS " (with spaces)
+            int tryAs = upper.IndexOf(" AS ");
+            if (tryAs >= 0)
+            {
+                table = tableAndAlias.Substring(0, tryAs).Trim();
+                alias = tableAndAlias.Substring(tryAs + 4).Trim();
+                return;
+            }
+            // No AS keyword — try two-token split
+            var parts = tableAndAlias.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length >= 2)
+            {
+                table = parts[0];
+                alias = parts[parts.Length - 1];
+            }
+            else
+            {
+                table = tableAndAlias.Trim();
+                alias = "";
+            }
+        }
+
+        /// <summary>
+        /// Returns the base name of a (possibly schema-qualified) table name.
+        /// e.g. "dbo.Employees" → "Employees", "[dbo].[Employees]" → "Employees"
+        /// </summary>
+        private static string BaseTableName(string table)
+        {
+            // Strip schema prefix: take the last dot-segment, remove brackets
+            int dot = table.LastIndexOf('.');
+            string name = dot >= 0 ? table.Substring(dot + 1) : table;
+            return name.Trim('[', ']');
+        }
+
+        /// <summary>
+        /// Finds the position of a multi-char token in <paramref name="s"/> outside parentheses.
+        /// Case-insensitive.
+        /// </summary>
+        private static int FindTokenOutsideParens(string s, string token)
+        {
+            int depth = 0;
+            string upper = s.ToUpperInvariant();
+            string tokenUpper = token.ToUpperInvariant();
+            for (int i = 0; i <= s.Length - token.Length; i++)
+            {
+                char c = s[i];
+                if (c == '(') { depth++; continue; }
+                if (c == ')') { depth--; continue; }
+                if (depth == 0 && upper.Substring(i, token.Length) == tokenUpper)
+                    return i;
+            }
+            return -1;
+        }
+
+        /// <summary>
+        /// Splits an ON clause on top-level " AND " separators.
+        /// </summary>
+        private static List<string> SplitOnConditions(string onClause)
+        {
+            var result = new List<string>();
+            int depth = 0;
+            int start = 0;
+            string upper = onClause.ToUpperInvariant();
+            for (int i = 0; i <= onClause.Length - 5; i++)
+            {
+                if (onClause[i] == '(') { depth++; continue; }
+                if (onClause[i] == ')') { depth--; continue; }
+                if (depth == 0 && upper.Substring(i, 5) == " AND ")
+                {
+                    result.Add(onClause.Substring(start, i - start).Trim());
+                    start = i + 5;
+                    i += 4; // skip " AND "
+                }
+            }
+            result.Add(onClause.Substring(start).Trim());
+            return result;
+        }
+
+        // ----------------------------------------------------------------
+        // EnsureColumnAliases: add AS alias to every SELECT column that lacks one
+        // ----------------------------------------------------------------
+
+        /// <summary>
+        /// Walks the formatted output and ensures every SELECT-list column has an explicit alias.
+        /// - Simple column references (optionally table-qualified, bracket-quoted) → base column name.
+        /// - Complex expressions (functions, arithmetic, CASE, wildcards) → ColumnAlias_N.
+        /// N resets to 1 for each new query (each new top-level SELECT block).
+        /// Columns that already have a top-level AS alias are left unchanged.
+        /// </summary>
+        private string EnsureColumnAliases(string output)
+        {
+            var lines = output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+            bool inSelectList = false;
+            int autoAliasCounter = 0;
+
+            for (int i = 0; i < lines.Length; i++)
+            {
+                string line = lines[i];
+                string trimmed = line.TrimStart();
+                string trimmedUpper = trimmed.ToUpperInvariant();
+
+                // --- Detect start of SELECT list ---
+                if (trimmedUpper.StartsWith("SELECT ") || trimmedUpper == "SELECT")
+                {
+                    inSelectList = true;
+                    autoAliasCounter = 0; // reset counter per query
+
+                    // The SELECT line itself may have first column inline.
+                    int selectEnd = trimmed.IndexOf(' ');
+                    if (selectEnd >= 0)
+                    {
+                        string afterSelect = trimmed.Substring(selectEnd + 1).TrimStart();
+                        // Handle TOP N prefix — skip this line if TOP present
+                        if (!afterSelect.ToUpperInvariant().StartsWith("TOP "))
+                        {
+                            string indent = line.Substring(0, line.Length - trimmed.Length);
+                            var (rewritten, newCounter) = EnsureAlias(afterSelect, autoAliasCounter);
+                            autoAliasCounter = newCounter;
+                            if (rewritten != afterSelect)
+                                lines[i] = indent + "SELECT " + rewritten;
+                        }
+                    }
+                    continue;
+                }
+
+                // --- Detect end of SELECT list ---
+                if (inSelectList)
+                {
+                    bool startsWithComma = trimmed.StartsWith(",");
+                    if (!startsWithComma && IsClauseStartLine(trimmedUpper))
+                    {
+                        inSelectList = false;
+                        continue;
+                    }
+
+                    if (startsWithComma)
+                    {
+                        // Leading-comma style: ,expr  or  ,expr AS alias
+                        string afterComma = trimmed.Substring(1).TrimStart();
+                        var (rewritten, newCounter) = EnsureAlias(afterComma, autoAliasCounter);
+                        autoAliasCounter = newCounter;
+                        if (rewritten != afterComma)
+                        {
+                            string indent = line.Substring(0, line.Length - trimmed.Length);
+                            lines[i] = indent + "," + rewritten;
+                        }
+                    }
+                    else if (!string.IsNullOrWhiteSpace(trimmed))
+                    {
+                        // Trailing-comma or bare expression line
+                        string trimmedLine = trimmed.TrimEnd(',');
+                        bool hadTrailingComma = trimmed.EndsWith(",");
+                        var (rewritten, newCounter) = EnsureAlias(trimmedLine, autoAliasCounter);
+                        autoAliasCounter = newCounter;
+                        if (rewritten != trimmedLine)
+                        {
+                            string indent = line.Substring(0, line.Length - trimmed.Length);
+                            lines[i] = indent + rewritten + (hadTrailingComma ? "," : "");
+                        }
+                    }
+                }
+            }
+
+            return string.Join(Environment.NewLine, lines);
+        }
+
+        /// <summary>
+        /// Returns a copy of <paramref name="col"/> with an AS alias appended if none exists.
+        /// Also returns the updated autoAliasCounter.
+        /// - Leaves unchanged if a top-level AS alias is already present.
+        /// - Leaves unchanged if col is a wildcard (* or t.*).
+        /// - Simple column ref (e.g. col, t.col, [col], t.[col]) → appends AS &lt;baseName&gt;.
+        /// - Complex expression → appends AS ColumnAlias_N (counter incremented).
+        /// </summary>
+        private static (string result, int counter) EnsureAlias(string col, int counter)
+        {
+            string trimmed = col.Trim();
+
+            // Already has alias?
+            if (FindAsOutsideParens(trimmed) >= 0)
+                return (col, counter);
+
+            // Wildcard — skip
+            if (trimmed == "*" || trimmed.EndsWith(".*"))
+                return (col, counter);
+
+            // Determine alias
+            string alias;
+            if (IsSimpleColumnRef(trimmed))
+            {
+                alias = ExtractColumnBaseName(trimmed);
+            }
+            else
+            {
+                counter++;
+                alias = "ColumnAlias_" + counter;
+            }
+
+            return (trimmed + " AS " + alias, counter);
+        }
+
+        /// <summary>
+        /// Returns true if <paramref name="expr"/> is a bare column reference:
+        /// an identifier (optionally bracket-quoted, optionally table- or schema-qualified)
+        /// with no parentheses, spaces, or arithmetic operators.
+        /// </summary>
+        private static bool IsSimpleColumnRef(string expr)
+        {
+            if (string.IsNullOrEmpty(expr)) return false;
+            // Must not contain parens (function calls), spaces (multi-token expressions),
+            // or arithmetic operators at the top level.
+            if (expr.IndexOfAny(new[] { '(', ')', ' ', '\t', '+', '-', '/', '%' }) >= 0)
+                return false;
+            // Allow * only as part of dereference (already handled above for wildcards)
+            if (expr.Contains('*')) return false;
+            // Must look like: word, word.word, [word], [word].[word], schema.table.col, etc.
+            // Split on '.' and check each segment is a valid identifier (possibly bracket-quoted).
+            foreach (string segment in expr.Split('.'))
+            {
+                string s = segment.Trim('[', ']');
+                if (string.IsNullOrEmpty(s)) return false;
+            }
+            return true;
+        }
+
+        /// <summary>
+        /// Returns the base column name from a possibly schema/table-qualified reference.
+        /// E.g. "dbo.Employees.FirstName" → "FirstName", "[MyCol]" → "MyCol".
+        /// </summary>
+        private static string ExtractColumnBaseName(string expr)
+        {
+            int dot = expr.LastIndexOf('.');
+            string name = dot >= 0 ? expr.Substring(dot + 1) : expr;
+            return name.Trim('[', ']');
+        }
+
+
         /// Only handles lines that are between a SELECT keyword line and the next clause keyword.
         /// </summary>
         private string RewriteAliasesToEqualSign(string output)

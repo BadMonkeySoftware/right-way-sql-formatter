@@ -66,6 +66,12 @@ alignDdlColumns.AddAlias("-adc");
 var ddlConstraintsNewLine = new Option<bool>("--ddl-constraints-newline", () => false, "Put each column constraint on its own line in CREATE TABLE");
 ddlConstraintsNewLine.AddAlias("-dcn");
 
+var alignTableJoins = new Option<bool>("--align-table-joins", () => false, "Align FROM/JOIN table names, aliases, and ON conditions vertically");
+alignTableJoins.AddAlias("-atj");
+
+var columnAlwaysHasAlias = new Option<bool>("--column-always-has-alias", () => false, "Ensure every SELECT column has an explicit AS alias");
+columnAlwaysHasAlias.AddAlias("-caha");
+
 var expandInLists = new Option<bool>("--expand-in-lists", () => true, "Expand IN lists");
 expandInLists.AddAlias("-eil");
 
@@ -92,7 +98,7 @@ var rootCommand = new RootCommand("Right Way SQL Formatter - formats T-SQL files
     trailingCommas, spaceAfterExpandedComma, expandBetween, expandBoolean,
     expandCase, expandCommaLists, selectFirstColumnOnNewLine, expandInLists, breakJoin,
     uppercaseKeywords, standardizeKeywords, allowParsingErrors,
-    aliasStyle, alignColumns, indentJoinOn, indentWhereAndOr, alignDdlColumns, ddlConstraintsNewLine,
+    aliasStyle, alignColumns, indentJoinOn, indentWhereAndOr, alignDdlColumns, ddlConstraintsNewLine, alignTableJoins, columnAlwaysHasAlias,
     outputFile, inputFile
 };
 
@@ -124,6 +130,8 @@ rootCommand.SetHandler(async (context) =>
         IndentWhereAndOrConditions = context.ParseResult.GetValueForOption(indentWhereAndOr),
         AlignColumnDefinitionsInDDL = context.ParseResult.GetValueForOption(alignDdlColumns),
         DDLConstraintsOnNewLine = context.ParseResult.GetValueForOption(ddlConstraintsNewLine),
+        AlignTableJoins = context.ParseResult.GetValueForOption(alignTableJoins),
+        ColumnAlwaysHasAlias = context.ParseResult.GetValueForOption(columnAlwaysHasAlias),
     };
 
     bool allowErrors = context.ParseResult.GetValueForOption(allowParsingErrors);
