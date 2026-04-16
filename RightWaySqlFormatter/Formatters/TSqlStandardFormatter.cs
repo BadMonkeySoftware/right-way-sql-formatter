@@ -386,7 +386,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 "LEFT OUTER JOIN", "RIGHT OUTER JOIN", "FULL OUTER JOIN",
                 "INNER JOIN", "LEFT JOIN", "RIGHT JOIN", "FULL JOIN", "CROSS JOIN",
                 "JOIN", "FROM"
-            ];
+            };
 
             keyword = "";
             string rest = trimmed;
