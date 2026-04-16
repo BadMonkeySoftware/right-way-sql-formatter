@@ -343,7 +343,8 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     {
                         // Split conditions and wrap extras.
                         string onBase = item.Indent + kwTable + tablepad + asPart + " ON ";
-                        string onIndent = new string(' ', onBase.Length - item.Indent.Length);
+                        // AND continuation lines align WITH the ON keyword (same column as ON, not after it)
+                        string onIndent = new string(' ', targetOnCol);
                         var conditions = SplitOnConditions(item.OnClause);
                         string firstCond = conditions[0];
                         var rest = conditions.Skip(1).Select(c => item.Indent + onIndent + "AND " + c);
