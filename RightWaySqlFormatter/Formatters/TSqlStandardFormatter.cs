@@ -912,6 +912,9 @@ namespace PoorMansTSqlFormatterLib.Formatters
         /// - remainder: the column expression after the modifier
         /// - modifierOnly: true when the line contains only the modifier with no column following
         /// </summary>
+        private static bool IsSelectModifierKeyword(string kwUpper) =>
+            kwUpper is "DISTINCT" or "TOP" or "PERCENT" or "WITH" or "TIES";
+
         private static (string prefix, string remainder, bool modifierOnly) StripSelectModifierPrefix(string expr)
         {
             string trimmed = expr.TrimStart();
@@ -938,6 +941,10 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     string modToken = trimmed.Substring(0, "DISTINCT".Length);
                     return (accumulatedPrefix + modToken, "", true);
                 }
+
+                // Bare "TOP" with no argument — modifier-only (incomplete TOP clause)
+                if (upper == "TOP")
+                    return (accumulatedPrefix + trimmed, "", true);
 
                 // TOP (N) or TOP N
                 if (upper.StartsWith("TOP ") || upper.StartsWith("TOP("))
@@ -1501,6 +1508,22 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 case SqlStructureConstants.ENAME_EXPRESSION_PARENS:
                 case SqlStructureConstants.ENAME_SELECTIONTARGET_PARENS:
 				case SqlStructureConstants.ENAME_IN_PARENS:
+                    // End modifier zone unless this is the TOP (N) argument — EXPRESSION_PARENS
+                    // immediately after TOP stays on the SELECT line.
+                    if (state.InSelectModifierZone)
+                    {
+                        if (contentElement.Name == SqlStructureConstants.ENAME_EXPRESSION_PARENS
+                            && state.TopArgumentExpected)
+                        {
+                            state.TopArgumentExpected = false;
+                        }
+                        else
+                        {
+                            state.InSelectModifierZone = false;
+                            state.TopArgumentExpected = false;
+                            state.BreakExpected = true;
+                        }
+                    }
 					WhiteSpace_SeparateWords(state);
 					if (contentElement.Name.Equals(SqlStructureConstants.ENAME_EXPRESSION_PARENS) || contentElement.Name.Equals(SqlStructureConstants.ENAME_IN_PARENS))
                         state.IncrementIndent();
@@ -1703,6 +1726,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
 
                 case SqlStructureConstants.ENAME_STRING:
                 case SqlStructureConstants.ENAME_NSTRING:
+                    if (state.InSelectModifierZone) { state.InSelectModifierZone = false; state.BreakExpected = true; }
                     WhiteSpace_SeparateWords(state);
                     string outValue = null;
                     if (contentElement.Name.Equals(SqlStructureConstants.ENAME_NSTRING))
@@ -1714,12 +1738,14 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     break;
 
                 case SqlStructureConstants.ENAME_BRACKET_QUOTED_NAME:
+                    if (state.InSelectModifierZone) { state.InSelectModifierZone = false; state.BreakExpected = true; }
                     WhiteSpace_SeparateWords(state);
                     state.AddOutputContent("[" + contentElement.TextValue.Replace("]", "]]") + "]");
                     state.WordSeparatorExpected = true;
                     break;
 
                 case SqlStructureConstants.ENAME_QUOTED_STRING:
+                    if (state.InSelectModifierZone) { state.InSelectModifierZone = false; state.BreakExpected = true; }
                     WhiteSpace_SeparateWords(state);
                     state.AddOutputContent("\"" + contentElement.TextValue.Replace("\"", "\"\"") + "\"");
                     state.WordSeparatorExpected = true;
@@ -1787,12 +1813,14 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 case SqlStructureConstants.ENAME_EQUALSSIGN:
                 case SqlStructureConstants.ENAME_ALPHAOPERATOR:
                 case SqlStructureConstants.ENAME_OTHEROPERATOR:
+                    if (state.InSelectModifierZone) { state.InSelectModifierZone = false; state.BreakExpected = true; }
                     WhiteSpace_SeparateWords(state);
                     state.AddOutputContent(FormatOperator(contentElement.TextValue), SqlHtmlConstants.CLASS_OPERATOR);
                     state.WordSeparatorExpected = true;
                     break;
 
                 case SqlStructureConstants.ENAME_COMPOUNDKEYWORD:
+                    if (state.InSelectModifierZone) { state.InSelectModifierZone = false; state.BreakExpected = true; }
                     WhiteSpace_SeparateWords(state);
                     state.SetRecentKeyword(contentElement.GetAttributeValue(SqlStructureConstants.ANAME_SIMPLETEXT));
                     state.AddOutputContent(FormatKeyword(contentElement.GetAttributeValue(SqlStructureConstants.ANAME_SIMPLETEXT)), SqlHtmlConstants.CLASS_KEYWORD);
@@ -1825,28 +1853,44 @@ namespace PoorMansTSqlFormatterLib.Formatters
                             state.BreakExpected = true;
                     }
 
+                    // If we're in the SELECT modifier zone and this keyword is NOT a modifier
+                    // (DISTINCT/TOP/PERCENT/WITH/TIES), end the zone and arm the break so this
+                    // token becomes the first column on a new line.
+                    if (state.InSelectModifierZone && !IsSelectModifierKeyword(kwUpper))
+                    {
+                        state.InSelectModifierZone = false;
+                        state.TopArgumentExpected = false;
+                        state.BreakExpected = true;
+                    }
+
                     WhiteSpace_SeparateWords(state);
                     state.SetRecentKeyword(contentElement.TextValue);
                     state.AddOutputContent(FormatKeyword(contentElement.TextValue), SqlHtmlConstants.CLASS_KEYWORD);
                     state.WordSeparatorExpected = true;
 
-                    // When SelectFirstColumnOnNewLine is on and this is a SELECT keyword,
-                    // request a line break so the first column lands on a new line.
+                    if (state.InSelectModifierZone && kwUpper == "TOP")
+                        state.TopArgumentExpected = true;
+
+                    // When SelectFirstColumnOnNewLine is on and this is a SELECT keyword, enter the
+                    // modifier zone: suppress breaks for DISTINCT/TOP/etc. and arm one for the first
+                    // real column instead.
                     if (Options.SelectFirstColumnOnNewLine
                         && Options.ExpandCommaLists
                         && kwUpper == "SELECT")
-                        state.BreakExpected = true;
+                        state.InSelectModifierZone = true;
 
                     break;
                 }
 
                 case SqlStructureConstants.ENAME_PSEUDONAME:
+                    if (state.InSelectModifierZone) { state.InSelectModifierZone = false; state.BreakExpected = true; }
                     WhiteSpace_SeparateWords(state);
                     state.AddOutputContent(FormatKeyword(contentElement.TextValue), SqlHtmlConstants.CLASS_KEYWORD);
                     state.WordSeparatorExpected = true;
                     break;
 
                 case SqlStructureConstants.ENAME_FUNCTION_KEYWORD:
+                    if (state.InSelectModifierZone) { state.InSelectModifierZone = false; state.BreakExpected = true; }
                     WhiteSpace_SeparateWords(state);
                     state.SetRecentKeyword(contentElement.TextValue);
                     state.AddOutputContent(FormatKeyword(contentElement.TextValue), SqlHtmlConstants.CLASS_FUNCTION);
@@ -1856,18 +1900,32 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 case SqlStructureConstants.ENAME_OTHERNODE:
                 case SqlStructureConstants.ENAME_MONETARY_VALUE:
                 case SqlStructureConstants.ENAME_LABEL:
+                    if (state.InSelectModifierZone) { state.InSelectModifierZone = false; state.BreakExpected = true; }
                     WhiteSpace_SeparateWords(state);
                     state.AddOutputContent(contentElement.TextValue);
                     state.WordSeparatorExpected = true;
                     break;
 
                 case SqlStructureConstants.ENAME_NUMBER_VALUE:
+                    // In modifier zone: a bare number is the TOP N count — stay on SELECT line.
+                    // Anything else (rare literal-number first column) gets the break.
+                    if (state.InSelectModifierZone)
+                    {
+                        if (state.TopArgumentExpected)
+                            state.TopArgumentExpected = false;
+                        else
+                        {
+                            state.InSelectModifierZone = false;
+                            state.BreakExpected = true;
+                        }
+                    }
                     WhiteSpace_SeparateWords(state);
                     state.AddOutputContent(contentElement.TextValue.ToLowerInvariant());
                     state.WordSeparatorExpected = true;
                     break;
 
                 case SqlStructureConstants.ENAME_BINARY_VALUE:
+                    if (state.InSelectModifierZone) { state.InSelectModifierZone = false; state.BreakExpected = true; }
                     WhiteSpace_SeparateWords(state);
                     state.AddOutputContent("0x");
                     state.AddOutputContent(contentElement.TextValue.Substring(2).ToUpperInvariant());
@@ -2045,6 +2103,8 @@ namespace PoorMansTSqlFormatterLib.Formatters
 
             public bool StatementBreakExpected { get; set; }
             public bool BreakExpected { get; set; }
+            public bool InSelectModifierZone { get; set; }
+            public bool TopArgumentExpected { get; set; }
             public bool WordSeparatorExpected { get; set; }
             public bool SourceBreakPending { get; set; }
             public int AdditionalBreaksExpected { get; set; }
