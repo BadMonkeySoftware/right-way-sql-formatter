@@ -9,4 +9,9 @@
     <Version>1.0.0</Version>
     <Description>T-SQL formatter library — modernized from PoorMansTSqlFormatter</Description>
   </PropertyGroup>
+  <!-- net472 does not support trimming, and its BCL lacks null annotations so nullable analysis is noise -->
+  <PropertyGroup Condition="'$(TargetFramework)' == 'net472'">
+    <PublishTrimmed>false</PublishTrimmed>
+    <Nullable>annotations</Nullable>
+  </PropertyGroup>
 </Project>

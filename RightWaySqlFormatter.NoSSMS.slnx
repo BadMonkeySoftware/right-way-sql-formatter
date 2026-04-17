@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="RightWaySqlFormatter/RightWaySqlFormatter.csproj" />
+  <Project Path="PoorMansTSqlFormatterCmdLine/PoorMansTSqlFormatterCmdLine.csproj" />
+  <Folder Name="/Tests/">
+    <Project Path="PoorMansTSqlFormatterTest/PoorMansTSqlFormatterTests.csproj" />
+  </Folder>
+</Solution>

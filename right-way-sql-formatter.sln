@@ -1,0 +1,59 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.2.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PoorMansTSqlFormatterSSMSLib", "PoorMansTSqlFormatterSSMSLib\PoorMansTSqlFormatterSSMSLib.csproj", "{26B20C1F-1957-2FBF-4DCD-E665DC3B8D81}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PoorMansTSqlFormatterCmdLine", "PoorMansTSqlFormatterCmdLine\PoorMansTSqlFormatterCmdLine.csproj", "{CBA03F89-3F70-3F70-874B-916F231E8A36}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "PoorMansTSqlFormatterTest", "PoorMansTSqlFormatterTest", "{137A586D-F1B4-6F3A-0B12-811956B42E43}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PoorMansTSqlFormatterPluginShared", "PoorMansTSqlFormatterPluginShared\PoorMansTSqlFormatterPluginShared.csproj", "{CFFE38A4-A5E2-7690-C2CE-A3E9B191EED4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RightWaySqlFormatter", "RightWaySqlFormatter\RightWaySqlFormatter.csproj", "{DEA22340-2B24-4A83-C7A5-5A26C621C7DC}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PoorMansTSqlFormatterSSMSPackage", "PoorMansTSqlFormatterSSMSPackage\PoorMansTSqlFormatterSSMSPackage.csproj", "{893CD4E3-D6A9-6DEE-BC63-938FB59EF172}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PoorMansTSqlFormatterTests", "PoorMansTSqlFormatterTest\PoorMansTSqlFormatterTests.csproj", "{989B4DFD-5DA1-4D5F-6601-54D63AC895A5}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{26B20C1F-1957-2FBF-4DCD-E665DC3B8D81}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{26B20C1F-1957-2FBF-4DCD-E665DC3B8D81}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{26B20C1F-1957-2FBF-4DCD-E665DC3B8D81}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{26B20C1F-1957-2FBF-4DCD-E665DC3B8D81}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CBA03F89-3F70-3F70-874B-916F231E8A36}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CBA03F89-3F70-3F70-874B-916F231E8A36}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CBA03F89-3F70-3F70-874B-916F231E8A36}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CBA03F89-3F70-3F70-874B-916F231E8A36}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CFFE38A4-A5E2-7690-C2CE-A3E9B191EED4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CFFE38A4-A5E2-7690-C2CE-A3E9B191EED4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CFFE38A4-A5E2-7690-C2CE-A3E9B191EED4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CFFE38A4-A5E2-7690-C2CE-A3E9B191EED4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DEA22340-2B24-4A83-C7A5-5A26C621C7DC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DEA22340-2B24-4A83-C7A5-5A26C621C7DC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DEA22340-2B24-4A83-C7A5-5A26C621C7DC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DEA22340-2B24-4A83-C7A5-5A26C621C7DC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{893CD4E3-D6A9-6DEE-BC63-938FB59EF172}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{893CD4E3-D6A9-6DEE-BC63-938FB59EF172}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{893CD4E3-D6A9-6DEE-BC63-938FB59EF172}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{893CD4E3-D6A9-6DEE-BC63-938FB59EF172}.Release|Any CPU.Build.0 = Release|Any CPU
+		{989B4DFD-5DA1-4D5F-6601-54D63AC895A5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{989B4DFD-5DA1-4D5F-6601-54D63AC895A5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{989B4DFD-5DA1-4D5F-6601-54D63AC895A5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{989B4DFD-5DA1-4D5F-6601-54D63AC895A5}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{989B4DFD-5DA1-4D5F-6601-54D63AC895A5} = {137A586D-F1B4-6F3A-0B12-811956B42E43}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {9E761D26-C183-448C-966F-9BA5E68872A5}
+	EndGlobalSection
+EndGlobal

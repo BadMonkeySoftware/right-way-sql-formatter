@@ -4,6 +4,7 @@
     <AssemblyName>PoorMansTSqlFormatterPluginShared</AssemblyName>
     <RootNamespace>PoorMansTSqlFormatterPluginShared</RootNamespace>
     <Nullable>enable</Nullable>
+    <NoWarn>$(NoWarn);NU1603</NoWarn>
     <LangVersion>latest</LangVersion>
     <UseWindowsForms>true</UseWindowsForms>
   </PropertyGroup>
