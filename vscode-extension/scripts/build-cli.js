@@ -100,7 +100,6 @@ try {
         '-r', getRid(),
         '--self-contained', 'true',
         '-p:PublishSingleFile=true',
-        '-p:PublishTrimmed=false',
         '-o', BIN_DIR,
         '--nologo',
     ], {
