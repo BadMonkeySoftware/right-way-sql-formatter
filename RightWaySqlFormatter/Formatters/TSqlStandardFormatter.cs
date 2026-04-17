@@ -565,12 +565,15 @@ namespace PoorMansTSqlFormatterLib.Formatters
                             if (!modOnly1)
                             {
                                 string indent = line.Substring(0, line.Length - trimmed.Length);
-                                var (rewritten, newCounter) = EnsureAlias(colPart1, autoAliasCounter);
+                                bool hadTrailingComma1 = colPart1.EndsWith(",");
+                                string colExpr1 = hadTrailingComma1 ? colPart1.Substring(0, colPart1.Length - 1).TrimEnd() : colPart1;
+                                var (rewritten, newCounter) = EnsureAlias(colExpr1, autoAliasCounter);
                                 autoAliasCounter = newCounter;
-                                if (rewritten != colPart1)
-                                    lines[i] = indent + "SELECT " + modPrefix1 + rewritten;
+                                string finalCol1 = rewritten + (hadTrailingComma1 ? "," : "");
+                                if (finalCol1 != colPart1)
+                                    lines[i] = indent + "SELECT " + modPrefix1 + finalCol1;
                                 // Track open parens from the inline column
-                                parenDepth += CountNetParens(rewritten != colPart1 ? rewritten : colPart1);
+                                parenDepth += CountNetParens(rewritten != colExpr1 ? rewritten : colExpr1);
                             }
                         }
                         continue;
@@ -597,11 +600,14 @@ namespace PoorMansTSqlFormatterLib.Formatters
                         if (!modOnly1)
                         {
                             string indent = line.Substring(0, line.Length - trimmed.Length);
-                            var (rewritten, newCounter) = EnsureAlias(colPart1, autoAliasCounter);
+                            bool hadTrailingComma1 = colPart1.EndsWith(",");
+                            string colExpr1 = hadTrailingComma1 ? colPart1.Substring(0, colPart1.Length - 1).TrimEnd() : colPart1;
+                            var (rewritten, newCounter) = EnsureAlias(colExpr1, autoAliasCounter);
                             autoAliasCounter = newCounter;
-                            if (rewritten != colPart1)
-                                lines[i] = indent + "SELECT " + modPrefix1 + rewritten;
-                            parenDepth += CountNetParens(rewritten != colPart1 ? rewritten : colPart1);
+                            string finalCol1 = rewritten + (hadTrailingComma1 ? "," : "");
+                            if (finalCol1 != colPart1)
+                                lines[i] = indent + "SELECT " + modPrefix1 + finalCol1;
+                            parenDepth += CountNetParens(rewritten != colExpr1 ? rewritten : colExpr1);
                         }
                     }
                     continue;
@@ -829,9 +835,12 @@ namespace PoorMansTSqlFormatterLib.Formatters
                         if (!modOnly1)
                         {
                             string indent = line.Substring(0, line.Length - trimmed.Length);
-                            string rewritten = TryRewriteColumnLine(colPart1);
-                            if (rewritten != colPart1)
-                                lines[i] = indent + "SELECT " + modPfx1 + rewritten;
+                            bool hadTrailingComma1 = colPart1.EndsWith(",");
+                            string colExpr1 = hadTrailingComma1 ? colPart1.Substring(0, colPart1.Length - 1).TrimEnd() : colPart1;
+                            string rewritten = TryRewriteColumnLine(colExpr1);
+                            string finalCol1 = rewritten + (hadTrailingComma1 ? "," : "");
+                            if (finalCol1 != colPart1)
+                                lines[i] = indent + "SELECT " + modPfx1 + finalCol1;
                         }
                     }
                     continue;
