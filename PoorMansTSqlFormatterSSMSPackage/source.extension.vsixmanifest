@@ -3,12 +3,17 @@
   <Metadata>
     <Identity Id="247609b1-2692-47d6-972a-976544685f0e" Version="2.0.0" Language="en-US" Publisher="right-way-sql-formatter" />
     <DisplayName>Right Way SQL Formatter — SSMS Extension</DisplayName>
-    <Description xml:space="preserve">T-SQL formatting extension for SSMS 17, 18, 19, and 20.</Description>
+    <Description xml:space="preserve">T-SQL formatting extension for SSMS 17, 18, 19, 20, 21, and 22.</Description>
     <License>LICENSE.rtf</License>
   </Metadata>
   <Installation>
-    <!-- SSMS 17 (17.x) through SSMS 20 -->
-    <InstallationTarget Id="ssms" Version="[17.0,20.0]" />
+    <InstallationTarget Version="[21.0,)" Id="Microsoft.VisualStudio.Ssms">
+        <ProductArchitecture>amd64</ProductArchitecture>
+    </InstallationTarget>
+    <!-- SSMS 15 (15.x) through SSMS 21 -->
+    <InstallationTarget Version="[15.0,20.0)" Id="Microsoft.VisualStudio.Ssms">
+        <ProductArchitecture>x86</ProductArchitecture>
+    </InstallationTarget>
   </Installation>
   <Prerequisites>
     <Prerequisite Id="Microsoft.VisualStudio.Component.CoreEditor" Version="[15.0,)" DisplayName="Visual Studio core editor" />
