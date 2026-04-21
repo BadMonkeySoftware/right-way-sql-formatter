@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotnet build *)",
+      "Bash(dotnet test *)",
+      "Bash(export PATH=\"$HOME/.dotnet:$PATH\")",
+      "Bash(curl -s https://raw.githubusercontent.com/nicholas-ross/SSMS-Schema-Folders/master/source.extension.vsixmanifest)",
+      "Bash(curl -s https://raw.githubusercontent.com/nicholas-ross/SSMS-Schema-Folders/master/SsmsSchemaFolders.Ssms18.csproj)",
+      "Bash(curl -s https://raw.githubusercontent.com/nicholas-ross/SSMS-Schema-Folders/master/SsmsSchemaFolders.Ssms22.csproj)"
+    ]
+  }
+}
