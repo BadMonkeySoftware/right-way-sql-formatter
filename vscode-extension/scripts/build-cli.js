@@ -2,15 +2,18 @@
 /**
  * build-cli.js
  *
- * Publishes a self-contained SqlFormatter binary into vscode-extension/bin/.
+ * Publishes self-contained SqlFormatter binaries for all major platforms into vscode-extension/bin/<rid>/.
  * Run via: npm run build:cli
  *
  * What it does:
  *   1. Locates the .NET SDK (checks ~/.dotnet, then PATH)
- *   2. Runs `dotnet publish` on the CLI project with self-contained + single-file flags
- *   3. Makes the output binary executable
+ *   2. Runs `dotnet publish` for each target RID (win-x64, win-arm64, osx-x64, osx-arm64, linux-x64, linux-arm64)
+ *   3. Outputs each binary to bin/<rid>/SqlFormatter[.exe]
+ *   4. Makes non-Windows binaries executable
  *
  * No manual exports, no manual copies. Just: npm run build:cli
+ *
+ * If you add new platforms, update the targets array below and the extension's resolveExecutablePath().
  */
 
 const { execFileSync } = require('child_process');
@@ -66,7 +69,8 @@ function findDotnet() {
 // Main
 // ---------------------------------------------------------------------------
 
-console.log('Building self-contained SqlFormatter binary...');
+
+console.log('Building self-contained SqlFormatter binaries for all platforms...');
 
 const dotnet = findDotnet();
 if (!dotnet) {
@@ -78,48 +82,55 @@ if (!dotnet) {
     process.exit(1);
 }
 
-console.log(`  dotnet: ${dotnet}`);
-console.log(`  project: ${CLI_PROJECT}`);
-console.log(`  output:  ${BIN_DIR}`);
-console.log(`  rid:     ${getRid()}`);
-
 if (!fs.existsSync(CLI_PROJECT)) {
     console.error(`ERROR: CLI project not found at ${CLI_PROJECT}`);
     console.error('Make sure you are running this from inside the right-way-sql-formatter repo.');
     process.exit(1);
 }
 
-// Ensure output directory exists
-fs.mkdirSync(BIN_DIR, { recursive: true });
+// Target RIDs for all major platforms
+const targets = [
+    { rid: 'win-x64',    exe: 'SqlFormatter.exe' },
+    { rid: 'win-arm64',  exe: 'SqlFormatter.exe' },
+    { rid: 'osx-x64',    exe: 'SqlFormatter' },
+    { rid: 'osx-arm64',  exe: 'SqlFormatter' },
+    { rid: 'linux-x64',  exe: 'SqlFormatter' },
+    { rid: 'linux-arm64',exe: 'SqlFormatter' },
+];
 
-// Run dotnet publish
-try {
-    execFileSync(dotnet, [
-        'publish', CLI_PROJECT,
-        '-c', 'Release',
-        '-r', getRid(),
-        '--self-contained', 'true',
-        '-p:PublishSingleFile=true',
-        '-o', BIN_DIR,
-        '--nologo',
-    ], {
-        stdio: 'inherit',
-        env: { ...process.env, DOTNET_CLI_TELEMETRY_OPTOUT: '1' },
-    });
-} catch (err) {
-    console.error('ERROR: dotnet publish failed.');
-    process.exit(1);
+for (const target of targets) {
+    const outDir = path.join(BIN_DIR, target.rid);
+    fs.mkdirSync(outDir, { recursive: true });
+    console.log(`\nPublishing for ${target.rid}...`);
+    try {
+        execFileSync(dotnet, [
+            'publish', CLI_PROJECT,
+            '-c', 'Release',
+            '-r', target.rid,
+            '--self-contained', 'true',
+            '-p:PublishSingleFile=true',
+            '-o', outDir,
+            '--nologo',
+        ], {
+            stdio: 'inherit',
+            env: { ...process.env, DOTNET_CLI_TELEMETRY_OPTOUT: '1' },
+        });
+        // Make executable on non-Windows
+        const binPath = path.join(outDir, target.exe);
+        if (!target.exe.endsWith('.exe') && fs.existsSync(binPath)) {
+            fs.chmodSync(binPath, 0o755);
+        }
+        if (fs.existsSync(binPath)) {
+            const size = (fs.statSync(binPath).size / 1024 / 1024).toFixed(1);
+            console.log(`  Done: ${binPath} (${size} MB)`);
+        } else {
+            console.error(`  ERROR: Expected binary not found at ${binPath}`);
+            process.exit(1);
+        }
+    } catch (err) {
+        console.error(`  ERROR: dotnet publish failed for ${target.rid}.`);
+        process.exit(1);
+    }
 }
 
-// Ensure the binary is executable (no-op on Windows)
-if (process.platform !== 'win32' && fs.existsSync(BINARY_PATH)) {
-    fs.chmodSync(BINARY_PATH, 0o755);
-}
-
-if (fs.existsSync(BINARY_PATH)) {
-    const size = (fs.statSync(BINARY_PATH).size / 1024 / 1024).toFixed(1);
-    console.log(`\nDone. Binary: ${BINARY_PATH} (${size} MB)`);
-} else {
-    console.error(`ERROR: Expected binary not found at ${BINARY_PATH}`);
-    process.exit(1);
-}
+console.log('\nAll platform binaries built successfully.');

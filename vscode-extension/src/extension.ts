@@ -1,3 +1,12 @@
+/**
+ * This extension bundles cross-platform SqlFormatter binaries in bin/<rid>/SqlFormatter[.exe].
+ * At runtime, it auto-detects the current platform/arch and launches the correct binary.
+ *
+ * Supported RIDs:
+ *   win-x64, win-arm64, osx-x64, osx-arm64, linux-x64, linux-arm64
+ *
+ * If you add new platforms, update both build-cli.js and resolveExecutablePath().
+ */
 import * as vscode from 'vscode';
 import * as cp from 'child_process';
 import * as path from 'path';
@@ -162,12 +171,27 @@ function resolveExecutablePath(): string | null {
         );
     }
 
-    // Look for a binary bundled alongside the extension (convenient for dev builds)
-    // Expected location: <extension-root>/bin/SqlFormatter (or SqlFormatter.exe on Windows)
+
+    // Look for a binary bundled for the current platform/arch
+    // Platform/arch to RID mapping
+    function getCurrentRid(): string {
+        const plat = process.platform;
+        const arch = process.arch;
+        if (plat === 'darwin') return arch === 'arm64' ? 'osx-arm64' : 'osx-x64';
+        if (plat === 'win32')  return arch === 'arm64' ? 'win-arm64' : 'win-x64';
+        return arch === 'arm64' ? 'linux-arm64' : 'linux-x64';
+    }
     const extDir = path.dirname(path.dirname(__filename)); // out/ -> extension root
-    const bundledBin = path.join(extDir, 'bin', process.platform === 'win32' ? 'SqlFormatter.exe' : 'SqlFormatter');
+    const rid = getCurrentRid();
+    const exeName = process.platform === 'win32' ? 'SqlFormatter.exe' : 'SqlFormatter';
+    const bundledBin = path.join(extDir, 'bin', rid, exeName);
     if (fs.existsSync(bundledBin)) {
         return bundledBin;
+    }
+    // Fallback for devs who may have a flat bin/SqlFormatter
+    const legacyBin = path.join(extDir, 'bin', exeName);
+    if (fs.existsSync(legacyBin)) {
+        return legacyBin;
     }
 
     // Fall back to PATH — `which SqlFormatter` equivalent
