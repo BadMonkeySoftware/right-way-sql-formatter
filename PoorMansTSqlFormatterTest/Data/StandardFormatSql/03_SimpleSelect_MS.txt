@@ -2,7 +2,7 @@
 SELECT EmployeeID
     ,FirstName
     ,LastName
-    ,HireDate
+    ,[Hire Date]
     ,City
 FROM Employees
 WHERE HireDate NOT BETWEEN '1-june-1992'
