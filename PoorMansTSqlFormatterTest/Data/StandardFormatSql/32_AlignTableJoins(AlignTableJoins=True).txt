@@ -3,10 +3,10 @@ SELECT e.EmployeeID
     ,e.FirstName
     ,d.DeptName
 FROM Employees          AS e
-INNER JOIN Departments  AS d ON e.DeptID = d.DeptID
-LEFT JOIN Managers      AS m ON e.ManagerID = m.ManagerID
+INNER JOIN Departments  AS d    ON  e.DeptID = d.DeptID
+LEFT JOIN Managers      AS m    ON  e.ManagerID = m.ManagerID
 
 SELECT o.OrderID
     ,c.CompanyName
 FROM Orders                 AS o
-LEFT OUTER JOIN Customers   AS c ON o.CustomerID = c.CustomerID
+LEFT OUTER JOIN Customers   AS c    ON  o.CustomerID = c.CustomerID
