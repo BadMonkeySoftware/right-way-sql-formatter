@@ -209,26 +209,40 @@ namespace PoorMansTSqlFormatterLib.Formatters
         /// </summary>
         private string AlignFromJoinClauses(string output)
         {
-            var lines = output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+            var lines = new List<string>(output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None));
             int indentSize = Options.SpacesPerTab > 0 ? Options.SpacesPerTab : 4;
 
             // Find contiguous FROM/JOIN blocks and align each one.
             int i = 0;
-            while (i < lines.Length)
+            while (i < lines.Count)
             {
                 string trimmed = lines[i].TrimStart();
                 string upper = trimmed.ToUpperInvariant();
                 if (IsFromOrJoinLine(upper))
                 {
                     int blockStart = i;
-                    while (i < lines.Length)
+                    bool expectFirstCond = false;
+                    while (i < lines.Count)
                     {
                         string t = lines[i].TrimStart().ToUpperInvariant();
-                        if (i > blockStart && !IsFromOrJoinLine(t) && !IsJoinContinuationLine(t))
+                        bool isFromJoin = IsFromOrJoinLine(t);
+                        bool isContinuation = IsJoinContinuationLine(t);
+
+                        if (i > blockStart && !isFromJoin && !isContinuation && !expectFirstCond)
                             break;
+
+                        if (expectFirstCond)
+                            expectFirstCond = false;
+                        else if (isFromJoin)
+                            expectFirstCond = t.TrimEnd().EndsWith(" ON");
+
                         i++;
                     }
-                    AlignFromJoinBlock(lines, blockStart, i, indentSize);
+                    var blockLines = lines.GetRange(blockStart, i - blockStart);
+                    var newBlock = AlignFromJoinBlock(blockLines, indentSize);
+                    lines.RemoveRange(blockStart, i - blockStart);
+                    lines.InsertRange(blockStart, newBlock);
+                    i = blockStart + newBlock.Count;
                     continue;
                 }
                 i++;
@@ -254,10 +268,12 @@ namespace PoorMansTSqlFormatterLib.Formatters
         }
 
         /// <summary>
-        /// Parses one FROM/JOIN block (lines[start..end)) and rewrites all lines
-        /// with aligned table names, aligned AS aliases, and aligned ON conditions.
+        /// Rewrites a FROM/JOIN block with aligned table names, AS aliases, and ON conditions.
+        /// When a JOIN line ends with a trailing ON (IndentJoinOnClause mode), the first condition
+        /// is pulled up to be inline with ON; subsequent AND/OR conditions are aligned under ON.
+        /// Returns the new lines for the block (may be fewer than input due to pulled-up conditions).
         /// </summary>
-        private void AlignFromJoinBlock(string[] lines, int start, int end, int indentSize)
+        private List<string> AlignFromJoinBlock(List<string> blockLines, int indentSize)
         {
             // Keyword tokens that we inject — respect UppercaseKeywords setting.
             bool uc = Options.UppercaseKeywords;
@@ -266,34 +282,43 @@ namespace PoorMansTSqlFormatterLib.Formatters
             string KW_AND = uc ? "AND" : "and";
 
             // ---- Pass 1: parse each FROM/JOIN line --------------------------
-            // For each line extract: indent, keyword (e.g. "FROM", "INNER JOIN"), table, alias, on-clause.
             var items = new List<JoinLineItem>();
+            bool captureFirstCond = false;
 
-            for (int i = start; i < end; i++)
+            for (int i = 0; i < blockLines.Count; i++)
             {
-                string line = lines[i];
+                string line = blockLines[i];
                 string trimmed = line.TrimStart();
                 string trimmedUpper = trimmed.ToUpperInvariant();
 
-                // Skip continuation AND/OR lines — we'll re-attach them later.
                 if (IsJoinContinuationLine(trimmedUpper))
                     continue;
 
+                // Capture first condition after a HasTrailingOn JOIN.
+                if (captureFirstCond && !IsFromOrJoinLine(trimmedUpper))
+                {
+                    items[items.Count - 1].FirstCondition = trimmed;
+                    captureFirstCond = false;
+                    continue;
+                }
+                captureFirstCond = false;
+
                 string indent = line.Substring(0, line.Length - trimmed.Length);
-                ParseFromJoinLine(trimmed, out string keyword, out string table, out string alias, out string onClause);
+                ParseFromJoinLine(trimmed, out string keyword, out string table, out string alias, out string onClause, out bool hasTrailingOn);
 
                 items.Add(new JoinLineItem
                 {
-                    LineIndex = i,
                     Indent = indent,
                     Keyword = keyword,
                     Table = table,
                     Alias = alias,
                     OnClause = onClause,
+                    HasTrailingOn = hasTrailingOn,
                 });
+                captureFirstCond = hasTrailingOn;
             }
 
-            if (items.Count == 0) return;
+            if (items.Count == 0) return blockLines;
 
             // ---- Pass 2: ensure every item has an alias ---------------------
             foreach (var item in items)
@@ -303,82 +328,126 @@ namespace PoorMansTSqlFormatterLib.Formatters
             }
 
             // ---- Pass 3: compute column positions --------------------------
-            // Col A: end of keyword+table — target = next tab stop after max(keyword.Length + 1 + table.Length)
             int maxKwTableLen = items.Max(it => it.Keyword.Length + 1 + it.Table.Length);
             int targetTableCol = ((maxKwTableLen / indentSize) + 1) * indentSize;
 
-            // Col B: end of AS+alias — target = next tab stop after max(alias.Length) + "AS ".Length
             int maxAliasLen = items.Max(it => it.Alias.Length);
-            // "AS alias" — the AS itself is 3 chars ("AS "). Target col for ON = next tab stop after "AS " + maxAlias.
             int asAliasLen = 3 + maxAliasLen; // "AS " + alias
             int targetOnCol = targetTableCol + ((asAliasLen / indentSize) + 1) * indentSize;
+            // Padding before ON so that ON starts at exactly targetOnCol for every JOIN line.
+            // Guaranteed >= 1 because targetOnCol rounds up past targetTableCol + asAliasLen.
+            int onPad = targetOnCol - targetTableCol - asAliasLen;
 
-            // ---- Pass 4: rewrite lines -------------------------------------
+            // ---- Pass 4: produce new lines ---------------------------------
+            var result = new List<string>();
             int itemIdx = 0;
-            for (int i = start; i < end; i++)
+            bool insideIndentedOn = false;
+            bool firstCondConsumed = false;
+
+            for (int i = 0; i < blockLines.Count; i++)
             {
-                string trimmedUpper = lines[i].TrimStart().ToUpperInvariant();
-                if (IsJoinContinuationLine(trimmedUpper))
+                string trimmedUpper = blockLines[i].TrimStart().ToUpperInvariant();
+                bool isFromJoin = IsFromOrJoinLine(trimmedUpper);
+
+                if (insideIndentedOn)
                 {
-                    // Re-indent continuation lines to align with ON position.
-                    string contIndent = items[itemIdx > 0 ? itemIdx - 1 : 0].Indent
-                        + new string(' ', targetOnCol);
-                    lines[i] = contIndent + lines[i].TrimStart();
+                    if (isFromJoin)
+                    {
+                        // Next JOIN/FROM line — exit indented-ON mode and fall through.
+                        insideIndentedOn = false;
+                        firstCondConsumed = false;
+                    }
+                    else if (!firstCondConsumed)
+                    {
+                        // Original first-condition line — already pulled up to the JOIN line above; skip it.
+                        firstCondConsumed = true;
+                        continue;
+                    }
+                    else if (IsJoinContinuationLine(trimmedUpper))
+                    {
+                        // AND/OR continuation: align under ON keyword.
+                        string andIndent = items[itemIdx - 1].Indent + new string(' ', targetOnCol);
+                        result.Add(andIndent + blockLines[i].TrimStart());
+                        continue;
+                    }
+                    else
+                    {
+                        result.Add(blockLines[i]);
+                        continue;
+                    }
+                }
+
+                if (!isFromJoin && IsJoinContinuationLine(trimmedUpper))
+                {
+                    // Inline-ON overflow continuation (non-IndentJoinOnClause wrapping).
+                    string contIndent = items[itemIdx > 0 ? itemIdx - 1 : 0].Indent + new string(' ', targetOnCol);
+                    result.Add(contIndent + blockLines[i].TrimStart());
+                    continue;
+                }
+
+                if (!isFromJoin)
+                {
+                    result.Add(blockLines[i]);
                     continue;
                 }
 
                 var item = items[itemIdx++];
                 string kwTable = item.Keyword + " " + item.Table;
-                int kwTableLen = kwTable.Length;
-                string tablepad = new string(' ', targetTableCol - kwTableLen);
-
+                string tablepad = new string(' ', targetTableCol - kwTable.Length);
                 string aliasPad = new string(' ', maxAliasLen - item.Alias.Length);
                 string asPart = KW_AS + " " + item.Alias + aliasPad;
 
-                string newLine;
-                if (string.IsNullOrEmpty(item.OnClause))
+                string onPrefix = new string(' ', onPad) + KW_ON + "  ";
+
+                if (item.HasTrailingOn)
                 {
-                    // FROM line — no ON clause
-                    newLine = item.Indent + kwTable + tablepad + asPart;
+                    // Pull first condition inline: "... <onPad>ON  first_condition"
+                    result.Add(item.Indent + kwTable + tablepad + asPart + onPrefix + item.FirstCondition);
+                    insideIndentedOn = true;
+                    firstCondConsumed = false;
+                }
+                else if (string.IsNullOrEmpty(item.OnClause))
+                {
+                    result.Add(item.Indent + kwTable + tablepad + asPart);
                 }
                 else
                 {
-                    string onFull = item.Indent + kwTable + tablepad + asPart + " " + KW_ON + " " + item.OnClause;
-                    // Check if it fits within 100 chars; if not, check further if multi-condition
+                    string onBase = item.Indent + kwTable + tablepad + asPart + onPrefix;
+                    string onFull = onBase + item.OnClause;
                     if (onFull.Length > 100 && item.OnClause.IndexOf(" AND ", StringComparison.OrdinalIgnoreCase) >= 0)
                     {
-                        // Split conditions and wrap extras.
-                        string onBase = item.Indent + kwTable + tablepad + asPart + " " + KW_ON + " ";
-                        // AND continuation lines align WITH the ON keyword (same column as ON, not after it)
                         string onIndent = new string(' ', targetOnCol);
                         var conditions = SplitOnConditions(item.OnClause);
-                        string firstCond = conditions[0];
-                        var rest = conditions.Skip(1).Select(c => item.Indent + onIndent + KW_AND + " " + c);
-                        newLine = onBase + firstCond + (rest.Any() ? Environment.NewLine + string.Join(Environment.NewLine, rest) : "");
+                        result.Add(onBase + conditions[0]);
+                        foreach (string c in conditions.Skip(1))
+                            result.Add(item.Indent + onIndent + KW_AND + " " + c);
                     }
                     else
                     {
-                        newLine = onFull;
+                        result.Add(onFull);
                     }
                 }
-                lines[i] = newLine;
             }
+
+            return result;
         }
 
         private sealed class JoinLineItem
         {
-            public int LineIndex { get; set; }
             public string Indent { get; set; } = "";
             public string Keyword { get; set; } = "";
             public string Table { get; set; } = "";
             public string Alias { get; set; } = "";
             public string OnClause { get; set; } = "";
+            public string FirstCondition { get; set; } = "";
+            public bool HasTrailingOn { get; set; }
         }
 
         /// <summary>
         /// Parses a single FROM/JOIN trimmed line into its components.
+        /// hasTrailingOn is true when IndentJoinOnClause mode emits "JOIN table alias ON" with no condition on this line.
         /// </summary>
-        private static void ParseFromJoinLine(string trimmed, out string keyword, out string table, out string alias, out string onClause)
+        private static void ParseFromJoinLine(string trimmed, out string keyword, out string table, out string alias, out string onClause, out bool hasTrailingOn)
         {
             // Keywords: FROM, JOIN, INNER JOIN, LEFT JOIN, LEFT OUTER JOIN, RIGHT JOIN,
             //           RIGHT OUTER JOIN, FULL JOIN, FULL OUTER JOIN, CROSS JOIN
@@ -409,14 +478,27 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 rest = sp >= 0 ? trimmed.Substring(sp + 1).TrimStart() : "";
             }
 
+            // Detect trailing " ON" with no condition (IndentJoinOnClause mode).
+            string restTrimmed = rest.TrimEnd();
+            string restUpper = restTrimmed.ToUpperInvariant();
+            if (restUpper.EndsWith(" ON"))
+            {
+                hasTrailingOn = true;
+                onClause = "";
+                string tableAndAlias = restTrimmed.Substring(0, restTrimmed.Length - 3).TrimEnd();
+                ParseTableAndAlias(tableAndAlias, out table, out alias);
+                return;
+            }
+
+            hasTrailingOn = false;
             // Now rest = "tableName [AS] [alias] [ON ...]" or "tableName [AS] [alias]"
             // Split on " ON " (case-insensitive, top-level)
             int onPos = FindTokenOutsideParens(rest, " ON ");
             onClause = onPos >= 0 ? rest.Substring(onPos + 4).Trim() : "";
-            string tableAndAlias = onPos >= 0 ? rest.Substring(0, onPos).TrimEnd() : rest.TrimEnd();
+            string tableAndAlias2 = onPos >= 0 ? rest.Substring(0, onPos).TrimEnd() : rest.TrimEnd();
 
             // Parse table [AS] alias from tableAndAlias
-            ParseTableAndAlias(tableAndAlias, out table, out alias);
+            ParseTableAndAlias(tableAndAlias2, out table, out alias);
         }
 
         private static void ParseTableAndAlias(string tableAndAlias, out string table, out string alias)
@@ -637,8 +719,10 @@ namespace PoorMansTSqlFormatterLib.Formatters
                         // Leading-comma style: ,expr  or  ,expr AS alias
                         string afterComma = trimmed.Substring(1).TrimStart();
                         int netParens = CountNetParens(afterComma);
-                        // Only alias if the expression is balanced (not a multi-line expression start)
-                        if (netParens <= 0)
+                        int netCase = CountNetCase(afterComma);
+                        // Only alias if the expression is balanced (not a multi-line expression start).
+                        // netCase > 0 means the line opens a CASE block that closes on later lines.
+                        if (netParens <= 0 && netCase <= 0)
                         {
                             var (rewritten, newCounter) = EnsureAlias(afterComma, autoAliasCounter);
                             autoAliasCounter = newCounter;
@@ -660,7 +744,8 @@ namespace PoorMansTSqlFormatterLib.Formatters
                             continue; // pure TOP N or DISTINCT line — not a column, leave as-is
 
                         int netParens2 = CountNetParens(colExpr2);
-                        if (netParens2 <= 0)
+                        int netCase2 = CountNetCase(colExpr2);
+                        if (netParens2 <= 0 && netCase2 <= 0)
                         {
                             var (rewritten, newCounter) = EnsureAlias(colExpr2, autoAliasCounter);
                             autoAliasCounter = newCounter;
@@ -715,6 +800,50 @@ namespace PoorMansTSqlFormatterLib.Formatters
             return depth;
         }
 
+        // Counts unmatched CASE keywords minus END keywords at the top paren level (outside
+        // strings/brackets/parens). Positive means the expression opens a CASE that continues
+        // on subsequent lines; used to skip EnsureAlias on the opening CASE token.
+        private static int CountNetCase(string s)
+        {
+            int net = 0;
+            int parenDepth = 0;
+            bool inSingleQuote = false;
+            bool inBracket = false;
+            for (int i = 0; i < s.Length; i++)
+            {
+                char c = s[i];
+                if (inSingleQuote)
+                {
+                    if (c == '\'' && i + 1 < s.Length && s[i + 1] == '\'') { i++; continue; }
+                    if (c == '\'') inSingleQuote = false;
+                    continue;
+                }
+                if (inBracket) { if (c == ']') inBracket = false; continue; }
+                if (c == '\'') { inSingleQuote = true; continue; }
+                if (c == '[') { inBracket = true; continue; }
+                if (c == '(') { parenDepth++; continue; }
+                if (c == ')') { parenDepth--; continue; }
+                if (parenDepth > 0) continue;
+                bool prevIsWord = i > 0 && (char.IsLetterOrDigit(s[i - 1]) || s[i - 1] == '_');
+                if (prevIsWord) continue;
+                if (i + 4 <= s.Length
+                    && string.Compare(s, i, "CASE", 0, 4, StringComparison.OrdinalIgnoreCase) == 0
+                    && (i + 4 >= s.Length || !(char.IsLetterOrDigit(s[i + 4]) || s[i + 4] == '_')))
+                {
+                    net++;
+                    i += 3;
+                }
+                else if (i + 3 <= s.Length
+                    && string.Compare(s, i, "END", 0, 3, StringComparison.OrdinalIgnoreCase) == 0
+                    && (i + 3 >= s.Length || !(char.IsLetterOrDigit(s[i + 3]) || s[i + 3] == '_')))
+                {
+                    net--;
+                    i += 2;
+                }
+            }
+            return net;
+        }
+
         /// <summary>
         /// Returns a copy of <paramref name="col"/> with an AS alias appended if none exists.
         /// Also returns the updated autoAliasCounter.
@@ -737,8 +866,10 @@ namespace PoorMansTSqlFormatterLib.Formatters
             if (FindAsOutsideParens(trimmed) >= 0)
                 return (col, counter);
 
-            // Already has EqualSign-style alias (alias = expr) from input SQL — leave alone
-            // Pattern: simple-identifier = anything (not starting with @, which is a var assignment handled below)
+            // Already has EqualSign-style alias (alias = expr) from input SQL.
+            // Rewrite to "expression AS alias" so the output is consistently AS style.
+            // (If ColumnAliasStyle=EqualSign is also active, RewriteAliasesToEqualSign will
+            // convert it back afterward.)
             if (!trimmed.StartsWith("@"))
             {
                 int eqPos = FindEqualSignOutsideParens(trimmed);
@@ -746,7 +877,10 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 {
                     string lhs = trimmed.Substring(0, eqPos).Trim();
                     if (IsSimpleColumnRef(lhs))
-                        return (col, counter);
+                    {
+                        string expression = trimmed.Substring(eqPos + 1).Trim();
+                        return (expression + " AS " + lhs, counter);
+                    }
                 }
             }
 
@@ -781,14 +915,19 @@ namespace PoorMansTSqlFormatterLib.Formatters
         private static bool IsSimpleColumnRef(string expr)
         {
             if (string.IsNullOrEmpty(expr)) return false;
-            // Must not contain parens (function calls), spaces (multi-token expressions),
-            // or arithmetic operators at the top level.
-            if (expr.IndexOfAny(new[] { '(', ')', ' ', '\t', '+', '-', '/', '%' }) >= 0)
-                return false;
-            // Allow * only as part of dereference (already handled above for wildcards)
-            if (expr.IndexOf('*') >= 0) return false;
+            // Scan character by character; spaces and special chars inside bracket-quoted
+            // segments (e.g. [Active Flag]) are valid and must not trigger a false negative.
+            bool inBracket = false;
+            foreach (char c in expr)
+            {
+                if (c == '[') { inBracket = true; continue; }
+                if (c == ']') { inBracket = false; continue; }
+                if (inBracket) continue;
+                if (c == '(' || c == ')' || c == ' ' || c == '\t' ||
+                    c == '+' || c == '-' || c == '/' || c == '%' || c == '*')
+                    return false;
+            }
             // Must look like: word, word.word, [word], [word].[word], schema.table.col, etc.
-            // Split on '.' and check each segment is a valid identifier (possibly bracket-quoted).
             foreach (string segment in expr.Split('.'))
             {
                 string s = segment.Trim('[', ']');
@@ -805,7 +944,8 @@ namespace PoorMansTSqlFormatterLib.Formatters
         {
             int dot = expr.LastIndexOf('.');
             string name = dot >= 0 ? expr.Substring(dot + 1) : expr;
-            return name.Trim('[', ']');
+            string bare = name.Trim('[', ']');
+            return bare.Contains(' ') ? "[" + bare + "]" : bare;
         }
 
 
