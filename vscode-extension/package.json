@@ -7,6 +7,7 @@
     "url": "git@github.com:BadMonkeySoftware/right-way-sql-formatter.git "
   },
   "version": "0.1.1",
+  "icon": "rightwayIcon.png",
   "publisher": "bad-monkey-software",
   "engines": {
     "vscode": "^1.85.0"
@@ -97,6 +98,9 @@
         "rightWaySqlFormatter.expandCommaLists": {
           "type": "boolean",
           "default": true,
+          "examples": [
+            
+          ],
           "description": "Expand comma-separated lists onto separate lines."
         },
         "rightWaySqlFormatter.selectFirstColumnOnNewLine": {

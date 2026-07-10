@@ -108,7 +108,7 @@ SqlFormatter --output formatted.sql myquery.sql
 Run `SqlFormatter --help` for the full list.
 
 ### Examples
-
+dotnet run --project PoorMansTSqlFormatterCmdLine -- --AlignTableJoins=True --IndentJoinOnClause=True < PoorMansTSqlFormatterTest/Data/InputSql/31_AlignTableJoins.txt 2>/dev/null
 ```bash
 # Format with 4 spaces for indent (using escape sequences)
 echo "select 1,2,3" | SqlFormatter --indent-string="\s\s\s\s"
