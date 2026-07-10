@@ -268,7 +268,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
         }
 
         /// <summary>
-        /// Rewrites a FROM/JOIN block with aligned table names, AS aliases, and ON conditions.
+        /// Rewrites a FROM/JOIN block with aligned table names, AS aliases, ON conditions, and = signs.
         /// When a JOIN line ends with a trailing ON (IndentJoinOnClause mode), the first condition
         /// is pulled up to be inline with ON; subsequent AND/OR conditions are aligned under ON.
         /// Returns the new lines for the block (may be fewer than input due to pulled-up conditions).
@@ -281,9 +281,10 @@ namespace PoorMansTSqlFormatterLib.Formatters
             string KW_ON  = uc ? "ON"  : "on";
             string KW_AND = uc ? "AND" : "and";
 
-            // ---- Pass 1: parse each FROM/JOIN line --------------------------
+            // ---- Pass 1: parse each FROM/JOIN line and collect ON conditions ----
             var items = new List<JoinLineItem>();
             bool captureFirstCond = false;
+            bool captureAndOrConds = false;
 
             for (int i = 0; i < blockLines.Count; i++)
             {
@@ -292,21 +293,33 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 string trimmedUpper = trimmed.ToUpperInvariant();
 
                 if (IsJoinContinuationLine(trimmedUpper))
+                {
+                    // Collect AND/OR conditions for the current HasTrailingOn item.
+                    if (captureAndOrConds && items.Count > 0)
+                    {
+                        int sp = trimmed.IndexOf(' ');
+                        if (sp >= 0) items[items.Count - 1].Conditions.Add(trimmed.Substring(sp + 1));
+                    }
                     continue;
+                }
 
                 // Capture first condition after a HasTrailingOn JOIN.
                 if (captureFirstCond && !IsFromOrJoinLine(trimmedUpper))
                 {
-                    items[items.Count - 1].FirstCondition = trimmed;
+                    var last = items[items.Count - 1];
+                    last.FirstCondition = trimmed;
+                    last.Conditions.Add(trimmed);
                     captureFirstCond = false;
+                    captureAndOrConds = true;
                     continue;
                 }
                 captureFirstCond = false;
+                captureAndOrConds = false;
 
                 string indent = line.Substring(0, line.Length - trimmed.Length);
                 ParseFromJoinLine(trimmed, out string keyword, out string table, out string alias, out string onClause, out bool hasTrailingOn);
 
-                items.Add(new JoinLineItem
+                var newItem = new JoinLineItem
                 {
                     Indent = indent,
                     Keyword = keyword,
@@ -314,7 +327,13 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     Alias = alias,
                     OnClause = onClause,
                     HasTrailingOn = hasTrailingOn,
-                });
+                };
+
+                // For inline ON, collect individual conditions from the clause.
+                if (!hasTrailingOn && !string.IsNullOrEmpty(onClause))
+                    newItem.Conditions.AddRange(SplitOnConditions(onClause));
+
+                items.Add(newItem);
                 captureFirstCond = hasTrailingOn;
             }
 
@@ -338,9 +357,18 @@ namespace PoorMansTSqlFormatterLib.Formatters
             // Guaranteed >= 1 because targetOnCol rounds up past targetTableCol + asAliasLen.
             int onPad = targetOnCol - targetTableCol - asAliasLen;
 
+            // Compute = alignment: tab-stop after the longest LHS across all conditions in the block.
+            int maxCondLHSLen = 0;
+            foreach (var item in items)
+                foreach (var cond in item.Conditions)
+                    if (TrySplitAtEq(cond, out string lhs, out _))
+                        maxCondLHSLen = Math.Max(maxCondLHSLen, lhs.Length);
+            int targetEqOffset = maxCondLHSLen > 0 ? ((maxCondLHSLen / indentSize) + 1) * indentSize : 0;
+
             // ---- Pass 4: produce new lines ---------------------------------
             var result = new List<string>();
             int itemIdx = 0;
+            int condIdx = 0;
             bool insideIndentedOn = false;
             bool firstCondConsumed = false;
 
@@ -365,9 +393,13 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     }
                     else if (IsJoinContinuationLine(trimmedUpper))
                     {
-                        // AND/OR continuation: align under ON keyword.
-                        string andIndent = items[itemIdx - 1].Indent + new string(' ', targetOnCol);
-                        result.Add(andIndent + blockLines[i].TrimStart());
+                        // AND/OR continuation: align under ON keyword with = alignment.
+                        var prevItem = items[itemIdx - 1];
+                        string andIndent = prevItem.Indent + new string(' ', targetOnCol);
+                        string condText = condIdx < prevItem.Conditions.Count
+                            ? ApplyEqPad(prevItem.Conditions[condIdx++], targetEqOffset)
+                            : blockLines[i].TrimStart().Substring(blockLines[i].TrimStart().IndexOf(' ') + 1);
+                        result.Add(andIndent + KW_AND + " " + condText);
                         continue;
                     }
                     else
@@ -391,40 +423,48 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     continue;
                 }
 
-                var item = items[itemIdx++];
-                string kwTable = item.Keyword + " " + item.Table;
+                var curItem = items[itemIdx++];
+                condIdx = 0;
+                string kwTable = curItem.Keyword + " " + curItem.Table;
                 string tablepad = new string(' ', targetTableCol - kwTable.Length);
-                string aliasPad = new string(' ', maxAliasLen - item.Alias.Length);
-                string asPart = KW_AS + " " + item.Alias + aliasPad;
-
+                string aliasPad = new string(' ', maxAliasLen - curItem.Alias.Length);
+                string asPart = KW_AS + " " + curItem.Alias + aliasPad;
                 string onPrefix = new string(' ', onPad) + KW_ON + "  ";
 
-                if (item.HasTrailingOn)
+                if (curItem.HasTrailingOn)
                 {
-                    // Pull first condition inline: "... <onPad>ON  first_condition"
-                    result.Add(item.Indent + kwTable + tablepad + asPart + onPrefix + item.FirstCondition);
+                    // Pull first condition inline with = alignment.
+                    string cond0 = curItem.Conditions.Count > 0
+                        ? ApplyEqPad(curItem.Conditions[0], targetEqOffset)
+                        : curItem.FirstCondition;
+                    result.Add(curItem.Indent + kwTable + tablepad + asPart + onPrefix + cond0);
+                    condIdx = 1;
                     insideIndentedOn = true;
                     firstCondConsumed = false;
                 }
-                else if (string.IsNullOrEmpty(item.OnClause))
+                else if (string.IsNullOrEmpty(curItem.OnClause))
                 {
-                    result.Add(item.Indent + kwTable + tablepad + asPart);
+                    result.Add(curItem.Indent + kwTable + tablepad + asPart);
                 }
                 else
                 {
-                    string onBase = item.Indent + kwTable + tablepad + asPart + onPrefix;
-                    string onFull = onBase + item.OnClause;
-                    if (onFull.Length > 100 && item.OnClause.IndexOf(" AND ", StringComparison.OrdinalIgnoreCase) >= 0)
+                    string onBase = curItem.Indent + kwTable + tablepad + asPart + onPrefix;
+                    string onFull = onBase + curItem.OnClause;
+                    if (onFull.Length > 100 && curItem.Conditions.Count > 1)
                     {
+                        // Wrap onto separate lines with = alignment.
                         string onIndent = new string(' ', targetOnCol);
-                        var conditions = SplitOnConditions(item.OnClause);
-                        result.Add(onBase + conditions[0]);
-                        foreach (string c in conditions.Skip(1))
-                            result.Add(item.Indent + onIndent + KW_AND + " " + c);
+                        result.Add(onBase + ApplyEqPad(curItem.Conditions[0], targetEqOffset));
+                        for (int c = 1; c < curItem.Conditions.Count; c++)
+                            result.Add(curItem.Indent + onIndent + KW_AND + " " + ApplyEqPad(curItem.Conditions[c], targetEqOffset));
                     }
                     else
                     {
-                        result.Add(onFull);
+                        // Single condition or short line — apply = alignment inline.
+                        string aligned = curItem.Conditions.Count > 0
+                            ? ApplyEqPad(curItem.Conditions[0], targetEqOffset)
+                            : curItem.OnClause;
+                        result.Add(onBase + aligned);
                     }
                 }
             }
@@ -440,7 +480,44 @@ namespace PoorMansTSqlFormatterLib.Formatters
             public string Alias { get; set; } = "";
             public string OnClause { get; set; } = "";
             public string FirstCondition { get; set; } = "";
+            public List<string> Conditions { get; set; } = new List<string>();
             public bool HasTrailingOn { get; set; }
+        }
+
+        /// <summary>
+        /// Splits "lhs = rhs" at the first standalone = (not part of !=, &lt;=, &gt;=, &lt;&gt;).
+        /// Returns false if no such = is found.
+        /// </summary>
+        private static bool TrySplitAtEq(string condition, out string lhs, out string rhs)
+        {
+            for (int i = 1; i < condition.Length - 2; i++)
+            {
+                if (condition[i] == ' ' && condition[i + 1] == '=' && condition[i + 2] == ' ')
+                {
+                    char prev = condition[i - 1];
+                    if (prev != '!' && prev != '<' && prev != '>' && prev != '=')
+                    {
+                        lhs = condition.Substring(0, i);
+                        rhs = condition.Substring(i + 3);
+                        return true;
+                    }
+                }
+            }
+            lhs = condition;
+            rhs = "";
+            return false;
+        }
+
+        /// <summary>
+        /// Rewrites "lhs = rhs" so that = starts at targetOffset characters from the start of the expression.
+        /// Conditions without = are returned unchanged.
+        /// </summary>
+        private static string ApplyEqPad(string condition, int targetOffset)
+        {
+            if (targetOffset <= 0 || !TrySplitAtEq(condition, out string lhs, out string rhs))
+                return condition;
+            int pad = Math.Max(1, targetOffset - lhs.Length);
+            return lhs + new string(' ', pad) + "= " + rhs;
         }
 
         /// <summary>
