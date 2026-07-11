@@ -943,22 +943,13 @@ namespace PoorMansTSqlFormatterLib.Formatters
             if (FindAsOutsideParens(trimmed) >= 0)
                 return (col, counter);
 
-            // Already has EqualSign-style alias (alias = expr) from input SQL.
-            // Rewrite to "expression AS alias" so the output is consistently AS style.
-            // (If ColumnAliasStyle=EqualSign is also active, RewriteAliasesToEqualSign will
-            // convert it back afterward.)
+            // Already has an EqualSign-style alias (alias = expr) in the input SQL.
+            // The column IS aliased — preserve the user's chosen style, do not rewrite to AS.
             if (!trimmed.StartsWith("@"))
             {
                 int eqPos = FindEqualSignOutsideParens(trimmed);
-                if (eqPos > 0)
-                {
-                    string lhs = trimmed.Substring(0, eqPos).Trim();
-                    if (IsSimpleColumnRef(lhs))
-                    {
-                        string expression = trimmed.Substring(eqPos + 1).Trim();
-                        return (expression + " AS " + lhs, counter);
-                    }
-                }
+                if (eqPos > 0 && IsSimpleColumnRef(trimmed.Substring(0, eqPos).Trim()))
+                    return (col, counter);
             }
 
             // Variable assignment SELECT @var = expr — not a column alias, leave alone
@@ -1252,18 +1243,22 @@ namespace PoorMansTSqlFormatterLib.Formatters
         }
 
         /// <summary>
-        /// Finds the position of a top-level standalone '=' outside parentheses and string literals.
+        /// Finds the position of a top-level standalone '=' outside parentheses, string
+        /// literals, and bracket-quoted identifiers (e.g. [Odd=Name]).
         /// Excludes !=, >=, &lt;= compound operators. Returns -1 if not found.
         /// </summary>
         private static int FindEqualSignOutsideParens(string s)
         {
             int depth = 0;
             bool inString = false;
+            bool inBracket = false;
             for (int i = 0; i < s.Length; i++)
             {
                 char c = s[i];
                 if (inString) { if (c == '\'') inString = false; continue; }
+                if (inBracket) { if (c == ']') inBracket = false; continue; }
                 if (c == '\'') { inString = true; continue; }
+                if (c == '[') { inBracket = true; continue; }
                 if (c == '(') { depth++; continue; }
                 if (c == ')') { depth--; continue; }
                 if (depth == 0 && c == '=')
@@ -1321,7 +1316,10 @@ namespace PoorMansTSqlFormatterLib.Formatters
         {
             // For each line in the block, find the position of " AS " (outside parens).
             // Measure the max expression width and pad.
+            // Lines using EqualSign-style aliases (alias = expr) are preserved as-is and
+            // aligned as their own group (their '=' signs line up with each other).
             var items = new List<(int lineIdx, string indent, string comma, string expr, string alias)>();
+            var equalSignItems = new List<(int lineIdx, string prefix, string alias, string expr)>();
 
             for (int i = start; i < end; i++)
             {
@@ -1354,17 +1352,42 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     string expr = content.Substring(0, asPos).TrimEnd();
                     string alias = content.Substring(asPos + 4).Trim();
                     items.Add((i, prefix, "", expr, alias));
+                    continue;
+                }
+
+                // EqualSign-style alias line: alias = expr (LHS must be a simple column
+                // reference; @variable assignments are not aliases).
+                if (!content.StartsWith("@"))
+                {
+                    int eqPos = FindEqualSignOutsideParens(content);
+                    if (eqPos > 0)
+                    {
+                        string alias = content.Substring(0, eqPos).TrimEnd();
+                        string expr = content.Substring(eqPos + 1).TrimStart();
+                        if (IsSimpleColumnRef(alias) && expr.Length > 0)
+                            equalSignItems.Add((i, prefix, alias, expr));
+                    }
                 }
             }
 
-            if (items.Count < 2) return;
-
-            int maxExprLen = items.Max(it => it.expr.Length);
-
-            foreach (var (lineIdx, prefix, _, expr, alias) in items)
+            if (items.Count >= 2)
             {
-                string padding = new string(' ', maxExprLen - expr.Length);
-                lines[lineIdx] = prefix + expr + padding + " AS " + alias;
+                int maxExprLen = items.Max(it => it.expr.Length);
+                foreach (var (lineIdx, prefix, _, expr, alias) in items)
+                {
+                    string padding = new string(' ', maxExprLen - expr.Length);
+                    lines[lineIdx] = prefix + expr + padding + " AS " + alias;
+                }
+            }
+
+            if (equalSignItems.Count >= 2)
+            {
+                int maxAliasLen = equalSignItems.Max(it => it.alias.Length);
+                foreach (var (lineIdx, prefix, alias, expr) in equalSignItems)
+                {
+                    string padding = new string(' ', maxAliasLen - alias.Length);
+                    lines[lineIdx] = prefix + alias + padding + " = " + expr;
+                }
             }
         }
 

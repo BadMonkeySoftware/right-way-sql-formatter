@@ -1,8 +1,8 @@
--- Test for AlignColumnDefinitions combined with ColumnAliasStyle=EqualSign
+﻿-- Test for AlignColumnDefinitions combined with ColumnAliasStyle=EqualSign
 SELECT c.CustomerID AS ID
     ,[Hire Date] AS [Hire Date]
     ,c.[Customer Name] AS [Customer Name]
-    ,c.IsActive AS [Active Flag]
+    ,[Active Flag] = c.IsActive
     ,CASE 
         WHEN Active = 1
             THEN 'Yes'
