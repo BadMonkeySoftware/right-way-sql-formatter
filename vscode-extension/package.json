@@ -45,6 +45,10 @@
       {
         "command": "rightWaySqlFormatter.formatSelection",
         "title": "Right Way SQL: Format Selection"
+      },
+      {
+        "command": "rightWaySqlFormatter.formatDocumentPreview",
+        "title": "Right Way SQL: Format Document (Preview)"
       }
     ],
     "menus": {
@@ -57,6 +61,11 @@
         {
           "when": "editorHasSelection && editorLangId == sql",
           "command": "rightWaySqlFormatter.formatSelection",
+          "group": "1_modification"
+        },
+        {
+          "when": "editorLangId == sql",
+          "command": "rightWaySqlFormatter.formatDocumentPreview",
           "group": "1_modification"
         }
       ]

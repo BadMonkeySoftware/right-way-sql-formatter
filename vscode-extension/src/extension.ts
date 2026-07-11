@@ -23,7 +23,13 @@ import * as fs from 'fs';
 export function activate(context: vscode.ExtensionContext): void {
     console.log('Right Way SQL Formatter activated');
 
-    // "Format Document" — replaces entire editor content with formatted SQL
+    // Serves formatted-SQL previews as read-only virtual documents for the diff view.
+    const previewProvider = new FormatPreviewProvider();
+    context.subscriptions.push(
+        vscode.workspace.registerTextDocumentContentProvider(PREVIEW_SCHEME, previewProvider)
+    );
+
+    // "Format Document" — applies minimal edits to the editor content
     context.subscriptions.push(
         vscode.commands.registerCommand('rightWaySqlFormatter.formatDocument', () => {
             const editor = vscode.window.activeTextEditor;
@@ -31,11 +37,7 @@ export function activate(context: vscode.ExtensionContext): void {
                 vscode.window.showErrorMessage('No active editor.');
                 return;
             }
-            const fullRange = new vscode.Range(
-                editor.document.positionAt(0),
-                editor.document.positionAt(editor.document.getText().length)
-            );
-            formatRange(editor, fullRange);
+            formatDocument(editor.document);
         })
     );
 
@@ -55,14 +57,36 @@ export function activate(context: vscode.ExtensionContext): void {
         })
     );
 
+    // "Format Document (Preview)" — opens a native diff (original vs formatted)
+    // so changes can be reviewed before applying.
+    context.subscriptions.push(
+        vscode.commands.registerCommand('rightWaySqlFormatter.formatDocumentPreview', () => {
+            const editor = vscode.window.activeTextEditor;
+            if (!editor) {
+                vscode.window.showErrorMessage('No active editor.');
+                return;
+            }
+            previewFormatDocument(editor.document, previewProvider);
+        })
+    );
+
     // Also register as a VS Code document formatter so it participates in
-    // "Format Document" (⇧⌥F / Shift+Alt+F) for SQL files.
+    // "Format Document" (⇧⌥F / Shift+Alt+F) and format-on-save for SQL files.
     context.subscriptions.push(
         vscode.languages.registerDocumentFormattingEditProvider('sql', {
-            provideDocumentFormattingEdits(document: vscode.TextDocument): vscode.TextEdit[] {
-                // Delegate to the async path; return empty here and apply via edit builder.
-                // (The synchronous provider path is kept simple — full async handled by command.)
-                return [];
+            async provideDocumentFormattingEdits(document: vscode.TextDocument): Promise<vscode.TextEdit[]> {
+                try {
+                    const result = await runFormatter(document.getText());
+                    if (result.parseWarning) {
+                        vscode.window.showWarningMessage(
+                            'SQL parsing errors encountered — output may be incorrect. See the warning comment at the top of the formatted SQL.'
+                        );
+                    }
+                    return computeMinimalEdits(document, result.sql);
+                } catch (err) {
+                    vscode.window.showErrorMessage(`SQL Formatter error: ${err instanceof Error ? err.message : String(err)}`);
+                    return [];
+                }
             }
         })
     );
@@ -75,6 +99,32 @@ export function deactivate(): void {
 // ---------------------------------------------------------------------------
 // Core formatting logic
 // ---------------------------------------------------------------------------
+
+/**
+ * Formats the whole document, applying the result as MINIMAL edits (only the
+ * changed line ranges are touched) so cursor position, undo granularity, and
+ * unchanged-region decorations survive formatting.
+ */
+async function formatDocument(document: vscode.TextDocument): Promise<void> {
+    let result: FormatterResult;
+    try {
+        result = await runFormatter(document.getText());
+    } catch (err) {
+        vscode.window.showErrorMessage(`SQL Formatter error: ${err instanceof Error ? err.message : String(err)}`);
+        return;
+    }
+
+    const edits = computeMinimalEdits(document, result.sql);
+    if (edits.length > 0) {
+        const workspaceEdit = new vscode.WorkspaceEdit();
+        workspaceEdit.set(document.uri, edits);
+        await vscode.workspace.applyEdit(workspaceEdit);
+    }
+
+    if (result.parseWarning) {
+        showParseWarning();
+    }
+}
 
 /**
  * Formats the text within `range` in the given `editor` by passing it through
@@ -97,16 +147,214 @@ async function formatRange(editor: vscode.TextEditor, range: vscode.Range): Prom
     });
 
     if (result.parseWarning) {
-        vscode.window.showWarningMessage(
-            'SQL parsing errors encountered — output may be incorrect. See the warning comment at the top of the formatted SQL for details.'
-        );
+        showParseWarning();
     }
+}
+
+function showParseWarning(): void {
+    vscode.window.showWarningMessage(
+        'SQL parsing errors encountered — output may be incorrect. See the warning comment at the top of the formatted SQL for details.'
+    );
 }
 
 /** Result of a formatter run: the output SQL plus whether parse errors were reported. */
 interface FormatterResult {
     sql: string;
     parseWarning: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Format preview (native diff view)
+// ---------------------------------------------------------------------------
+
+const PREVIEW_SCHEME = 'rwsql-format-preview';
+
+/** Read-only virtual documents backing the right-hand side of the format-preview diff. */
+class FormatPreviewProvider implements vscode.TextDocumentContentProvider {
+    private readonly contents = new Map<string, string>();
+    private readonly emitter = new vscode.EventEmitter<vscode.Uri>();
+    readonly onDidChange = this.emitter.event;
+
+    provideTextDocumentContent(uri: vscode.Uri): string {
+        return this.contents.get(uri.toString()) ?? '';
+    }
+
+    update(uri: vscode.Uri, content: string): void {
+        this.contents.set(uri.toString(), content);
+        this.emitter.fire(uri);
+    }
+
+    remove(uri: vscode.Uri): void {
+        this.contents.delete(uri.toString());
+    }
+}
+
+/**
+ * Opens VS Code's native diff editor showing original (left) vs formatted
+ * (right), then offers an Apply action. Applying re-formats the document's
+ * CURRENT text (safe even if it changed while the preview was open) using
+ * minimal edits.
+ */
+async function previewFormatDocument(document: vscode.TextDocument, provider: FormatPreviewProvider): Promise<void> {
+    let result: FormatterResult;
+    try {
+        result = await runFormatter(document.getText());
+    } catch (err) {
+        vscode.window.showErrorMessage(`SQL Formatter error: ${err instanceof Error ? err.message : String(err)}`);
+        return;
+    }
+
+    const fileName = document.uri.path.split('/').pop() ?? 'untitled.sql';
+    const previewUri = vscode.Uri.from({
+        scheme: PREVIEW_SCHEME,
+        path: document.uri.path,
+        query: document.uri.toString()
+    });
+    provider.update(previewUri, result.sql);
+
+    await vscode.commands.executeCommand(
+        'vscode.diff',
+        document.uri,
+        previewUri,
+        `${fileName}: current ↔ formatted`,
+        { preview: true }
+    );
+
+    if (result.parseWarning) {
+        showParseWarning();
+    }
+
+    const choice = await vscode.window.showInformationMessage(
+        `Apply formatting to ${fileName}?`,
+        'Apply',
+        'Discard'
+    );
+
+    if (choice === 'Apply') {
+        await formatDocument(document); // re-runs on current text; minimal edits
+    }
+    if (choice !== undefined) {
+        await closeDiffTab(previewUri);
+    }
+    provider.remove(previewUri);
+}
+
+/** Closes the diff tab whose modified (right) side is the given preview URI. */
+async function closeDiffTab(previewUri: vscode.Uri): Promise<void> {
+    for (const group of vscode.window.tabGroups.all) {
+        for (const tab of group.tabs) {
+            if (tab.input instanceof vscode.TabInputTextDiff
+                && tab.input.modified.toString() === previewUri.toString()) {
+                await vscode.window.tabGroups.close(tab);
+                return;
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Minimal-edit computation
+// ---------------------------------------------------------------------------
+
+/**
+ * Computes line-based minimal edits transforming the document's text into
+ * `formatted`. Uses common prefix/suffix trimming plus an LCS diff over the
+ * remaining middle section (falling back to a single replace when the middle
+ * is very large). EOL differences between the CLI output and the document are
+ * normalized away: replacement text always uses the document's EOL.
+ */
+function computeMinimalEdits(document: vscode.TextDocument, formatted: string): vscode.TextEdit[] {
+    const eol = document.eol === vscode.EndOfLine.CRLF ? '\r\n' : '\n';
+    const a = document.getText().split(/\r\n|\r|\n/);
+    const b = formatted.split(/\r\n|\r|\n/);
+
+    // Trim common prefix / suffix
+    let prefix = 0;
+    while (prefix < a.length && prefix < b.length && a[prefix] === b[prefix]) prefix++;
+    let suffix = 0;
+    while (suffix < a.length - prefix && suffix < b.length - prefix
+        && a[a.length - 1 - suffix] === b[b.length - 1 - suffix]) suffix++;
+
+    const aMid = a.slice(prefix, a.length - suffix);
+    const bMid = b.slice(prefix, b.length - suffix);
+    if (aMid.length === 0 && bMid.length === 0) return [];
+
+    // Hunks over the middle section: [aStart, aEnd) in a replaced by [bStart, bEnd) in b
+    type Hunk = { aStart: number; aEnd: number; bStart: number; bEnd: number };
+    let hunks: Hunk[];
+    if (aMid.length * bMid.length > 1_000_000) {
+        // Middle too large for LCS — single replace of the whole middle
+        hunks = [{ aStart: prefix, aEnd: prefix + aMid.length, bStart: prefix, bEnd: prefix + bMid.length }];
+    } else {
+        hunks = lcsHunks(aMid, bMid).map(h => ({
+            aStart: h.aStart + prefix, aEnd: h.aEnd + prefix,
+            bStart: h.bStart + prefix, bEnd: h.bEnd + prefix
+        }));
+    }
+
+    const edits: vscode.TextEdit[] = [];
+    const lastLine = a.length; // a.length lines => line indices 0..a.length-1
+    for (const h of hunks) {
+        const newText = b.slice(h.bStart, h.bEnd).join(eol);
+        let range: vscode.Range;
+        let text: string;
+        if (h.aEnd < lastLine) {
+            // Replace whole lines [aStart, aEnd): range ends at start of line aEnd
+            range = new vscode.Range(h.aStart, 0, h.aEnd, 0);
+            text = newText.length > 0 ? newText + eol : '';
+        } else {
+            // Replacement reaches end of document
+            const endPos = document.lineAt(document.lineCount - 1).range.end;
+            range = new vscode.Range(new vscode.Position(h.aStart, 0), endPos);
+            text = newText;
+        }
+        edits.push(vscode.TextEdit.replace(range, text));
+    }
+    return edits;
+}
+
+/**
+ * Standard LCS diff over two string arrays, returning replace-hunks
+ * ([aStart,aEnd) -> [bStart,bEnd)) in ascending order.
+ */
+function lcsHunks(a: string[], b: string[]): { aStart: number; aEnd: number; bStart: number; bEnd: number }[] {
+    const n = a.length, m = b.length;
+    // DP table of LCS lengths
+    const width = m + 1;
+    const dp = new Int32Array((n + 1) * width);
+    for (let i = n - 1; i >= 0; i--) {
+        for (let j = m - 1; j >= 0; j--) {
+            dp[i * width + j] = a[i] === b[j]
+                ? dp[(i + 1) * width + j + 1] + 1
+                : Math.max(dp[(i + 1) * width + j], dp[i * width + j + 1]);
+        }
+    }
+    // Backtrack, emitting hunks for runs of non-matching lines
+    const hunks: { aStart: number; aEnd: number; bStart: number; bEnd: number }[] = [];
+    let i = 0, j = 0, aStart = 0, bStart = 0;
+    let inHunk = false;
+    const flush = (aEnd: number, bEnd: number) => {
+        if (inHunk) {
+            hunks.push({ aStart, aEnd, bStart, bEnd });
+            inHunk = false;
+        }
+    };
+    while (i < n && j < m) {
+        if (a[i] === b[j]) {
+            flush(i, j);
+            i++; j++;
+        } else {
+            if (!inHunk) { aStart = i; bStart = j; inHunk = true; }
+            if (dp[(i + 1) * width + j] >= dp[i * width + j + 1]) i++;
+            else j++;
+        }
+    }
+    if (i < n || j < m) {
+        if (!inHunk) { aStart = i; bStart = j; inHunk = true; }
+        i = n; j = m;
+    }
+    flush(i, j);
+    return hunks;
 }
 
 /** Exit code used by the SqlFormatter CLI to signal "output emitted, but input had parse errors". */
