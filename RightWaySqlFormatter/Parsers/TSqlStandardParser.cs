@@ -1250,17 +1250,20 @@ namespace PoorMansTSqlFormatterLib.Parsers
 
         private void ProcessCompoundKeywordWithError(ITokenList tokenList, ParseTree sqlTree, Node currentContainerElement, ref int tokenID, List<int> significantTokenPositions, int keywordCount)
         {
-            ProcessCompoundKeyword(tokenList, sqlTree, currentContainerElement, ref tokenID, significantTokenPositions, keywordCount);
+            Node compoundKeyword = ProcessCompoundKeyword(tokenList, sqlTree, currentContainerElement, ref tokenID, significantTokenPositions, keywordCount);
+            // Mark the offending keyword itself so error reporting can name it.
+            compoundKeyword.SetAttribute(SqlStructureConstants.ANAME_HASERROR, "1");
             sqlTree.SetError();
         }
 
-        private void ProcessCompoundKeyword(ITokenList tokenList, ParseTree sqlTree, Node targetContainer, ref int tokenID, List<int> significantTokenPositions, int keywordCount)
+        private Node ProcessCompoundKeyword(ITokenList tokenList, ParseTree sqlTree, Node targetContainer, ref int tokenID, List<int> significantTokenPositions, int keywordCount)
         {
             Node compoundKeyword = sqlTree.SaveNewElement(SqlStructureConstants.ENAME_COMPOUNDKEYWORD, "", targetContainer);
             string targetText = ExtractTokensString(tokenList, significantTokenPositions.GetRange(0, keywordCount)).TrimEnd();
             compoundKeyword.SetAttribute(SqlStructureConstants.ANAME_SIMPLETEXT, targetText);
             AppendNodesWithMapping(sqlTree, tokenList.GetRangeByIndex(significantTokenPositions[0], significantTokenPositions[keywordCount - 1]), SqlStructureConstants.ENAME_OTHERKEYWORD, compoundKeyword);
             tokenID = significantTokenPositions[keywordCount - 1];
+            return compoundKeyword;
         }
 
         private void AppendNodesWithMapping(ParseTree sqlTree, IEnumerable<IToken> tokens, string otherTokenMappingName, Node targetContainer)

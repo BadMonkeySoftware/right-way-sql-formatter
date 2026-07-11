@@ -95,6 +95,47 @@ namespace PoorMansTSqlFormatterTests
             //needs temp folder work...
         }
 
+        [Test]
+        public void TestCmdLineParseErrorEmitsOutputAndExitCode5()
+        {
+            var (exitCode, stdOut, stdErr) = RunFormatter("SELECT 1)", "");
+            Assert.That(exitCode, Is.EqualTo(5), "parse errors must be signalled via exit code 5");
+            Assert.That(stdOut, Does.Contain("WARNING! ERRORS ENCOUNTERED DURING SQL PARSING"),
+                "formatted output must carry the warning comment");
+            Assert.That(stdOut, Does.Contain("SELECT"), "formatted output must still be emitted");
+            Assert.That(stdErr, Does.Contain("parsing error"), "stderr must carry the warning too");
+        }
+
+        [Test]
+        public void TestCmdLineParseErrorDetailIncludesDiagnostics()
+        {
+            var (exitCode, stdOut, _) = RunFormatter("SELECT 'never closed", "");
+            Assert.That(exitCode, Is.EqualTo(5));
+            Assert.That(stdOut, Does.Contain("Unclosed string literal"));
+        }
+
+        [Test]
+        public void TestCmdLineAllowParsingErrorsExitsZero()
+        {
+            var (exitCode, stdOut, _) = RunFormatter("SELECT 1)", "--allow-parsing-errors");
+            Assert.That(exitCode, Is.EqualTo(0), "--allow-parsing-errors must suppress the error exit code");
+            Assert.That(stdOut, Does.Contain("WARNING! ERRORS ENCOUNTERED DURING SQL PARSING"),
+                "warning comment is still emitted so the reader knows parsing was imperfect");
+        }
+
+        private (int exitCode, string stdOut, string stdErr) RunFormatter(string inputString, string arguments)
+        {
+            var formatterProcess = StartFormatterProcess(arguments);
+            var wrappingWriter = new System.IO.StreamWriter(formatterProcess.StandardInput.BaseStream, Encoding.UTF8);
+            wrappingWriter.Write(inputString);
+            wrappingWriter.Flush();
+            wrappingWriter.Close();
+            string stdOut = formatterProcess.StandardOutput.ReadToEnd();
+            string stdErr = formatterProcess.StandardError.ReadToEnd();
+            formatterProcess.WaitForExit();
+            return (formatterProcess.ExitCode, stdOut, stdErr);
+        }
+
         private Process StartFormatterProcess(string arguments)
         {
             Process myProcess = new Process();

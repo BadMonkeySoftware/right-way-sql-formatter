@@ -70,7 +70,9 @@ namespace PoorMansTSqlFormatterLib
         {
             get
             {
-                return _newStatementDue;
+                // Read from the attribute (the setter's source of truth). This previously
+                // returned _newStatementDue — the wrong backing field.
+                return this.GetAttributeValue(SqlStructureConstants.ANAME_ERRORFOUND) == "1";
             }
             private set
             {
@@ -105,6 +107,9 @@ namespace PoorMansTSqlFormatterLib
         internal Node SaveNewElementWithError(string newElementName, string newElementValue)
         {
             Node newElement = SaveNewElement(newElementName, newElementValue);
+            // Mark the offending element itself (in addition to the current container,
+            // which SetError marks) so error reporting can name the unexpected token.
+            newElement.SetAttribute(SqlStructureConstants.ANAME_HASERROR, "1");
             SetError();
             return newElement;
         }

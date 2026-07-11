@@ -151,13 +151,33 @@ rootCommand.SetHandler(async (context) =>
 
     var formatter = new TSqlStandardFormatter(opts);
     formatter.ErrorOutputPrefix = "/* WARNING: Parsing error encountered */\n";
-    var manager = new PoorMansTSqlFormatterLib.SqlFormattingManager(formatter);
 
     bool parsingError = false;
     string result;
     try
     {
-        result = manager.Format(inputSql, ref parsingError);
+        // Run the pipeline directly (rather than via SqlFormattingManager) so that,
+        // on parse errors, a detailed warning comment can be composed and installed
+        // as the formatter's error prefix BEFORE formatting.
+        var tokenizer = new PoorMansTSqlFormatterLib.Tokenizers.TSqlStandardTokenizer();
+        var parser = new PoorMansTSqlFormatterLib.Parsers.TSqlStandardParser();
+
+        var tokenList = tokenizer.TokenizeSQL(inputSql);
+        var sqlTree = parser.ParseSQL(tokenList);
+        parsingError = sqlTree.GetAttributeValue(
+            PoorMansTSqlFormatterLib.Interfaces.SqlStructureConstants.ANAME_ERRORFOUND) == "1";
+
+        if (parsingError)
+        {
+            var errorDescriptions = PoorMansTSqlFormatterLib.ParseErrorAnalyzer.GetErrorDescriptions(sqlTree, tokenList);
+            var warningComment = new StringBuilder();
+            warningComment.AppendLine("-- WARNING! ERRORS ENCOUNTERED DURING SQL PARSING - formatted output may be incorrect:");
+            foreach (string description in errorDescriptions)
+                warningComment.AppendLine("--   " + description);
+            formatter.ErrorOutputPrefix = warningComment.ToString();
+        }
+
+        result = formatter.FormatSQLTree(sqlTree);
         if (allowErrors) parsingError = false;
     }
     catch (Exception ex)
@@ -169,9 +189,10 @@ rootCommand.SetHandler(async (context) =>
 
     if (parsingError)
     {
+        // Emit the formatted output (with its warning-comment prefix) anyway; the
+        // non-zero exit code is the machine-readable signal that parsing failed.
         await Console.Error.WriteLineAsync("Warning: parsing error encountered in input.");
         context.ExitCode = 5;
-        return;
     }
 
     if (!string.IsNullOrEmpty(outPath))

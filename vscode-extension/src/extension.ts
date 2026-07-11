@@ -83,9 +83,9 @@ export function deactivate(): void {
 async function formatRange(editor: vscode.TextEditor, range: vscode.Range): Promise<void> {
     const inputSql = editor.document.getText(range);
 
-    let formattedSql: string;
+    let result: FormatterResult;
     try {
-        formattedSql = await runFormatter(inputSql);
+        result = await runFormatter(inputSql);
     } catch (err) {
         vscode.window.showErrorMessage(`SQL Formatter error: ${err instanceof Error ? err.message : String(err)}`);
         return;
@@ -93,17 +93,34 @@ async function formatRange(editor: vscode.TextEditor, range: vscode.Range): Prom
 
     // Apply the formatted result back into the editor
     await editor.edit(editBuilder => {
-        editBuilder.replace(range, formattedSql);
+        editBuilder.replace(range, result.sql);
     });
+
+    if (result.parseWarning) {
+        vscode.window.showWarningMessage(
+            'SQL parsing errors encountered — output may be incorrect. See the warning comment at the top of the formatted SQL for details.'
+        );
+    }
 }
+
+/** Result of a formatter run: the output SQL plus whether parse errors were reported. */
+interface FormatterResult {
+    sql: string;
+    parseWarning: boolean;
+}
+
+/** Exit code used by the SqlFormatter CLI to signal "output emitted, but input had parse errors". */
+const EXIT_CODE_PARSE_WARNING = 5;
 
 /**
  * Runs the SqlFormatter CLI with the current settings, piping `sql` in via
  * stdin and returning the formatted output from stdout.
  *
- * Throws if the process exits non-zero or cannot be found.
+ * Exit code 0 = clean; exit code 5 = formatted output emitted but the input
+ * had parse errors (a warning comment is prepended to the output by the CLI).
+ * Throws for any other exit code or if the executable cannot be found.
  */
-function runFormatter(sql: string): Promise<string> {
+function runFormatter(sql: string): Promise<FormatterResult> {
     return new Promise((resolve, reject) => {
         const execPath = resolveExecutablePath();
         if (!execPath) {
@@ -128,11 +145,14 @@ function runFormatter(sql: string): Promise<string> {
         });
 
         proc.on('close', (code) => {
-            if (code !== 0) {
-                reject(new Error(`Formatter exited with code ${code}. stderr: ${stderr.trim()}`));
-            } else {
+            if (code === 0 || (code === EXIT_CODE_PARSE_WARNING && stdout.length > 0)) {
                 // Strip trailing newline added by Console.WriteLine in the CLI
-                resolve(stdout.replace(/\n$/, ''));
+                resolve({
+                    sql: stdout.replace(/\n$/, ''),
+                    parseWarning: code === EXIT_CODE_PARSE_WARNING
+                });
+            } else {
+                reject(new Error(`Formatter exited with code ${code}. stderr: ${stderr.trim()}`));
             }
         });
 

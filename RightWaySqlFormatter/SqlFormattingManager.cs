@@ -68,6 +68,19 @@ namespace PoorMansTSqlFormatterLib
             return Formatter.FormatSQLTree(sqlTree);
         }
 
+        /// <summary>
+        /// Formats the given SQL, additionally returning human-readable descriptions of any
+        /// parse errors encountered (empty list when parsing succeeded).
+        /// </summary>
+        public string Format(string inputSQL, ref bool errorEncountered, out System.Collections.Generic.IList<string> errorDescriptions)
+        {
+            Interfaces.ITokenList tokenList = Tokenizer.TokenizeSQL(inputSQL);
+            Node sqlTree = Parser.ParseSQL(tokenList);
+            errorEncountered = (sqlTree.GetAttributeValue(SqlStructureConstants.ANAME_ERRORFOUND) == "1");
+            errorDescriptions = ParseErrorAnalyzer.GetErrorDescriptions(sqlTree, tokenList);
+            return Formatter.FormatSQLTree(sqlTree);
+        }
+
         public static string DefaultFormat(string inputSQL)
         {
             return new SqlFormattingManager().Format(inputSQL);
