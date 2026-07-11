@@ -56,7 +56,7 @@ Test data lives in `PoorMansTSqlFormatterTest/Data/`:
 - `ParsedSql/` — expected parse trees
 - `CmdLineSql/` — expected CLI outputs
 
-The test harness reads the `(...)` portion of each expected filename as the `TSqlStandardFormatterOptions` config string to build the formatter under test. The two intentionally skipped tests are `02_Random_INVALID.txt` (malformed SQL) and `28_BadNestingDontCrash.txt` (broken nesting; must not crash).
+The test harness reads the `(...)` portion of each expected filename as the `TSqlStandardFormatterOptions` config string to build the formatter under test. The two intentionally skipped tests are `02_Random_INVALID.sql` (malformed SQL) and `28_BadNestingDontCrash.sql` (broken nesting; must not crash).
 
 ## Rules (from AGENTS.md)
 

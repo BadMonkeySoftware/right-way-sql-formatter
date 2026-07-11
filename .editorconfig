@@ -20,3 +20,11 @@ trim_trailing_whitespace = false
 [*.{csproj,slnx,props,targets}]
 indent_style = space
 indent_size = 2
+
+# Test data files are byte-exact expected outputs (BOM + CRLF significant).
+# Editors must never normalize line endings, trim whitespace, or re-encode them.
+[PoorMansTSqlFormatterTest/Data/**]
+end_of_line = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset
+charset = unset

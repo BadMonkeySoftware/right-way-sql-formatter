@@ -108,7 +108,7 @@ SqlFormatter --output formatted.sql myquery.sql
 Run `SqlFormatter --help` for the full list.
 
 ### Examples
-dotnet run --project PoorMansTSqlFormatterCmdLine -- --AlignTableJoins=True --IndentJoinOnClause=True < PoorMansTSqlFormatterTest/Data/InputSql/31_AlignTableJoins.txt 2>/dev/null
+dotnet run --project PoorMansTSqlFormatterCmdLine -- --AlignTableJoins=True --IndentJoinOnClause=True < PoorMansTSqlFormatterTest/Data/InputSql/31_AlignTableJoins.sql 2>/dev/null
 ```bash
 # Format with 4 spaces for indent (using escape sequences)
 echo "select 1,2,3" | SqlFormatter --indent-string="\s\s\s\s"
@@ -157,7 +157,7 @@ Build on Windows VM, install the resulting `.vsix`.
 - **Namespaces** are intentionally kept as `PoorMansTSqlFormatterLib.*` in the core library to avoid breaking anything if upstream changes are ever cherry-picked in.
 - **Upstream reference**: `git fetch upstream` to pull latest changes from TaoK/PoorMansTSqlFormatter for comparison.
 - **Nullable warnings**: 76 nullable reference warnings remain in the core library (pre-existing from the original codebase). Not blocking but targeted for cleanup.
-- **Known test skips**: `02_Random_INVALID.txt` and `28_BadNestingDontCrash.txt` are skipped in reformatting tests — both contain intentionally malformed SQL that the original formatter also couldn't round-trip cleanly.
+- **Known test skips**: `02_Random_INVALID.sql` and `28_BadNestingDontCrash.sql` are skipped in reformatting tests — both contain intentionally malformed SQL that the original formatter also couldn't round-trip cleanly.
 
 ---
 

@@ -77,7 +77,7 @@ namespace PoorMansTSqlFormatterTests
 
             if (!inputSQL.Contains(Utils.REFORMATTING_INCONSISTENCY_WARNING)
                 && !inputSQL.Contains(Utils.INVALID_SQL_WARNING)
-                && FileName != "28_BadNestingDontCrash.txt")
+                && FileName != "28_BadNestingDontCrash.sql")
             {
                 Assert.That(formattedAgain, Is.EqualTo(outputSQL), "first-pass formatted vs reformatted");
                 Utils.StripWhiteSpaceFromSqlTree(parsed);
@@ -131,9 +131,9 @@ namespace PoorMansTSqlFormatterTests
                 foreach (string config in _validityGuardConfigs)
                 {
                     // Skip exceptionally complex files with the ColumnAlwaysHasAlias config.
-                    // 05_ComplexDDL.txt has deeply nested subqueries in column expressions with multi-line
+                    // 05_ComplexDDL.sql has deeply nested subqueries in column expressions with multi-line
                     // continuations that exceed the text-based heuristic capabilities of EnsureColumnAliases.
-                    if (config.Contains("ColumnAlwaysHasAlias") && fileName == "05_ComplexDDL.txt")
+                    if (config.Contains("ColumnAlwaysHasAlias") && fileName == "05_ComplexDDL.sql")
                         continue;
 
                     yield return new TestCaseData(fileName, config).SetName($"FormatterValidityGuard_{fileName}_{(string.IsNullOrEmpty(config) ? "DefaultOptions" : config)}");

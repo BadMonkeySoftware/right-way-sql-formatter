@@ -53,7 +53,8 @@ namespace PoorMansTSqlFormatterTests
             XmlDocument expectedXmlDoc = new XmlDocument();
             expectedXmlDoc.PreserveWhitespace = true;
             expectedXmlDoc.Load(Path.Combine(Utils.GetTestContentFolder(Utils.PARSEDSQLFOLDER), FileName));
-            string inputSql = Utils.GetTestFileContent(FileName, Utils.INPUTSQLFOLDER);
+            // ParsedSql expectations are .xml; the corresponding input file is .sql
+            string inputSql = Utils.GetTestFileContent(Path.ChangeExtension(FileName, ".sql"), Utils.INPUTSQLFOLDER);
 
             ITokenList tokenized = _tokenizer.TokenizeSQL(inputSql);
             Node parsed = _parser.ParseSQL(tokenized);
