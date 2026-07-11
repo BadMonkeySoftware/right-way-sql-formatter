@@ -6,7 +6,40 @@ This changelog aims to follow the structure laid out at [Keep a Changelog](http:
 
 ### Added 
 
+* Parse-error diagnostics: invalid SQL now formats best-effort with a leading
+  comment describing what's wrong (unclosed string/comment/bracket identifier,
+  unexpected token/keyword, incomplete statement). New `ParseErrorAnalyzer` in
+  the core library; new `SqlFormattingManager.Format` overload returning
+  error descriptions.
+* CLI: on parse errors, formatted output is emitted (with the diagnostic
+  comment prefix) and the process exits with code 5; `--allow-parsing-errors`
+  still exits 0.
+* VS Code extension: "Format Document (Preview)" command — native diff editor
+  (current vs formatted) with Apply/Discard before touching the file.
+* VS Code extension: formatting is applied as line-minimal edits (LCS diff),
+  preserving cursor position and undo granularity; the Shift+Alt+F document
+  formatter registration now actually works (was a no-op stub).
+* EqualSign-style column aliases (`Alias = expression`) are now first-class:
+  preserved through all formatting options (never silently rewritten to `AS`),
+  aligned as their own group under `AlignColumnDefinitions`, and covered by
+  new test data (`39_EqualSignAliasInput`).
+* `ExpectedOutputRegenerator` explicit test for regenerating expected-output
+  test files via the formatter library (`REGEN_FILES=... dotnet test --filter
+  "Name~RegenerateExpectedFiles"`).
 * "Version Bump" script, for simplifying the release process
+
+### Changed
+
+* Test data files renamed to real extensions: `InputSql`/`StandardFormatSql`
+  `*.txt` → `*.sql`, `ParsedSql` `*.txt` → `*.xml` (content byte-identical);
+  `.editorconfig` now exempts `Data/**` from whitespace/EOL normalization.
+* `ColumnAlwaysHasAlias=True` no longer rewrites `alias = expr` columns to
+  `expr AS alias`; the input's alias style is preserved
+  (expected file `31_AlignWithEqualSign(ColumnAlwaysHasAlias=True)` updated
+  accordingly).
+* Fixed latent `ParseTree.ErrorFound` getter reading the wrong backing field.
+* Parser now marks the offending token element itself with `hasError` (in
+  addition to its container), so HTML output highlights the exact token.
 
 ### Changed
 

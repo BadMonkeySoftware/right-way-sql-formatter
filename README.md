@@ -103,13 +103,40 @@ SqlFormatter --output formatted.sql myquery.sql
 --statement-breaks=2        Blank lines between statements (default: 2)
 --clause-breaks=1           Blank lines between clauses (default: 1)
 --max-line-width=999        Max line width (default: 999)
+--alias-style=as            Column alias style: 'as' or 'equals' (default: as)
+--align-columns=false       Align aliases vertically in SELECT lists (default: false)
+--column-always-has-alias=false  Add an explicit alias to every SELECT column (default: false)
+--allow-parsing-errors=false Exit 0 even when the input has parse errors (default: false)
 ```
 
 Run `SqlFormatter --help` for the full list.
 
+Both T-SQL column alias styles (`expr AS alias` and `alias = expr`) are supported in input SQL, and the style you wrote is preserved unless you pass `--alias-style` explicitly.
+
+### Exit codes and invalid SQL
+
+| Code | Meaning |
+|------|---------|
+| 0    | Formatted cleanly (also with `--allow-parsing-errors` when errors occurred) |
+| 1    | Fatal error (unreadable input, unexpected exception) — no output |
+| 5    | Input had parse errors — formatted output IS still emitted, prefixed with a warning comment |
+
+On parse errors the output starts with a diagnostic comment block, e.g.:
+
+```sql
+-- WARNING! ERRORS ENCOUNTERED DURING SQL PARSING - formatted output may be incorrect:
+--   Unclosed string literal (missing closing single-quote)
+--   Unexpected token ')'
+```
+
+Diagnostics cover unclosed strings/comments/bracket identifiers, unexpected or misplaced tokens/keywords, and incomplete statements at end of input.
+
 ### Examples
-dotnet run --project PoorMansTSqlFormatterCmdLine -- --AlignTableJoins=True --IndentJoinOnClause=True < PoorMansTSqlFormatterTest/Data/InputSql/31_AlignTableJoins.sql 2>/dev/null
+
 ```bash
+# Run a repo test input through the formatter with alignment options
+dotnet run --project PoorMansTSqlFormatterCmdLine -- --align-table-joins=true --indent-join-on=true < PoorMansTSqlFormatterTest/Data/InputSql/31_AlignTableJoins.sql 2>/dev/null
+
 # Format with 4 spaces for indent (using escape sequences)
 echo "select 1,2,3" | SqlFormatter --indent-string="\s\s\s\s"
 
@@ -138,6 +165,8 @@ See [vscode-extension/README.md](vscode-extension/README.md) for full setup and 
 2. `cd vscode-extension && npm install && npm run compile`
 3. Open in VS Code and press `F5` to launch Extension Development Host
 4. Open a `.sql` file → right-click → "Right Way SQL: Format Document"
+
+Use **"Right Way SQL: Format Document (Preview)"** to review changes in VS Code's native diff editor (original vs formatted) before applying. Formatting is applied as minimal line edits, so cursor position and undo history stay sane, and invalid SQL produces a warning comment at the top of the output plus a toast instead of failing silently.
 
 ---
 

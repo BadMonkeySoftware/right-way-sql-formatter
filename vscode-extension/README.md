@@ -12,10 +12,23 @@ No language server, no parsing in JS — all formatting logic lives in the .NET 
 
 | Command | Keyboard Shortcut | Description |
 |---|---|---|
-| Right Way SQL: Format Document | — | Formats the entire active SQL file |
+| Right Way SQL: Format Document | — | Formats the entire active SQL file (minimal edits) |
 | Right Way SQL: Format Selection | — | Formats only the selected text |
+| Right Way SQL: Format Document (Preview) | — | Opens a native diff (current ↔ formatted) with Apply/Discard |
 
-Both commands are also available in the right-click context menu when editing a `.sql` file.
+All commands are also available in the right-click context menu when editing a `.sql` file. The extension additionally registers as the document formatter for SQL, so `Format Document` (⇧⌥F / Shift+Alt+F) and format-on-save work too.
+
+### Diff preview
+
+`Format Document (Preview)` shows the proposed formatting in VS Code's built-in diff editor — green/red change highlighting, side-by-side or inline — before anything touches your file. Choose **Apply** in the prompt to apply (formatting re-runs against the document's current text, so it's safe even if you kept typing), or **Discard** to close the preview unchanged.
+
+### Minimal edits
+
+Formatting is applied as line-level minimal edits (computed with an LCS diff) rather than replacing the whole document: cursor position survives, undo is a single clean step, and unchanged lines are untouched. Replacement text uses the document's own line endings.
+
+### Invalid SQL
+
+If the input can't be fully parsed, the formatter still produces best-effort output, prefixed with a comment describing what's wrong (e.g. unclosed string literal, unexpected token), and the extension shows a warning toast. The underlying CLI signals this with exit code 5.
 
 ## Setup
 
