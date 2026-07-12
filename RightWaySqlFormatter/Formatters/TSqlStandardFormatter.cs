@@ -2167,8 +2167,10 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 case SqlStructureConstants.ENAME_BINARY_VALUE:
                     if (state.InSelectModifierZone) { state.InSelectModifierZone = false; state.BreakExpected = true; }
                     WhiteSpace_SeparateWords(state);
-                    state.AddOutputContent("0x");
-                    state.AddOutputContent(contentElement.TextValue!.Substring(2).ToUpperInvariant());
+                    //single AddOutputContent call: the max-line-width logic may break BETWEEN
+                    // content calls, and a binary literal must never be split across lines
+                    // (whitespace inside 0x... changes the SQL's meaning).
+                    state.AddOutputContent("0x" + contentElement.TextValue!.Substring(2).ToUpperInvariant());
                     state.WordSeparatorExpected = true;
                     break;
 
