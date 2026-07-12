@@ -482,9 +482,12 @@ namespace PoorMansTSqlFormatterLib.Parsers
                             sqlTree.StartNewContainer(SqlStructureConstants.ENAME_BEGIN_END_BLOCK, token.Value, SqlStructureConstants.ENAME_CONTAINER_MULTISTATEMENT);
                             sqlTree.StartNewStatement();
                         }
-                        else if (significantTokensString.StartsWith("MERGE "))
+                        else if (significantTokensString.StartsWith("MERGE ")
+                            && !sqlTree.PathNameMatches(0, SqlStructureConstants.ENAME_DDL_PARENS)
+                            )
                         {
                             //According to BOL, MERGE is a fully reserved keyword from compat 100 onwards, for the MERGE statement only.
+                            //Inside DDL_PARENS it is a join hint (OPTION (MERGE JOIN)), not a statement.
                             sqlTree.ConsiderStartingNewStatement();
                             sqlTree.ConsiderStartingNewClause();
                             sqlTree.StartNewContainer(SqlStructureConstants.ENAME_MERGE_CLAUSE, token.Value, SqlStructureConstants.ENAME_MERGE_TARGET);
