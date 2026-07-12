@@ -128,3 +128,18 @@ probe "WAITFOR DELAY @variable" <<'SQL'
 DECLARE @d varchar(8) = '00:00:01';
 WAITFOR DELAY @d;
 SQL
+
+probe "INSERT with table hint WITH (TABLOCK)" <<'SQL'
+INSERT dbo.t WITH (TABLOCK) (a, b)
+SELECT 1, 2;
+SQL
+
+probe "CTE then INSERT with WITH (TABLOCK) hint" <<'SQL'
+WITH c AS (SELECT 1 AS n)
+INSERT #t WITH (TABLOCK) (n)
+SELECT n FROM c;
+SQL
+
+probe "UPDATE with table hint" <<'SQL'
+UPDATE t WITH (ROWLOCK) SET a = 1 WHERE b = 2;
+SQL
