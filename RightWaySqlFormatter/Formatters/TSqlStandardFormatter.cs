@@ -207,15 +207,60 @@ namespace PoorMansTSqlFormatterLib.Formatters
         ///   5. Multi-condition ON clauses that exceed 100 chars wrap to the next line,
         ///      aligned under the ON keyword.
         /// </summary>
+        /// <summary>
+        /// For each output line, true when the line STARTS inside an open single-quoted
+        /// string literal (multi-line dynamic SQL) or an open /* block comment */.
+        /// The text-based post-processing passes must leave such lines untouched:
+        /// "SELECT ..." inside a dynamic-SQL string is DATA, and rewriting it corrupts
+        /// the SQL's meaning. Bracket-quoted identifiers and -- comments are handled
+        /// within each line; block comments nest, per T-SQL rules.
+        /// </summary>
+        private static bool[] ComputeLinesInsideStringOrComment(IList<string> lines)
+        {
+            bool[] mask = new bool[lines.Count];
+            bool inString = false;
+            int commentDepth = 0;
+            for (int i = 0; i < lines.Count; i++)
+            {
+                mask[i] = inString || commentDepth > 0;
+                string line = lines[i];
+                for (int j = 0; j < line.Length; j++)
+                {
+                    char c = line[j];
+                    char next = j + 1 < line.Length ? line[j + 1] : '\0';
+                    if (inString)
+                    {
+                        if (c == '\'' && next == '\'') { j++; continue; } //escaped quote
+                        if (c == '\'') inString = false;
+                    }
+                    else if (commentDepth > 0)
+                    {
+                        if (c == '*' && next == '/') { commentDepth--; j++; }
+                        else if (c == '/' && next == '*') { commentDepth++; j++; }
+                    }
+                    else
+                    {
+                        if (c == '\'') inString = true;
+                        else if (c == '[') { while (j + 1 < line.Length && line[j + 1] != ']') j++; if (j + 1 < line.Length) j++; }
+                        else if (c == '-' && next == '-') break; //rest of line is comment
+                        else if (c == '/' && next == '*') { commentDepth++; j++; }
+                    }
+                }
+            }
+            return mask;
+        }
+
         private string AlignFromJoinClauses(string output)
         {
             var lines = new List<string>(output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None));
             int indentSize = Options.SpacesPerTab > 0 ? Options.SpacesPerTab : 4;
+            bool[] insideStringOrComment = ComputeLinesInsideStringOrComment(lines);
 
             // Find contiguous FROM/JOIN blocks and align each one.
             int i = 0;
             while (i < lines.Count)
             {
+                if (insideStringOrComment[i]) { i++; continue; }
                 string trimmed = lines[i].TrimStart();
                 string upper = trimmed.ToUpperInvariant();
                 if (IsFromOrJoinLine(upper))
@@ -224,6 +269,8 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     bool expectFirstCond = false;
                     while (i < lines.Count)
                     {
+                        if (insideStringOrComment[i])
+                            break;
                         string t = lines[i].TrimStart().ToUpperInvariant();
                         bool isFromJoin = IsFromOrJoinLine(t);
                         bool isContinuation = IsJoinContinuationLine(t);
@@ -243,6 +290,9 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     lines.RemoveRange(blockStart, i - blockStart);
                     lines.InsertRange(blockStart, newBlock);
                     i = blockStart + newBlock.Count;
+                    //line indices shifted; keep the in-string/in-comment mask in sync
+                    if (newBlock.Count != blockLines.Count)
+                        insideStringOrComment = ComputeLinesInsideStringOrComment(lines);
                     continue;
                 }
                 i++;
@@ -680,9 +730,12 @@ namespace PoorMansTSqlFormatterLib.Formatters
             int autoAliasCounter = 0;
             int beginDepth = 0; // tracks BEGIN/END nesting depth
             int parenDepth = 0; // tracks open-paren depth inside a SELECT column expression
+            bool[] insideStringOrComment = ComputeLinesInsideStringOrComment(lines);
 
             for (int i = 0; i < lines.Length; i++)
             {
+                //never touch the interior of a multi-line string literal or block comment
+                if (insideStringOrComment[i]) { inSelectList = false; parenDepth = 0; continue; }
                 string line = lines[i];
                 string trimmed = line.TrimStart();
                 string trimmedUpper = trimmed.ToUpperInvariant();
@@ -866,6 +919,14 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     if (c == ']') inBracket = false;
                     continue;
                 }
+                if (c == '-' && i + 1 < s.Length && s[i + 1] == '-') break; //-- comment
+                if (c == '/' && i + 1 < s.Length && s[i + 1] == '*')
+                {
+                    int close = s.IndexOf("*/", i + 2, StringComparison.Ordinal);
+                    if (close < 0) break; //comment continues past end of line
+                    i = close + 1;
+                    continue;
+                }
                 switch (c)
                 {
                     case '\'' : inSingleQuote = true; break;
@@ -898,6 +959,14 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 if (inBracket) { if (c == ']') inBracket = false; continue; }
                 if (c == '\'') { inSingleQuote = true; continue; }
                 if (c == '[') { inBracket = true; continue; }
+                if (c == '-' && i + 1 < s.Length && s[i + 1] == '-') break; //-- comment
+                if (c == '/' && i + 1 < s.Length && s[i + 1] == '*')
+                {
+                    int close = s.IndexOf("*/", i + 2, StringComparison.Ordinal);
+                    if (close < 0) break; //comment continues past end of line
+                    i = close + 1;
+                    continue;
+                }
                 if (c == '(') { parenDepth++; continue; }
                 if (c == ')') { parenDepth--; continue; }
                 if (parenDepth > 0) continue;
@@ -932,6 +1001,15 @@ namespace PoorMansTSqlFormatterLib.Formatters
         private static (string result, int counter) EnsureAlias(string col, int counter)
         {
             string trimmed = col.Trim();
+
+            //peel a trailing statement terminator off before analysis; re-appended at the
+            // end so "SELECT foo;" becomes "SELECT foo AS foo;", never "foo; AS foo;"
+            string suffix = "";
+            while (trimmed.EndsWith(";"))
+            {
+                suffix = ";" + suffix;
+                trimmed = trimmed.Substring(0, trimmed.Length - 1).TrimEnd();
+            }
 
             // Empty or comment-only — skip
             if (string.IsNullOrEmpty(trimmed)
@@ -972,7 +1050,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 alias = "ColumnAlias_" + counter;
             }
 
-            return (trimmed + " AS " + alias, counter);
+            return (trimmed + " AS " + alias + suffix, counter);
         }
 
         /// <summary>
@@ -1023,9 +1101,12 @@ namespace PoorMansTSqlFormatterLib.Formatters
         {
             var lines = output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
             bool inSelectList = false;
+            bool[] insideStringOrComment = ComputeLinesInsideStringOrComment(lines);
 
             for (int i = 0; i < lines.Length; i++)
             {
+                //never touch the interior of a multi-line string literal or block comment
+                if (insideStringOrComment[i]) { inSelectList = false; continue; }
                 string line = lines[i];
                 string trimmed = line.TrimStart();
                 string trimmedUpper = trimmed.ToUpperInvariant();
@@ -1159,15 +1240,18 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 {
                     // Preserve original casing of "TOP"
                     string topWord = trimmed.Substring(0, 3); // "TOP" in original case
-                    int pos = trimmed.IndexOf(' '); // index of space after "TOP"
-                    string afterTop = trimmed.Substring(pos).TrimStart();
+                    // Everything after "TOP" — do NOT assume a space exists ("TOP(@i)"
+                    // reaches here with no space at all, e.g. from sp_WhoIsActive).
+                    string afterTop = trimmed.Substring(3).TrimStart();
                     string rest;
                     string topToken;
                     if (afterTop.StartsWith("("))
                     {
                         int close = afterTop.IndexOf(')');
+                        if (close < 0)
+                            return (accumulatedPrefix + trimmed, "", true); //unterminated TOP(...) — treat as modifier-only
                         topToken = afterTop.Substring(0, close + 1);
-                        rest = close >= 0 ? afterTop.Substring(close + 1).TrimStart() : "";
+                        rest = afterTop.Substring(close + 1).TrimStart();
                     }
                     else
                     {
@@ -1204,8 +1288,16 @@ namespace PoorMansTSqlFormatterLib.Formatters
             if (asPos < 0) return col;
             string expr = col.Substring(0, asPos).TrimEnd();
             string alias = col.Substring(asPos + 4).Trim();
+            //a trailing statement terminator belongs at the END of the rewritten line,
+            // not glued to the alias ("SELECT x AS a;" must become "a = x;", not "a; = x")
+            string suffix = "";
+            while (alias.EndsWith(";"))
+            {
+                suffix = ";" + suffix;
+                alias = alias.Substring(0, alias.Length - 1).TrimEnd();
+            }
             if (string.IsNullOrEmpty(alias) || string.IsNullOrEmpty(expr)) return col;
-            return alias + " = " + expr;
+            return alias + " = " + expr + suffix;
         }
 
         /// <summary>
@@ -1228,6 +1320,17 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 if (c == '\'')
                 {
                     inString = true;
+                    continue;
+                }
+                //comments: '-- ...' ends the scan; '/* ... */' spans are skipped; an
+                // unterminated '/*' means the rest of the line is comment content
+                // (a comment like /* same drive as data */ must never match " AS ")
+                if (c == '-' && i + 1 < s.Length && s[i + 1] == '-') break;
+                if (c == '/' && i + 1 < s.Length && s[i + 1] == '*')
+                {
+                    int close = s.IndexOf("*/", i + 2, StringComparison.Ordinal);
+                    if (close < 0) break;
+                    i = close + 1;
                     continue;
                 }
                 if (c == '(') { depth++; continue; }
@@ -1259,6 +1362,14 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 if (inBracket) { if (c == ']') inBracket = false; continue; }
                 if (c == '\'') { inString = true; continue; }
                 if (c == '[') { inBracket = true; continue; }
+                if (c == '-' && i + 1 < s.Length && s[i + 1] == '-') break; //-- comment
+                if (c == '/' && i + 1 < s.Length && s[i + 1] == '*')
+                {
+                    int close = s.IndexOf("*/", i + 2, StringComparison.Ordinal);
+                    if (close < 0) break; //comment continues past end of line
+                    i = close + 1;
+                    continue;
+                }
                 if (c == '(') { depth++; continue; }
                 if (c == ')') { depth--; continue; }
                 if (depth == 0 && c == '=')
@@ -1278,11 +1389,14 @@ namespace PoorMansTSqlFormatterLib.Formatters
         private string AlignSelectColumns(string output)
         {
             var lines = output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+            bool[] insideStringOrComment = ComputeLinesInsideStringOrComment(lines);
 
             // Find runs of SELECT column lines and align each run.
             int i = 0;
             while (i < lines.Length)
             {
+                //never treat the interior of a multi-line string literal or block comment as SQL
+                if (insideStringOrComment[i]) { i++; continue; }
                 string trimmed = lines[i].TrimStart().ToUpperInvariant();
                 if (trimmed.StartsWith("SELECT ") || trimmed == "SELECT")
                 {
@@ -1292,6 +1406,8 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     // Column lines continue until we hit a non-column line.
                     while (i < lines.Length)
                     {
+                        if (insideStringOrComment[i])
+                            break;
                         string t = lines[i].TrimStart();
                         string tu = t.ToUpperInvariant();
                         if (i > start && !t.StartsWith(",") && IsClauseStartLine(tu))
