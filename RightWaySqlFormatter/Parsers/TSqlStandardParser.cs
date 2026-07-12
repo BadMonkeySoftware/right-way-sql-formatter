@@ -147,7 +147,20 @@ namespace PoorMansTSqlFormatterLib.Parsers
                         sqlTree.EscapeAnySingleOrPartialStatementContainers();
 
                         //check whether we expected to end the parens...
-                        if (sqlTree.CurrentContainer.Name.Equals(SqlStructureConstants.ENAME_DDLDETAIL_PARENS)
+                        if (sqlTree.CurrentContainer.Name.Equals(SqlStructureConstants.ENAME_DDL_PARENS)
+                            && sqlTree.PathNameMatches(1, SqlStructureConstants.ENAME_CTE_ALIAS)
+                            && sqlTree.PathNameMatches(2, SqlStructureConstants.ENAME_CTE_WITH_CLAUSE)
+                            && IsXmlNamespacesCteAlias(sqlTree, sqlTree.CurrentContainer.Parent!)
+                            )
+                        {
+                            //WITH XMLNAMESPACES('uri' AS prefix): the parens close completes the
+                            // pseudo-CTE entry. Land in the same "CTE completed" state as a normal
+                            // "name AS (...)" body close, so a following comma continues the WITH
+                            // clause and a following DML keyword continues the SAME statement.
+                            sqlTree.MoveToAncestorContainer(2, SqlStructureConstants.ENAME_CTE_WITH_CLAUSE);
+                            sqlTree.CurrentContainer = sqlTree.SaveNewElement(SqlStructureConstants.ENAME_CONTAINER_GENERALCONTENT, "");
+                        }
+                        else if (sqlTree.CurrentContainer.Name.Equals(SqlStructureConstants.ENAME_DDLDETAIL_PARENS)
                             || sqlTree.CurrentContainer.Name.Equals(SqlStructureConstants.ENAME_DDL_PARENS)
 							|| sqlTree.CurrentContainer.Name.Equals(SqlStructureConstants.ENAME_FUNCTION_PARENS)
 							|| sqlTree.CurrentContainer.Name.Equals(SqlStructureConstants.ENAME_IN_PARENS)
@@ -764,8 +777,21 @@ namespace PoorMansTSqlFormatterLib.Parsers
                         }
                         else if (significantTokensString.StartsWith("IF "))
                         {
-                            sqlTree.ConsiderStartingNewStatement();
-                            sqlTree.StartNewContainer(SqlStructureConstants.ENAME_IF_STATEMENT, token.Value, SqlStructureConstants.ENAME_BOOLEAN_EXPRESSION);
+                            if (significantTokensString.StartsWith("IF EXISTS ")
+                                && !sqlTree.NewStatementDue
+                                && sqlTree.PathNameMatches(0, SqlStructureConstants.ENAME_SQL_CLAUSE)
+                                && IsDropObjectTypePrefix(sqlTree.CurrentContainer)
+                                )
+                            {
+                                //DROP <object-type> IF EXISTS <name>: this IF is part of the DROP
+                                // statement, not control flow — keep it in the current clause.
+                                sqlTree.SaveNewElement(SqlStructureConstants.ENAME_OTHERKEYWORD, token.Value);
+                            }
+                            else
+                            {
+                                sqlTree.ConsiderStartingNewStatement();
+                                sqlTree.StartNewContainer(SqlStructureConstants.ENAME_IF_STATEMENT, token.Value, SqlStructureConstants.ENAME_BOOLEAN_EXPRESSION);
+                            }
                         }
                         else if (significantTokensString.StartsWith("ELSE "))
                         {
@@ -1215,6 +1241,46 @@ namespace PoorMansTSqlFormatterLib.Parsers
                 sqlTree.SetError();
 
             return sqlTree;
+        }
+
+        /// <summary>
+        /// True when the given clause consists ONLY of keywords so far, starting with DROP
+        /// (e.g. "DROP TABLE", "DROP PROCEDURE") — i.e. we are positioned where an
+        /// "IF EXISTS" suffix is valid. Once any object name has appeared in the clause
+        /// (e.g. "DROP TABLE dbo.t"), a following IF is control flow, not a DROP suffix.
+        /// </summary>
+        private static bool IsDropObjectTypePrefix(Node clause)
+        {
+            bool first = true;
+            foreach (Node child in clause.ChildrenExcludingNames(SqlStructureConstants.ENAMELIST_NONCONTENT))
+            {
+                if (first)
+                {
+                    if (!child.Name.Equals(SqlStructureConstants.ENAME_OTHERKEYWORD)
+                        || child.TextValue == null
+                        || !child.TextValue.ToUpperInvariant().Equals("DROP"))
+                        return false;
+                    first = false;
+                }
+                else if (!child.Name.Equals(SqlStructureConstants.ENAME_OTHERKEYWORD)
+                    && !child.Name.Equals(SqlStructureConstants.ENAME_DATATYPE_KEYWORD))
+                {
+                    return false;
+                }
+            }
+            return !first; //must have seen at least the DROP keyword
+        }
+
+        /// <summary>
+        /// True when the given CTE_ALIAS container's first content element is the
+        /// XMLNAMESPACES pseudo-function (WITH XMLNAMESPACES('uri' AS prefix, ...)).
+        /// </summary>
+        private static bool IsXmlNamespacesCteAlias(ParseTree sqlTree, Node cteAliasNode)
+        {
+            Node? firstElement = sqlTree.GetFirstNonWhitespaceNonCommentChildElement(cteAliasNode);
+            return firstElement != null
+                && firstElement.TextValue != null
+                && firstElement.TextValue.ToUpperInvariant().Equals("XMLNAMESPACES");
         }
 
         //TODO: move into parse tree
