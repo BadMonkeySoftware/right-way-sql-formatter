@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 */
 
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -86,34 +87,68 @@ namespace PoorMansTSqlFormatterTests
                 .Replace("\r\n", "\n").Replace("\r", "\n");
         }
 
+        // Expected-output filenames encode formatter options as short slugs, filesystem-safe
+        // on every platform (no parens/equals/commas/spaces, and much shorter for Windows
+        // MAX_PATH):   <InputBaseName>__<Slug1>_<Slug2>.sql
+        // Slugs contain no underscores; '__' separates the base name from the config part.
+        // Each slug maps to one TSqlStandardFormatterOptions fragment below. Add new slugs
+        // here when new option combinations get expected files.
+        private static readonly Dictionary<string, string> CONFIG_SLUGS = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            { "NoExpandComma",   "ExpandCommaLists=false" },
+            { "Width60",         "MaxLineWidth=60" },
+            { "Tab8",            "SpacesPerTab=8" },
+            { "Clause2",         "NewClauseLineBreaks=2" },
+            { "Stmt3",           "NewStatementLineBreaks=3" },
+            { "NoUpper",         "UppercaseKeywords=false" },
+            { "StdKw",           "KeywordStandardization=true" },
+            { "Html",            "HTMLColoring=true" },
+            { "SpaceComma",      "SpaceAfterExpandedComma=true" },
+            { "NoExpandBool",    "ExpandBooleanExpressions=false" },
+            { "NoExpandBetween", "ExpandBetweenConditions=false" },
+            { "NoExpandCase",    "ExpandCaseStatements=false" },
+            { "TrailComma",      "TrailingCommas=true" },
+            { "Indent6Sp",       "IndentString=      " },
+            { "BreakJoinOn",     "BreakJoinOnSections=true" },
+            { "AlignCols",       "AlignColumnDefinitions=True" },
+            { "EqAlias",         "ColumnAliasStyle=EqualSign" },
+            { "AlignDdl",        "AlignColumnDefinitionsInDDL=True" },
+            { "DdlConstrNL",     "DDLConstraintsOnNewLine=True" },
+            { "IndentOn",        "IndentJoinOnClause=True" },
+            { "IndentAndOr",     "IndentWhereAndOrConditions=True" },
+            { "AlignJoins",      "AlignTableJoins=True" },
+            { "AlwaysAlias",     "ColumnAlwaysHasAlias=True" },
+            { "FirstColNL",      "SelectFirstColumnOnNewLine=True" },
+        };
+
+        private const string CONFIG_MARKER = "__";
+
         public static string StripFileConfigString(string fileName)
         {
-            int openParens = fileName.IndexOf("(");
-            if (openParens >= 0)
-            {
-                int closeParens = fileName.IndexOf(")", openParens);
-                if (closeParens >= 0)
-                {
-                    return fileName.Substring(0, openParens) + fileName.Substring(closeParens + 1);
-                }
+            int marker = fileName.IndexOf(CONFIG_MARKER, StringComparison.Ordinal);
+            if (marker < 0)
                 return fileName;
-            }
-            return fileName;
+            return fileName.Substring(0, marker) + Path.GetExtension(fileName);
         }
 
         public static string GetFileConfigString(string fileName)
         {
-            int openParens = fileName.IndexOf("(");
-            if (openParens >= 0)
-            {
-                int closeParens = fileName.IndexOf(")", openParens);
-                if (closeParens >= 0)
-                {
-                    return fileName.Substring(openParens + 1, (closeParens - openParens) - 1);
-                }
+            int marker = fileName.IndexOf(CONFIG_MARKER, StringComparison.Ordinal);
+            if (marker < 0)
                 return "";
+            string extension = Path.GetExtension(fileName);
+            string slugPart = fileName.Substring(marker + CONFIG_MARKER.Length,
+                fileName.Length - marker - CONFIG_MARKER.Length - extension.Length);
+            var fragments = new List<string>();
+            foreach (string slug in slugPart.Split('_'))
+            {
+                if (!CONFIG_SLUGS.TryGetValue(slug, out string? fragment))
+                    throw new ArgumentException(
+                        $"Unknown config slug '{slug}' in test data filename '{fileName}'. " +
+                        "Add it to Utils.CONFIG_SLUGS.");
+                fragments.Add(fragment);
             }
-            return "";
+            return string.Join(",", fragments);
         }
     }
 }

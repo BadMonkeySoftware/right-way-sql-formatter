@@ -21,12 +21,12 @@ namespace PoorMansTSqlFormatterTests
     ///
     /// Marked [Explicit]: never runs as part of a normal `dotnet test`.
     /// Usage (from repo root):
-    ///   REGEN_FILES="39_Foo.sql;39_Foo(SomeOption=True).sql" \
+    ///   REGEN_FILES="39_Foo.sql;39_Foo__AlignCols.sql" \
     ///     dotnet test RightWaySqlFormatter.NoSSMS.slnx --filter "Name~RegenerateExpectedFiles"
     ///
-    /// Each entry is an expected-output filename; its (config) segment selects the
-    /// formatter options, exactly as the test harness reads it. Files are written to
-    /// the SOURCE Data folder (not the bin copy).
+    /// Each entry is an expected-output filename; its __Slug1_Slug2 suffix selects the
+    /// formatter options (slugs defined in Utils.CONFIG_SLUGS), exactly as the test
+    /// harness reads it. Files are written to the SOURCE Data folder (not the bin copy).
     /// </summary>
     [TestFixture]
     public class ExpectedOutputRegenerator
