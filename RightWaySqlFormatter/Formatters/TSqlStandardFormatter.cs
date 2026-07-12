@@ -1741,6 +1741,11 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     state.DecrementIndent();
                     WhiteSpace_BreakAsExpected(state);
                     state.AddOutputContent(FormatOperator(")"), SqlHtmlConstants.CLASS_OPERATOR);
+                    //a source line-break INSIDE the (collapsed) argument list must not leak out:
+                    // it would push a trailing comment after the call onto its own line, which
+                    // re-attaches the comment to the next clause on reformat (indent drift /
+                    // non-idempotent output). A break AFTER the call sets this flag again anyway.
+                    state.SourceBreakPending = false;
                     state.WordSeparatorExpected = true;
                     break;
 
