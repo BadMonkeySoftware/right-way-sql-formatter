@@ -297,8 +297,19 @@ namespace PoorMansTSqlFormatterLib
                     && SqlStructureConstants.ENAMELIST_NONCONTENT.Contains(migrationCandidate.PreviousSibling()!.Name)
                     )
                 {
-                    if (migrationCandidate.PreviousSibling()!.Name.Equals(SqlStructureConstants.ENAME_WHITESPACE)
-                        && Regex.IsMatch(migrationCandidate.PreviousSibling()!.TextValue!, @"(\r|\n)+")
+                    // "Preceded by a line break" is normally proven by line-breaking whitespace.
+                    // A MULTILINE comment that follows a single-line comment (directly, or with
+                    // only line-indentation whitespace between them) also qualifies: the
+                    // single-line comment's token ends with the newline that terminated it, so
+                    // no line-breaking whitespace node exists in that case. Without this, a
+                    // /*block*/ after a trailing --comment migrates when a blank line separates
+                    // them but not after formatting collapses that blank line, making output
+                    // non-idempotent. (Restricted to multiline candidates so consecutive
+                    // --comment banner blocks keep their historical attachment.)
+                    if ((migrationCandidate.PreviousSibling()!.Name.Equals(SqlStructureConstants.ENAME_WHITESPACE)
+                            && Regex.IsMatch(migrationCandidate.PreviousSibling()!.TextValue!, @"(\r|\n)+"))
+                        || (migrationCandidate.Name.Equals(SqlStructureConstants.ENAME_COMMENT_MULTILINE)
+                            && MultilineCommentStartsALine(migrationCandidate))
                         )
                     {
                         //we have a match, so migrate everything considered so far (backwards from the end). need to keep track of where we're inserting.
@@ -334,6 +345,25 @@ namespace PoorMansTSqlFormatterLib
                     migrationCandidate = migrationCandidate.Children.LastOrDefault();
                 }
             }
+        }
+
+        /// <summary>
+        /// True when the multiline comment begins a source line by virtue of following a
+        /// single-line comment — directly, or separated only by non-line-breaking
+        /// (indentation) whitespace. Single-line comment tokens embed their terminating
+        /// newline, so no line-breaking whitespace node exists between the two.
+        /// </summary>
+        private static bool MultilineCommentStartsALine(Node multilineComment)
+        {
+            Node? previous = multilineComment.PreviousSibling();
+            if (previous != null
+                && previous.Name.Equals(SqlStructureConstants.ENAME_WHITESPACE)
+                && !Regex.IsMatch(previous.TextValue ?? "", @"(\r|\n)+")
+                )
+                previous = previous.PreviousSibling();
+            return previous != null
+                && (previous.Name.Equals(SqlStructureConstants.ENAME_COMMENT_SINGLELINE)
+                    || previous.Name.Equals(SqlStructureConstants.ENAME_COMMENT_SINGLELINE_CSTYLE));
         }
 
         internal void ConsiderStartingNewStatement()

@@ -679,7 +679,13 @@ namespace PoorMansTSqlFormatterLib.Parsers
                         {
                             sqlTree.EscapeAnySingleOrPartialStatementContainers();
 
-                            if ((tokenID == 0 || IsLineBreakingWhiteSpaceOrComment(tokenList[tokenID - 1]))
+                            if ((tokenID == 0
+                                    || IsLineBreakingWhiteSpaceOrComment(tokenList[tokenID - 1])
+                                    //GO indented at the very start of the file: preceded only by
+                                    // non-line-breaking whitespace (mid-file indented GO already
+                                    // works because its whitespace token contains the newline)
+                                    || (tokenID == 1 && tokenList[0].Type == SqlTokenType.WhiteSpace)
+                                    )
                                 && IsFollowedByLineBreakingWhiteSpaceOrSingleLineCommentOrEnd(tokenList, tokenID)
                                 )
                             {

@@ -23,6 +23,63 @@ namespace PoorMansTSqlFormatterTests
         }
 
         [Test]
+        public void BlockCommentAfterTrailingSingleLineCommentIsIdempotent()
+        {
+            // Real-world case (sp_AllNightLog_Setup): a /*block*/ comment following a
+            // trailing --comment, separated by a blank line. Formatting collapses the
+            // blank line (DECLARE-run exemption); the reparse must still attach the
+            // block comment to the following statement or its indent drifts every pass.
+            string sql = string.Join("\n",
+                "DECLARE @a INT; --first",
+                "",
+                "/*block comment*/",
+                "DECLARE @b INT; --second");
+
+            string pass1 = Format(sql);
+            string pass2 = Format(pass1);
+            string pass3 = Format(pass2);
+
+            Assert.That(pass2, Is.EqualTo(pass1), "pass 2 must equal pass 1");
+            Assert.That(pass3, Is.EqualTo(pass2), "pass 3 must equal pass 2");
+        }
+
+        [Test]
+        public void IndentedBlockCommentAfterSingleLineCommentIsIdempotent()
+        {
+            // Same as above but with indentation before the block comment (the shape
+            // inside a proc body) - indentation whitespace between the two comments
+            // must not defeat the line-break detection.
+            string sql = string.Join("\n",
+                "IF @x = 1",
+                "BEGIN",
+                "    DECLARE @a INT = 1; --used for things",
+                "",
+                "    /*these variables control the loop*/",
+                "    DECLARE @b INT = 2; --loop counter",
+                "END;");
+
+            string pass1 = Format(sql);
+            string pass2 = Format(pass1);
+
+            Assert.That(pass2, Is.EqualTo(pass1), "formatting must be idempotent");
+        }
+
+        [Test]
+        public void FileStartingWithBatchSeparatorIsIdempotent()
+        {
+            // Real-world case (tsqlt build scripts): a file whose first statement is GO
+            // (possibly indented). The implicit empty leading statement must not render
+            // a stray blank line that grows/shifts on reformat.
+            string sql = "  GO\n  EXEC #x;\n  GO\n";
+
+            string pass1 = Format(sql);
+            string pass2 = Format(pass1);
+
+            Assert.That(pass2, Is.EqualTo(pass1), "formatting must be idempotent");
+            Assert.That(pass1, Does.StartWith("GO"), "no leading blank line before the first GO");
+        }
+
+        [Test]
         public void TrailingCommentAfterMultilineFunctionArgsStaysInline()
         {
             // Real-world case (DarlingData sp_IndexCleanup): a source line-break inside

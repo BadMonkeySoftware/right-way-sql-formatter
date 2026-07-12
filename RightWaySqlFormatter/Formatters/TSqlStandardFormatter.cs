@@ -1555,6 +1555,13 @@ namespace PoorMansTSqlFormatterLib.Formatters
             switch (contentElement.Name)
             {
                 case SqlStructureConstants.ENAME_SQL_STATEMENT:
+                    //a LEADING empty statement (the implicit statement before a GO that opens
+                    // the file) renders nothing - otherwise it emits a stray blank line and
+                    // files starting with a batch separator reformat differently every pass.
+                    // Trailing/mid-file empty statements keep their historical rendering.
+                    if (contentElement.PreviousSibling() == null
+                        && !StatementHasRenderableContent(contentElement))
+                        break;
                     WhiteSpace_SeparateStatements(contentElement, state);
                     state.ResetKeywords();
                     ProcessSqlNodeList(contentElement.Children, state);
@@ -1581,8 +1588,13 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     break;
 
                 case SqlStructureConstants.ENAME_BATCH_SEPARATOR:
-                    //newline regardless of whether previous element recommended a break or not.
-                    state.WhiteSpace_BreakToNextLine();
+                    //newline regardless of whether previous element recommended a break or not
+                    // - unless nothing has been output yet (GO as the file's first statement),
+                    // where a break would just emit a stray leading blank line.
+                    if (state.CurrentLineHasContent || state.OutputContainsLineBreak)
+                        state.WhiteSpace_BreakToNextLine();
+                    else
+                        state.BreakExpected = false;
                     ProcessSqlNodeList(contentElement.Children, state);
                     state.BreakExpected = true;
                     break;
@@ -2253,6 +2265,27 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 state.StatementBreakExpected = false;
                 state.WordSeparatorExpected = false;
             }
+        }
+
+        /// <summary>
+        /// True when the statement contains anything that produces output: any element
+        /// other than whitespace, including comments. Empty clauses are recursed into.
+        /// </summary>
+        private static bool StatementHasRenderableContent(Node statement)
+        {
+            foreach (Node child in statement.Children)
+            {
+                if (child.Name.Equals(SqlStructureConstants.ENAME_WHITESPACE))
+                    continue;
+                if (child.Name.Equals(SqlStructureConstants.ENAME_SQL_CLAUSE))
+                {
+                    if (StatementHasRenderableContent(child))
+                        return true;
+                    continue;
+                }
+                return true;
+            }
+            return false;
         }
 
         private Node? FirstSemanticElementChild(Node? contentElement)
