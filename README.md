@@ -34,6 +34,29 @@ curl -fsSL https://dot.net/v1/dotnet-install.sh | bash -s -- --channel 10.0 --in
 export PATH="$HOME/.dotnet:$PATH"
 ```
 
+### Windows: long path support
+
+Builds copy the test data under `bin\...\Data\`, so deep checkout locations can push paths past
+Windows' historical 260-character `MAX_PATH` limit. Test data filenames are kept deliberately
+short (see the slug convention in CLAUDE.md), but if you check out several folders deep, enable
+long paths once:
+
+```powershell
+git config --global core.longpaths true   # lets git itself handle >260-char paths
+```
+
+and, as Administrator (or via Group Policy), allow long paths OS-wide:
+
+```powershell
+Set-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem" -Name LongPathsEnabled -Value 1
+```
+
+Caveats: the registry setting requires Windows 10 1607+ and only helps applications whose
+manifests opt in — modern git, .NET SDK, and VS 2022+ are fine, but File Explorer and some
+older tools still choke on >260-char paths, so a shallow checkout location (e.g. `C:\src\`)
+remains the most reliable option. `core.longpaths` alone fixes git operations but not tools
+that later read those files.
+
 ---
 
 ## Building
