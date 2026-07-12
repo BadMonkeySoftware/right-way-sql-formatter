@@ -427,6 +427,30 @@ namespace PoorMansTSqlFormatterLib.Parsers
                             sqlTree.ConsiderStartingNewStatement();
                             sqlTree.SaveNewElement(SqlStructureConstants.ENAME_OTHERKEYWORD, token.Value, sqlTree.SaveNewElement(SqlStructureConstants.ENAME_ROLLBACK_TRANSACTION, token.Value));
                         }
+                        else if (significantTokensString.StartsWith("BEGIN DIALOG CONVERSATION "))
+                        {
+                            //Service Broker: starts a statement, NOT a BEGIN...END block
+                            sqlTree.ConsiderStartingNewStatement();
+                            sqlTree.ConsiderStartingNewClause();
+                            ProcessCompoundKeyword(tokenList, sqlTree, sqlTree.CurrentContainer, ref tokenID, significantTokenPositions, 3);
+                        }
+                        else if (significantTokensString.StartsWith("BEGIN DIALOG ")
+                            || significantTokensString.StartsWith("BEGIN CONVERSATION TIMER ")
+                            )
+                        {
+                            //Service Broker: starts a statement, NOT a BEGIN...END block
+                            sqlTree.ConsiderStartingNewStatement();
+                            sqlTree.ConsiderStartingNewClause();
+                            ProcessCompoundKeyword(tokenList, sqlTree, sqlTree.CurrentContainer, ref tokenID, significantTokenPositions,
+                                significantTokensString.StartsWith("BEGIN CONVERSATION TIMER ") ? 3 : 2);
+                        }
+                        else if (significantTokensString.StartsWith("SEND ON CONVERSATION "))
+                        {
+                            //Service Broker SEND: the bare ON must not be mistaken for a join condition
+                            sqlTree.ConsiderStartingNewStatement();
+                            sqlTree.ConsiderStartingNewClause();
+                            ProcessCompoundKeyword(tokenList, sqlTree, sqlTree.CurrentContainer, ref tokenID, significantTokenPositions, 3);
+                        }
                         else if (significantTokensString.StartsWith("BEGIN TRY "))
                         {
                             sqlTree.ConsiderStartingNewStatement();
@@ -634,6 +658,17 @@ namespace PoorMansTSqlFormatterLib.Parsers
                             {
                                 ProcessCompoundKeywordWithError(tokenList, sqlTree, sqlTree.CurrentContainer, ref tokenID, significantTokenPositions, 2);
                             }
+                        }
+                        else if (significantTokensString.StartsWith("END CONVERSATION ")
+                            && !sqlTree.PathNameMatches(1, SqlStructureConstants.ENAME_CASE_THEN)
+                            && !sqlTree.PathNameMatches(1, SqlStructureConstants.ENAME_CASE_ELSE)
+                            )
+                        {
+                            //Service Broker: a statement, NOT the END of a block. (Guarded against
+                            // the pathological 'CASE ... END CONVERSATION' alias case.)
+                            sqlTree.ConsiderStartingNewStatement();
+                            sqlTree.ConsiderStartingNewClause();
+                            ProcessCompoundKeyword(tokenList, sqlTree, sqlTree.CurrentContainer, ref tokenID, significantTokenPositions, 2);
                         }
                         else if (significantTokensString.StartsWith("END "))
                         {
