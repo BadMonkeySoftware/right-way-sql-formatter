@@ -238,8 +238,15 @@ namespace PoorMansTSqlFormatterLib.Parsers
                             sqlTree.CurrentContainer = sqlTree.SaveNewElement(SqlStructureConstants.ENAME_DDL_PROCEDURAL_BLOCK, "");
                             sqlTree.SaveNewElement(SqlStructureConstants.ENAME_OTHERKEYWORD, token.Value);
                         }
-                        else if (_CursorDetector.IsMatch(significantTokensString))
+                        else if (_CursorDetector.IsMatch(significantTokensString)
+                            && !significantTokensString.StartsWith("DECLARE @")
+                            )
                         {
+                            //classic cursor declaration: DECLARE name [INSENSITIVE|SCROLL] CURSOR FOR ...
+                            //NOT a cursor VARIABLE declaration (DECLARE @var CURSOR;) - those have no
+                            // FOR clause here (it arrives later via SET @var = CURSOR ... FOR ...), so
+                            // opening a CursorDeclaration container for them swallows the rest of the
+                            // batch. Cursor variables start with @; classic cursor names cannot.
                             sqlTree.ConsiderStartingNewStatement();
                             sqlTree.CurrentContainer = sqlTree.SaveNewElement(SqlStructureConstants.ENAME_CURSOR_DECLARATION, "");
                             sqlTree.SaveNewElement(SqlStructureConstants.ENAME_OTHERKEYWORD, token.Value);
