@@ -178,7 +178,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     if (PreserveComments)
                     {
                         state.SpaceExpected = false;
-                        state.AddOutputContent("--" + contentElement.TextValue.Replace("\r", "").Replace("\n", ""));
+                        state.AddOutputContent("--" + contentElement.TextValue!.Replace("\r", "").Replace("\n", ""));
                         state.BreakExpected = true;
                     }
                     break;
@@ -187,7 +187,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     if (PreserveComments)
                     {
                         state.SpaceExpected = false;
-                        state.AddOutputContent("//" + contentElement.TextValue.Replace("\r", "").Replace("\n", ""));
+                        state.AddOutputContent("//" + contentElement.TextValue!.Replace("\r", "").Replace("\n", ""));
                         state.BreakExpected = true;
                     }
                     break;
@@ -202,23 +202,23 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 case SqlStructureConstants.ENAME_STRING:
                     state.SpaceIfExpectedForAnsiString();
                     state.SpaceExpected = false;
-                    state.AddOutputContent("'" + contentElement.TextValue.Replace("'", "''") + "'");
+                    state.AddOutputContent("'" + contentElement.TextValue!.Replace("'", "''") + "'");
                     state.SpaceExpectedForAnsiString = true;
                     break;
 
                 case SqlStructureConstants.ENAME_NSTRING:
-                    state.AddOutputContent("N'" + contentElement.TextValue.Replace("'", "''") + "'");
+                    state.AddOutputContent("N'" + contentElement.TextValue!.Replace("'", "''") + "'");
                     state.SpaceExpectedForAnsiString = true;
                     break;
 
                 case SqlStructureConstants.ENAME_BRACKET_QUOTED_NAME:
                     state.SpaceExpected = false;
-                    state.AddOutputContent("[" + contentElement.TextValue.Replace("]", "]]") + "]");
+                    state.AddOutputContent("[" + contentElement.TextValue!.Replace("]", "]]") + "]");
                     break;
 
                 case SqlStructureConstants.ENAME_QUOTED_STRING:
                     state.SpaceExpected = false;
-                    state.AddOutputContent("\"" + contentElement.TextValue.Replace("\"", "\"\"") + "\"");
+                    state.AddOutputContent("\"" + contentElement.TextValue!.Replace("\"", "\"\"") + "\"");
                     break;
 
                 case SqlStructureConstants.ENAME_COMMA:
@@ -229,17 +229,17 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 case SqlStructureConstants.ENAME_EQUALSSIGN:
                 case SqlStructureConstants.ENAME_OTHEROPERATOR:
                     state.SpaceExpected = false;
-                    state.AddOutputContent(contentElement.TextValue);
+                    state.AddOutputContent(contentElement.TextValue!);
                     break;
 
                 case SqlStructureConstants.ENAME_COMPOUNDKEYWORD:
-                    state.AddOutputContent(FormatKeyword(contentElement.GetAttributeValue(SqlStructureConstants.ANAME_SIMPLETEXT)));
+                    state.AddOutputContent(FormatKeyword(contentElement.GetAttributeValue(SqlStructureConstants.ANAME_SIMPLETEXT)!));
                     state.SpaceExpected = true;
                     break;
 
 
                 case SqlStructureConstants.ENAME_LABEL:
-                    state.AddOutputContent(contentElement.TextValue);
+                    state.AddOutputContent(contentElement.TextValue!);
                     state.BreakExpected = true;
                     break;
 
@@ -248,33 +248,33 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 case SqlStructureConstants.ENAME_DATATYPE_KEYWORD:
                 case SqlStructureConstants.ENAME_PSEUDONAME:
                 case SqlStructureConstants.ENAME_BINARY_VALUE:
-                    state.AddOutputContent(FormatKeyword(contentElement.TextValue));
+                    state.AddOutputContent(FormatKeyword(contentElement.TextValue!));
                     state.SpaceExpected = true;
                     break;
 
                 case SqlStructureConstants.ENAME_NUMBER_VALUE:
-                    state.AddOutputContent(FormatKeyword(contentElement.TextValue));
-                    if (!contentElement.TextValue.ToLowerInvariant().Contains("e"))
+                    state.AddOutputContent(FormatKeyword(contentElement.TextValue!));
+                    if (!contentElement.TextValue!.ToLowerInvariant().Contains("e"))
                     {
                         state.SpaceExpectedForE = true;
-                        if (contentElement.TextValue.Equals("0"))
+                        if (contentElement.TextValue!.Equals("0"))
                             state.SpaceExpectedForX = true;
                     }
                     break;
 
                 case SqlStructureConstants.ENAME_MONETARY_VALUE:
-                    if (!contentElement.TextValue.Substring(0, 1).Equals("$"))
+                    if (!contentElement.TextValue!.Substring(0, 1).Equals("$"))
                         state.SpaceExpected = false;
 
-                    state.AddOutputContent(contentElement.TextValue);
+                    state.AddOutputContent(contentElement.TextValue!);
 
-                    if (contentElement.TextValue.Length == 1)
+                    if (contentElement.TextValue!.Length == 1)
                         state.SpaceExpectedForPlusMinus = true;
                     break;
 
                 case SqlStructureConstants.ENAME_OTHERNODE:
                 case SqlStructureConstants.ENAME_FUNCTION_KEYWORD:
-                    state.AddOutputContent(contentElement.TextValue);
+                    state.AddOutputContent(contentElement.TextValue!);
                     state.SpaceExpected = true;
                     break;
 
@@ -285,7 +285,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
 
         private string FormatKeyword(string keyword)
         {
-            string outputKeyword;
+            string? outputKeyword;
             if (!KeywordMapping.TryGetValue(keyword.ToUpperInvariant(), out outputKeyword))
                 outputKeyword = keyword;
 
@@ -353,7 +353,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
 
             private int _currentColorLength = 0;
             private int _currentColorLimit = MAX_COLOR_WORD_LENGTH;
-            private string _currentColor = null;
+            private string? _currentColor = null;
 
             public void BreakIfExpected()
             {
@@ -387,7 +387,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 }
             }
 
-            public override void AddOutputContent(string content, string htmlClassName)
+            public override void AddOutputContent(string content, string? htmlClassName)
             {
                 if (htmlClassName != null)
                     throw new NotSupportedException("Obfuscating formatter does not use html class names...");
@@ -429,9 +429,9 @@ namespace PoorMansTSqlFormatterLib.Formatters
                             writing = _currentColorLimit - _currentColorLength;
 
                         base.AddOutputContentRaw("<span style=\"color: ");
-                        base.AddOutputContentRaw(_currentColor);
+                        base.AddOutputContentRaw(_currentColor ?? "");
                         base.AddOutputContentRaw(";\">");
-                        base.AddOutputContentRaw(Utils.HtmlEncode(content.Substring(lengthWritten, writing)));
+                        base.AddOutputContentRaw(Utils.HtmlEncode(content.Substring(lengthWritten, writing))!);
                         base.AddOutputContentRaw("</span>");
                         lengthWritten += writing;
                         _currentColorLength += writing;

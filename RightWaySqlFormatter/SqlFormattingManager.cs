@@ -96,7 +96,7 @@ namespace PoorMansTSqlFormatterLib
     // these classes to COM in order for this library to be used in a .Net project.
 #if !SIMPLIFIEDFW
     [Guid("A7FD140A-C3C3-4233-95DB-A64B50C8DF2A")]
-    [CLSCompliant(false), ComVisible(true)]
+    [ComVisible(true)]
     [InterfaceType(ComInterfaceType.InterfaceIsDual)]
 #endif
     public interface _SqlFormattingManager
