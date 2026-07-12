@@ -106,10 +106,17 @@ namespace PoorMansTSqlFormatterLib
 
         internal Node SaveNewElementWithError(string newElementName, string newElementValue)
         {
+            return SaveNewElementWithError(newElementName, newElementValue, 0);
+        }
+
+        internal Node SaveNewElementWithError(string newElementName, string newElementValue, int sourceLineNumber)
+        {
             Node newElement = SaveNewElement(newElementName, newElementValue);
             // Mark the offending element itself (in addition to the current container,
             // which SetError marks) so error reporting can name the unexpected token.
             newElement.SetAttribute(SqlStructureConstants.ANAME_HASERROR, "1");
+            if (sourceLineNumber > 0)
+                newElement.SetAttribute(SqlStructureConstants.ANAME_ERRORLINE, sourceLineNumber.ToString());
             SetError();
             return newElement;
         }

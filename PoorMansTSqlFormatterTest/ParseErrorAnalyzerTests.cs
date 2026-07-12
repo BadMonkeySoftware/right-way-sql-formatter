@@ -94,6 +94,24 @@ namespace PoorMansTSqlFormatterTests
         }
 
         [Test]
+        public void DescriptionsIncludeSourceLineNumbers()
+        {
+            var descriptions = Analyze("SELECT 1\nFROM x\nWHERE y = 1)", out bool errorFound);
+            Assert.That(errorFound, Is.True);
+            Assert.That(descriptions.Any(d => d.Contains("')'") && d.Contains("(line 3)")), Is.True,
+                "got: " + string.Join(" | ", descriptions));
+        }
+
+        [Test]
+        public void UnfinishedTokenIncludesLineNumber()
+        {
+            var descriptions = Analyze("SELECT 1\n\n\nSELECT 'never closed", out bool errorFound);
+            Assert.That(errorFound, Is.True);
+            Assert.That(descriptions.Any(d => d.Contains("Unclosed string literal") && d.Contains("(line 4)")), Is.True,
+                "got: " + string.Join(" | ", descriptions));
+        }
+
+        [Test]
         public void DescriptionsAreSingleLineAndBounded()
         {
             var descriptions = Analyze("SELECT 'multi\nline\nnever-closed string literal that runs on and on and on and on", out bool errorFound);

@@ -35,9 +35,10 @@ namespace PoorMansTSqlFormatterLib
             // 1. Unfinished token at end of input (tokenizer-level: unclosed string/comment/bracket)
             if (tokenList != null && tokenList.HasUnfinishedToken && tokenList.Count > 0)
             {
-                string? unfinished = DescribeUnfinishedToken(tokenList[tokenList.Count - 1]);
+                IToken lastToken = tokenList[tokenList.Count - 1];
+                string? unfinished = DescribeUnfinishedToken(lastToken);
                 if (unfinished != null)
-                    descriptions.Add(unfinished);
+                    descriptions.Add(unfinished + FormatLineSuffix(lastToken.LineNumber));
             }
 
             // 2. Nodes the parser flagged as errors. Token-level flags (the unexpected token
@@ -103,15 +104,16 @@ namespace PoorMansTSqlFormatterLib
             if (!string.IsNullOrWhiteSpace(text))
             {
                 string cleaned = CleanTokenText(text!);
+                string lineSuffix = FormatLineSuffix(GetErrorLine(node));
                 switch (node.Name)
                 {
                     case SqlStructureConstants.ENAME_OTHERKEYWORD:
                     case SqlStructureConstants.ENAME_COMPOUNDKEYWORD:
-                        return ("Unexpected or misplaced keyword '" + cleaned + "'", true);
+                        return ("Unexpected or misplaced keyword '" + cleaned + "'" + lineSuffix, true);
                     case SqlStructureConstants.ENAME_OTHEROPERATOR:
-                        return ("Unexpected operator '" + cleaned + "'", true);
+                        return ("Unexpected operator '" + cleaned + "'" + lineSuffix, true);
                     default:
-                        return ("Unexpected token '" + cleaned + "'", true);
+                        return ("Unexpected token '" + cleaned + "'" + lineSuffix, true);
                 }
             }
 
@@ -153,6 +155,17 @@ namespace PoorMansTSqlFormatterLib
                     return fromChild;
             }
             return null;
+        }
+
+        private static int GetErrorLine(Node node)
+        {
+            string? attr = node.GetAttributeValue(SqlStructureConstants.ANAME_ERRORLINE);
+            return int.TryParse(attr, out int line) ? line : 0;
+        }
+
+        private static string FormatLineSuffix(int lineNumber)
+        {
+            return lineNumber > 0 ? " (line " + lineNumber + ")" : "";
         }
 
         /// <summary>

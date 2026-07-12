@@ -178,7 +178,7 @@ namespace PoorMansTSqlFormatterLib.Parsers
                         }
                         else
                         {
-                            sqlTree.SaveNewElementWithError(SqlStructureConstants.ENAME_OTHERNODE, ")");
+                            sqlTree.SaveNewElementWithError(SqlStructureConstants.ENAME_OTHERNODE, ")", token.LineNumber);
                         }
                         break;
 
@@ -453,7 +453,7 @@ namespace PoorMansTSqlFormatterLib.Parsers
                                 sqlTree.StartNewContainer(SqlStructureConstants.ENAME_MERGE_USING, token.Value, SqlStructureConstants.ENAME_SELECTIONTARGET);
                             }
                             else
-                                sqlTree.SaveNewElementWithError(SqlStructureConstants.ENAME_OTHERNODE, token.Value);
+                                sqlTree.SaveNewElementWithError(SqlStructureConstants.ENAME_OTHERNODE, token.Value, token.LineNumber);
                         }
                         else if (significantTokensString.StartsWith("ON "))
                         {
@@ -513,7 +513,7 @@ namespace PoorMansTSqlFormatterLib.Parsers
                                 sqlTree.StartNewContainer(SqlStructureConstants.ENAME_MERGE_WHEN, token.Value, SqlStructureConstants.ENAME_CONTAINER_GENERALCONTENT);
                             }
                             else
-                                sqlTree.SaveNewElementWithError(SqlStructureConstants.ENAME_OTHERNODE, token.Value);
+                                sqlTree.SaveNewElementWithError(SqlStructureConstants.ENAME_OTHERNODE, token.Value, token.LineNumber);
                         }
                         else if (significantTokensString.StartsWith("THEN "))
                         {
@@ -535,7 +535,7 @@ namespace PoorMansTSqlFormatterLib.Parsers
                                 sqlTree.StartNewStatement();
                             }
                             else
-                                sqlTree.SaveNewElementWithError(SqlStructureConstants.ENAME_OTHERNODE, token.Value);
+                                sqlTree.SaveNewElementWithError(SqlStructureConstants.ENAME_OTHERNODE, token.Value, token.LineNumber);
                         }
                         else if (significantTokensString.StartsWith("OUTPUT "))
                         {
@@ -658,7 +658,7 @@ namespace PoorMansTSqlFormatterLib.Parsers
                                 }
                                 else
                                 {
-                                    sqlTree.SaveNewElementWithError(SqlStructureConstants.ENAME_OTHERKEYWORD, token.Value);
+                                    sqlTree.SaveNewElementWithError(SqlStructureConstants.ENAME_OTHERKEYWORD, token.Value, token.LineNumber);
                                 }
                             }
                         }
@@ -680,7 +680,7 @@ namespace PoorMansTSqlFormatterLib.Parsers
                                 }
                                 else
                                 {
-                                    sqlTree.SaveNewElementWithError(SqlStructureConstants.ENAME_OTHERKEYWORD, token.Value);
+                                    sqlTree.SaveNewElementWithError(SqlStructureConstants.ENAME_OTHERKEYWORD, token.Value, token.LineNumber);
                                 }
                             }
                             else
@@ -818,14 +818,14 @@ namespace PoorMansTSqlFormatterLib.Parsers
                                         else
                                         {
                                             //if this isn't a known single-statement container, then we're lost.
-                                            sqlTree.SaveNewElementWithError(SqlStructureConstants.ENAME_OTHERKEYWORD, token.Value);
+                                            sqlTree.SaveNewElementWithError(SqlStructureConstants.ENAME_OTHERKEYWORD, token.Value, token.LineNumber);
                                             stopSearching = true;
                                         }
                                     }
                                 }
                                 else
                                 {
-                                    sqlTree.SaveNewElementWithError(SqlStructureConstants.ENAME_OTHERKEYWORD, token.Value);
+                                    sqlTree.SaveNewElementWithError(SqlStructureConstants.ENAME_OTHERKEYWORD, token.Value, token.LineNumber);
                                 }
                             }
                         }
@@ -1150,7 +1150,7 @@ namespace PoorMansTSqlFormatterLib.Parsers
                         }
                         else
                         {
-                            sqlTree.SaveNewElementWithError(SqlStructureConstants.ENAME_OTHEROPERATOR, token.Value);
+                            sqlTree.SaveNewElementWithError(SqlStructureConstants.ENAME_OTHEROPERATOR, token.Value, token.LineNumber);
                         }
                         break;
 
@@ -1253,6 +1253,9 @@ namespace PoorMansTSqlFormatterLib.Parsers
             Node compoundKeyword = ProcessCompoundKeyword(tokenList, sqlTree, currentContainerElement, ref tokenID, significantTokenPositions, keywordCount);
             // Mark the offending keyword itself so error reporting can name it.
             compoundKeyword.SetAttribute(SqlStructureConstants.ANAME_HASERROR, "1");
+            int errorLine = tokenList[significantTokenPositions[0]].LineNumber;
+            if (errorLine > 0)
+                compoundKeyword.SetAttribute(SqlStructureConstants.ANAME_ERRORLINE, errorLine.ToString());
             sqlTree.SetError();
         }
 

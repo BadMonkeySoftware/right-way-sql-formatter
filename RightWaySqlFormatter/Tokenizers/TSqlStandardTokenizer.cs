@@ -50,6 +50,9 @@ namespace PoorMansTSqlFormatterLib.Tokenizers
             public long? RequestedMarkerPosition { get; private set; }
             public bool HasUnprocessedCurrentCharacter { get; set; }
 
+            /// <summary>1-based line number of the most recently READ character.</summary>
+            public int CurrentLineNumber { get; private set; } = 1;
+
             public TokenizationState(string inputSQL, long? requestedMarkerPosition)
             {
                 if (requestedMarkerPosition > inputSQL.Length)
@@ -67,7 +70,11 @@ namespace PoorMansTSqlFormatterLib.Tokenizers
                 CurrentCharInt = InputReader.Read();
 
                 if (CurrentCharInt >= 0)
+                {
                     HasUnprocessedCurrentCharacter = true;
+                    if (CurrentCharInt == '\n')
+                        CurrentLineNumber++;
+                }
             }
 
             internal void ConsumeCurrentCharacterIntoToken()
@@ -979,7 +986,17 @@ namespace PoorMansTSqlFormatterLib.Tokenizers
 
         private static void SaveToken(TokenizationState state, SqlTokenType tokenType, string tokenValue)
         {
-            var foundToken = new Token(tokenType, tokenValue);
+            // Token start line = current line, minus newlines contained in the token itself,
+            // minus one if the (unconsumed) lookahead character is a newline that already
+            // bumped the counter but lies beyond this token's end.
+            int newlinesInToken = 0;
+            for (int i = 0; i < tokenValue.Length; i++)
+                if (tokenValue[i] == '\n') newlinesInToken++;
+            int startLine = state.CurrentLineNumber - newlinesInToken
+                - (state.HasUnprocessedCurrentCharacter && state.CurrentChar == '\n' ? 1 : 0);
+            if (startLine < 1) startLine = 1;
+
+            var foundToken = new Token(tokenType, tokenValue, startLine);
             state.TokenContainer.Add(foundToken);
 
             long positionOfLastCharacterInToken = state.InputReader.LastCharacterPosition - (state.HasUnprocessedCurrentCharacter ? 1 : 0);

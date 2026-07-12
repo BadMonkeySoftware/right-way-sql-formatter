@@ -47,7 +47,7 @@ Entry point: `SqlFormattingManager.Format()` composes these via `ISqlTokenizer` 
 - [RightWaySqlFormatter/Parsers/TSqlStandardParser.cs](RightWaySqlFormatter/Parsers/TSqlStandardParser.cs) — AST construction
 - [RightWaySqlFormatter/Tokenizers/TSqlStandardTokenizer.cs](RightWaySqlFormatter/Tokenizers/TSqlStandardTokenizer.cs) — lexer
 - [RightWaySqlFormatter/SqlFormattingManager.cs](RightWaySqlFormatter/SqlFormattingManager.cs) — public API
-- [RightWaySqlFormatter/ParseErrorAnalyzer.cs](RightWaySqlFormatter/ParseErrorAnalyzer.cs) — plain-English parse-error descriptions from the tree (`hasError` nodes) + token list (unfinished tokens); observational only, never mutates the tree
+- [RightWaySqlFormatter/ParseErrorAnalyzer.cs](RightWaySqlFormatter/ParseErrorAnalyzer.cs) — plain-English parse-error descriptions with source line numbers, from the tree (`hasError`/`errorLine` attributes) + token list (unfinished tokens; `IToken.LineNumber` is stamped by the tokenizer); observational only, never mutates the tree
 
 **Parse-error handling:** invalid SQL is still formatted (best effort). The parser flags the root with `errorFound="1"` and both the offending element and its container with `hasError="1"`. The formatter prepends `ErrorOutputPrefix` (default: `--WARNING! ERRORS ENCOUNTERED DURING SQL PARSING!`). The CLI composes a detailed prefix from `ParseErrorAnalyzer`, emits the output anyway, and **exits 5** (0 with `--allow-parsing-errors`); the VS Code extension treats exit 5 as apply-output-plus-warning-toast. Don't change the library's default prefix — `28_BadNestingDontCrash` expected output encodes it.
 

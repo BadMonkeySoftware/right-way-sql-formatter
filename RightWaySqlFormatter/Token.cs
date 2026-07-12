@@ -30,7 +30,15 @@ namespace PoorMansTSqlFormatterLib
             Value = value;
         }
 
+        public Token(SqlTokenType type, string value, int lineNumber) : this(type, value)
+        {
+            LineNumber = lineNumber;
+        }
+
         public SqlTokenType Type { get; set; }
         public string Value { get; set; }
+
+        /// <summary>1-based line number of the token's START in the source SQL; 0 = unknown.</summary>
+        public int LineNumber { get; set; }
     }
 }

@@ -8,9 +8,14 @@ This changelog aims to follow the structure laid out at [Keep a Changelog](http:
 
 * Parse-error diagnostics: invalid SQL now formats best-effort with a leading
   comment describing what's wrong (unclosed string/comment/bracket identifier,
-  unexpected token/keyword, incomplete statement). New `ParseErrorAnalyzer` in
+  unexpected token/keyword, incomplete statement), including source line
+  numbers (e.g. "Unexpected token ')' (line 3)"). New `ParseErrorAnalyzer` in
   the core library; new `SqlFormattingManager.Format` overload returning
-  error descriptions.
+  error descriptions; tokens carry `LineNumber`; error tree nodes carry an
+  `errorLine` attribute.
+* Real-world test tooling: `tools/realworld-test.sh` (corpus crash/parse/
+  idempotency sweep over well-known public T-SQL projects) and
+  `tools/bisect-parse-error.sh` (isolates parse errors per GO batch).
 * CLI: on parse errors, formatted output is emitted (with the diagnostic
   comment prefix) and the process exits with code 5; `--allow-parsing-errors`
   still exits 0.

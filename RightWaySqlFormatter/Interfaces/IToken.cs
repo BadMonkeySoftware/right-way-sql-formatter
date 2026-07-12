@@ -26,5 +26,8 @@ namespace PoorMansTSqlFormatterLib.Interfaces
     {
         SqlTokenType Type { get; set; }
         string Value { get; set; }
+
+        /// <summary>1-based line number of the token's START in the source SQL; 0 = unknown.</summary>
+        int LineNumber { get; set; }
     }
 }
