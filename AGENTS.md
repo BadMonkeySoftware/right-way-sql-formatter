@@ -25,7 +25,7 @@ Use the formatter library directly, not the CLI — CLI defaults may differ from
 
 ## General Coding Rules
 
-- Run `dotnet test` before marking any task done. All tests must pass (baseline: 347 total, 0 failed, 2 skipped).
+- Run `dotnet test` before marking any task done. All tests must pass (baseline: 349 total, 0 failed, 2 skipped).
 - Do not suppress or skip tests without approval.
 - This is a personal project — no deadlines, but code quality matters. Don't cut corners.
 - SSMS plugin tasks require a Windows build environment and cannot be executed on this Mac dev machine — flag these explicitly rather than guessing.

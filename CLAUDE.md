@@ -11,7 +11,7 @@ dotnet build RightWaySqlFormatter.NoSSMS.slnx
 # Full solution build — Windows only (includes SSMS plugin)
 dotnet build RightWaySqlFormatter.slnx
 
-# Run all tests (expected: 347 total, 0 failed, 2 skipped)
+# Run all tests (expected: 349 total, 0 failed, 2 skipped)
 dotnet test RightWaySqlFormatter.NoSSMS.slnx
 
 # Regenerate expected-output files (deliberate use only — see Tests section)
