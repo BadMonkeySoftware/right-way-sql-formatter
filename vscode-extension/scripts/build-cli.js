@@ -27,7 +27,7 @@ const os = require('os');
 
 // This script lives in vscode-extension/scripts/ — repo root is two levels up
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
-const CLI_PROJECT = path.join(REPO_ROOT, 'PoorMansTSqlFormatterCmdLine', 'PoorMansTSqlFormatterCmdLine.csproj');
+const CLI_PROJECT = path.join(REPO_ROOT, 'RightWaySqlFormatter.CmdLine', 'RightWaySqlFormatter.CmdLine.csproj');
 const BIN_DIR = path.join(__dirname, '..', 'bin');
 const BINARY_NAME = process.platform === 'win32' ? 'SqlFormatter.exe' : 'SqlFormatter';
 const BINARY_PATH = path.join(BIN_DIR, BINARY_NAME);

@@ -100,11 +100,11 @@
       <Project>{DEA22340-2B24-4A83-C7A5-5A26C621C7DC}</Project>
       <Name>RightWaySqlFormatter</Name>
     </ProjectReference>
-    <ProjectReference Include="..\PoorMansTSqlFormatterPluginShared\PoorMansTSqlFormatterPluginShared.csproj">
+    <ProjectReference Include="..\RightWaySqlFormatter.PluginShared\RightWaySqlFormatter.PluginShared.csproj">
       <Project>{CFFE38A4-A5E2-7690-C2CE-A3E9B191EED4}</Project>
       <Name>PoorMansTSqlFormatterPluginShared</Name>
     </ProjectReference>
-    <ProjectReference Include="..\PoorMansTSqlFormatterSSMSLib\PoorMansTSqlFormatterSSMSLib.csproj">
+    <ProjectReference Include="..\RightWaySqlFormatter.SSMSLib\RightWaySqlFormatter.SSMSLib.csproj">
       <Project>{26B20C1F-1957-2FBF-4DCD-E665DC3B8D81}</Project>
       <Name>PoorMansTSqlFormatterSSMSLib</Name>
     </ProjectReference>

@@ -14,7 +14,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\RightWaySqlFormatter\RightWaySqlFormatter.csproj" />
-    <ProjectReference Include="..\PoorMansTSqlFormatterPluginShared\PoorMansTSqlFormatterPluginShared.csproj" />
+    <ProjectReference Include="..\RightWaySqlFormatter.PluginShared\RightWaySqlFormatter.PluginShared.csproj" />
   </ItemGroup>
   <ItemGroup>
     <!-- EnvDTE COM interop — shipped with Visual Studio; referenced via NuGet on Windows -->

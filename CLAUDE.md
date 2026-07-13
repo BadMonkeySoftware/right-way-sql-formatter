@@ -11,7 +11,7 @@ dotnet build RightWaySqlFormatter.NoSSMS.slnx
 # Full solution build — Windows only (includes SSMS plugin)
 dotnet build RightWaySqlFormatter.slnx
 
-# Run all tests (expected: 414 total, 0 failed, 2 skipped)
+# Run all tests (expected: 461 total, 0 failed, 10 skipped — 2 historical + 8 ScriptDom-oracle ignores)
 dotnet test RightWaySqlFormatter.NoSSMS.slnx
 
 # Regenerate expected-output files (deliberate use only — see Tests section)
@@ -55,16 +55,16 @@ Entry point: `SqlFormattingManager.Format()` composes these via `ISqlTokenizer` 
 
 **VS Code extension** shells out to the `SqlFormatter` CLI binary; it does not call .NET APIs directly. It applies formatting as line-minimal edits (LCS diff in `computeMinimalEdits`) and offers a native diff preview command (`Format Document (Preview)`) backed by a `TextDocumentContentProvider` on the `rwsql-format-preview` scheme.
 
-**SSMS plugin** (`PoorMansTSqlFormatterSSMSLib/`, `PoorMansTSqlFormatterSSMSPackage/`) requires Windows + Visual Studio — cannot be built or tested on macOS.
+**SSMS plugin** (`RightWaySqlFormatter.SSMSLib/`, `RightWaySqlFormatter.SSMSPackage/`) requires Windows + Visual Studio — cannot be built or tested on macOS.
 
 ## Tests
 
-Test data lives in `PoorMansTSqlFormatterTest/Data/`:
+Test data lives in `RightWaySqlFormatter.Tests/Data/`:
 - `InputSql/` — raw SQL inputs (`.sql`)
 - `StandardFormatSql/` — expected formatter outputs (`.sql`; filename encodes formatter options)
 - `ParsedSql/` — expected parse trees (`.xml`; same base name as the matching InputSql `.sql` file)
 
-Configured expected filenames use the slug convention `<InputBaseName>__<Slug1>_<Slug2>.sql` (e.g. `30_NewFormatOptions__AlignCols_EqAlias.sql`) — filesystem-safe on all platforms and short enough for Windows MAX_PATH. Each slug maps to one `TSqlStandardFormatterOptions` fragment via the `CONFIG_SLUGS` dictionary in `PoorMansTSqlFormatterTest/Utils.cs`; unknown slugs fail loudly. Expected/input pairing strips everything from `__` onward. The two intentionally skipped tests are `02_Random_INVALID.sql` (malformed SQL) and `28_BadNestingDontCrash.sql` (broken nesting; must not crash).
+Configured expected filenames use the slug convention `<InputBaseName>__<Slug1>_<Slug2>.sql` (e.g. `30_NewFormatOptions__AlignCols_EqAlias.sql`) — filesystem-safe on all platforms and short enough for Windows MAX_PATH. Each slug maps to one `TSqlStandardFormatterOptions` fragment via the `CONFIG_SLUGS` dictionary in `RightWaySqlFormatter.Tests/Utils.cs`; unknown slugs fail loudly. Expected/input pairing strips everything from `__` onward. The two intentionally skipped tests are `02_Random_INVALID.sql` (malformed SQL) and `28_BadNestingDontCrash.sql` (broken nesting; must not crash).
 
 Data files are byte-exact (BOM + CRLF significant); `.editorconfig` carves `Data/**` out of all normalization — never let an editor or script reformat them.
 

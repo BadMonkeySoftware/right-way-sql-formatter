@@ -27,8 +27,8 @@ OUT="$WORK/flagged"
 PROFILE="${PROFILE:-}"
 
 echo "== Building CLI (Release) =="
-dotnet build -c Release PoorMansTSqlFormatterCmdLine/PoorMansTSqlFormatterCmdLine.csproj || exit 1
-FMT="$ROOT/PoorMansTSqlFormatterCmdLine/bin/Release/net10.0/SqlFormatter"
+dotnet build -c Release RightWaySqlFormatter.CmdLine/RightWaySqlFormatter.CmdLine.csproj || exit 1
+FMT="$ROOT/RightWaySqlFormatter.CmdLine/bin/Release/net10.0/SqlFormatter"
 [ -x "$FMT" ] || { echo "CLI binary not found at $FMT"; exit 1; }
 
 mkdir -p "$CORPUS" "$OUT"

@@ -3,7 +3,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <OutputType>Exe</OutputType>
     <AssemblyName>SqlFormatter</AssemblyName>
-    <RootNamespace>PoorMansTSqlFormatterCmdLine</RootNamespace>
+    <RootNamespace>RightWaySqlFormatter.CmdLine</RootNamespace>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>

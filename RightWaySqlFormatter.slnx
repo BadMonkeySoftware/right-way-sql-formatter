@@ -1,12 +1,12 @@
 <Solution>
-  <Folder Name="/PoorMansTSqlFormatterTest/">
-    <Project Path="PoorMansTSqlFormatterTest/PoorMansTSqlFormatterTests.csproj" />
+  <Folder Name="/RightWaySqlFormatter.Tests/">
+    <Project Path="RightWaySqlFormatter.Tests/RightWaySqlFormatter.Tests.csproj" />
   </Folder>
   <Folder Name="/SSMS Plugin/">
-    <Project Path="PoorMansTSqlFormatterPluginShared/PoorMansTSqlFormatterPluginShared.csproj" />
-    <Project Path="PoorMansTSqlFormatterSSMSLib/PoorMansTSqlFormatterSSMSLib.csproj" />
-    <Project Path="PoorMansTSqlFormatterSSMSPackage/PoorMansTSqlFormatterSSMSPackage.csproj" />
+    <Project Path="RightWaySqlFormatter.PluginShared/RightWaySqlFormatter.PluginShared.csproj" />
+    <Project Path="RightWaySqlFormatter.SSMSLib/RightWaySqlFormatter.SSMSLib.csproj" />
+    <Project Path="RightWaySqlFormatter.SSMSPackage/RightWaySqlFormatter.SSMSPackage.csproj" />
   </Folder>
-  <Project Path="PoorMansTSqlFormatterCmdLine/PoorMansTSqlFormatterCmdLine.csproj" />
+  <Project Path="RightWaySqlFormatter.CmdLine/RightWaySqlFormatter.CmdLine.csproj" />
   <Project Path="RightWaySqlFormatter/RightWaySqlFormatter.csproj" />
 </Solution>

@@ -17,7 +17,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\RightWaySqlFormatter\RightWaySqlFormatter.csproj" />
-    <ProjectReference Include="..\PoorMansTSqlFormatterCmdLine\PoorMansTSqlFormatterCmdLine.csproj" />
+    <ProjectReference Include="..\RightWaySqlFormatter.CmdLine\RightWaySqlFormatter.CmdLine.csproj" />
   </ItemGroup>
     <ItemGroup>
     <!-- Exclude old bundled DLL references folder and old AssemblyInfo -->

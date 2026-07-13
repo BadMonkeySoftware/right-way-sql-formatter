@@ -5,8 +5,8 @@
 
 set -u
 cd "$(dirname "$0")/.."
-FMT="PoorMansTSqlFormatterCmdLine/bin/Release/net10.0/SqlFormatter"
-[ -x "$FMT" ] || { echo "Build first: dotnet build -c Release PoorMansTSqlFormatterCmdLine/PoorMansTSqlFormatterCmdLine.csproj"; exit 1; }
+FMT="RightWaySqlFormatter.CmdLine/bin/Release/net10.0/SqlFormatter"
+[ -x "$FMT" ] || { echo "Build first: dotnet build -c Release RightWaySqlFormatter.CmdLine/RightWaySqlFormatter.CmdLine.csproj"; exit 1; }
 
 probe() { # name, sql via stdin
     local name="$1"

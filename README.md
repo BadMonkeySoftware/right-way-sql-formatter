@@ -13,10 +13,10 @@ Targets: **SSMS plugin**, **VS Code extension**, **CLI tool** — all powered by
 | Project | Description |
 |---|---|
 | `RightWaySqlFormatter/` | Core formatting library (.NET 10) |
-| `PoorMansTSqlFormatterCmdLine/` | CLI tool — `SqlFormatter` binary |
-| `PoorMansTSqlFormatterSSMSPackage/` | SSMS plugin (Windows build only) |
-| `PoorMansTSqlFormatterSSMSLib/` | Shared SSMS helper library |
-| `PoorMansTSqlFormatterTest/` | NUnit 4 test suite |
+| `RightWaySqlFormatter.CmdLine/` | CLI tool — `SqlFormatter` binary |
+| `RightWaySqlFormatter.SSMSPackage/` | SSMS plugin (Windows build only) |
+| `RightWaySqlFormatter.SSMSLib/` | Shared SSMS helper library |
+| `RightWaySqlFormatter.Tests/` | NUnit 4 test suite |
 | `vscode-extension/` | VS Code extension (TypeScript, shells out to CLI) |
 
 ---
@@ -70,16 +70,16 @@ export PATH="$HOME/.dotnet:$PATH"
 dotnet build RightWaySqlFormatter.slnx
 
 # Run tests
-dotnet test PoorMansTSqlFormatterTest/PoorMansTSqlFormatterTests.csproj
+dotnet test RightWaySqlFormatter.Tests/RightWaySqlFormatter.Tests.csproj
 ```
 
-Expected: `414 total, 0 failed, 2 skipped` (exact totals grow as test data is added; failures must be zero)
+Expected: `461 total, 0 failed, 10 skipped` (exact totals grow as test data is added; failures must be zero)
 
 ### CLI (Release build)
 
 ```bash
-dotnet build PoorMansTSqlFormatterCmdLine/PoorMansTSqlFormatterCmdLine.csproj -c Release
-# Binary: PoorMansTSqlFormatterCmdLine/bin/Release/net10.0/SqlFormatter
+dotnet build RightWaySqlFormatter.CmdLine/RightWaySqlFormatter.CmdLine.csproj -c Release
+# Binary: RightWaySqlFormatter.CmdLine/bin/Release/net10.0/SqlFormatter
 ```
 
 ### VS Code Extension
@@ -163,7 +163,7 @@ Diagnostics cover unclosed strings/comments/bracket identifiers, unexpected or m
 
 ```bash
 # Run a repo test input through the formatter with alignment options
-dotnet run --project PoorMansTSqlFormatterCmdLine -- --align-table-joins=true --indent-join-on=true < PoorMansTSqlFormatterTest/Data/InputSql/31_AlignTableJoins.sql 2>/dev/null
+dotnet run --project RightWaySqlFormatter.CmdLine -- --align-table-joins=true --indent-join-on=true < RightWaySqlFormatter.Tests/Data/InputSql/31_AlignTableJoins.sql 2>/dev/null
 
 # Format with 4 spaces for indent (using escape sequences)
 echo "select 1,2,3" | SqlFormatter --indent-string="\s\s\s\s"
@@ -306,7 +306,7 @@ Diagnostics cover unclosed strings/comments/bracket identifiers, unexpected or m
 
 ```bash
 # Run a repo test input through the formatter with alignment options
-dotnet run --project PoorMansTSqlFormatterCmdLine -- --align-table-joins=true --indent-join-on=true < PoorMansTSqlFormatterTest/Data/InputSql/31_AlignTableJoins.sql 2>/dev/null
+dotnet run --project RightWaySqlFormatter.CmdLine -- --align-table-joins=true --indent-join-on=true < RightWaySqlFormatter.Tests/Data/InputSql/31_AlignTableJoins.sql 2>/dev/null
 
 # Format with 4 spaces for indent (using escape sequences)
 echo "select 1,2,3" | SqlFormatter --indent-string="\s\s\s\s"
@@ -375,7 +375,7 @@ Use **"Right Way SQL: Format Document (Preview)"** to review changes in VS Code'
 
 ## SSMS Plugin
 
-The `PoorMansTSqlFormatterSSMSPackage/` project is the VS Package-style SSMS plugin. Build requires:
+The `RightWaySqlFormatter.SSMSPackage/` project is the VS Package-style SSMS plugin. Build requires:
 - Windows
 - Visual Studio 2019+ with VSIX development workload
 - SSMS 18+ (for testing)
