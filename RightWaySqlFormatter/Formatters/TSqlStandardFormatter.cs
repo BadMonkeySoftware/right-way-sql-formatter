@@ -250,6 +250,17 @@ namespace PoorMansTSqlFormatterLib.Formatters
             return mask;
         }
 
+        /// <summary>
+        /// A line is untouchable by text passes when it STARTS inside an open string/comment
+        /// (interior of multi-line dynamic SQL) or ENDS inside one (the boundary line that
+        /// OPENS the literal): restructuring either moves quote/comment delimiters across
+        /// lines and corrupts the SQL.
+        /// </summary>
+        private static bool LineTouchesStringOrComment(bool[] insideMask, int i)
+        {
+            return insideMask[i] || (i + 1 < insideMask.Length && insideMask[i + 1]);
+        }
+
         private string AlignFromJoinClauses(string output)
         {
             var lines = new List<string>(output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None));
@@ -260,7 +271,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
             int i = 0;
             while (i < lines.Count)
             {
-                if (insideStringOrComment[i]) { i++; continue; }
+                if (LineTouchesStringOrComment(insideStringOrComment, i)) { i++; continue; }
                 string trimmed = lines[i].TrimStart();
                 string upper = trimmed.ToUpperInvariant();
                 if (IsFromOrJoinLine(upper))
@@ -269,7 +280,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     bool expectFirstCond = false;
                     while (i < lines.Count)
                     {
-                        if (insideStringOrComment[i])
+                        if (LineTouchesStringOrComment(insideStringOrComment, i))
                             break;
                         string t = lines[i].TrimStart().ToUpperInvariant();
                         bool isFromJoin = IsFromOrJoinLine(t);
@@ -740,8 +751,8 @@ namespace PoorMansTSqlFormatterLib.Formatters
 
             for (int i = 0; i < lines.Length; i++)
             {
-                //never touch the interior of a multi-line string literal or block comment
-                if (insideStringOrComment[i]) { inSelectList = false; parenDepth = 0; continue; }
+                //never touch lines inside OR opening a multi-line string literal / block comment
+                if (LineTouchesStringOrComment(insideStringOrComment, i)) { inSelectList = false; parenDepth = 0; continue; }
                 string line = lines[i];
                 string trimmed = line.TrimStart();
                 string trimmedUpper = trimmed.ToUpperInvariant();
@@ -1067,6 +1078,10 @@ namespace PoorMansTSqlFormatterLib.Formatters
         private static bool IsSimpleColumnRef(string expr)
         {
             if (string.IsNullOrEmpty(expr)) return false;
+            //literals are not column references: numbers must not become their own alias
+            // (SELECT 1 -> '1 = 1' is invalid SQL), and quoted strings are not identifiers
+            if (char.IsDigit(expr[0]) || expr[0] == '\'' || expr.StartsWith("N'"))
+                return false;
             // Scan character by character; spaces and special chars inside bracket-quoted
             // segments (e.g. [Active Flag]) are valid and must not trigger a false negative.
             bool inBracket = false;
@@ -1111,8 +1126,8 @@ namespace PoorMansTSqlFormatterLib.Formatters
 
             for (int i = 0; i < lines.Length; i++)
             {
-                //never touch the interior of a multi-line string literal or block comment
-                if (insideStringOrComment[i]) { inSelectList = false; continue; }
+                //never touch lines inside OR opening a multi-line string literal / block comment
+                if (LineTouchesStringOrComment(insideStringOrComment, i)) { inSelectList = false; continue; }
                 string line = lines[i];
                 string trimmed = line.TrimStart();
                 string trimmedUpper = trimmed.ToUpperInvariant();
@@ -1401,8 +1416,8 @@ namespace PoorMansTSqlFormatterLib.Formatters
             int i = 0;
             while (i < lines.Length)
             {
-                //never treat the interior of a multi-line string literal or block comment as SQL
-                if (insideStringOrComment[i]) { i++; continue; }
+                //never treat lines inside or opening a multi-line string literal / block comment as SQL
+                if (LineTouchesStringOrComment(insideStringOrComment, i)) { i++; continue; }
                 string trimmed = lines[i].TrimStart().ToUpperInvariant();
                 if (trimmed.StartsWith("SELECT ") || trimmed == "SELECT")
                 {
@@ -1412,7 +1427,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     // Column lines continue until we hit a non-column line.
                     while (i < lines.Length)
                     {
-                        if (insideStringOrComment[i])
+                        if (LineTouchesStringOrComment(insideStringOrComment, i))
                             break;
                         string t = lines[i].TrimStart();
                         string tu = t.ToUpperInvariant();
@@ -1769,6 +1784,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
 					if (Options.CompactSingleStatementBlocks
 						&& contentElement.Name.Equals(SqlStructureConstants.ENAME_CONTAINER_SINGLESTATEMENT)
 						&& !singleStatementIsIf
+						&& IsSmallSubtree(contentElement, 60)
 						)
 					{
 						TSqlStandardFormattingState compactState = new TSqlStandardFormattingState(state);
@@ -2421,6 +2437,30 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 state.StatementBreakExpected = false;
                 state.WordSeparatorExpected = false;
             }
+        }
+
+        /// <summary>
+        /// Cheap bounded check: true when the subtree contains at most maxNodes nodes.
+        /// Used to gate the speculative inline rendering of CompactSingleStatementBlocks -
+        /// without a bound, the try-inline-then-fallback double rendering is exponential
+        /// on nested single-statement bodies (observed: >30s on a 2MB script).
+        /// </summary>
+        private static bool IsSmallSubtree(Node container, int maxNodes)
+        {
+            int count = 0;
+            return CountNodesUpTo(container, maxNodes, ref count);
+        }
+
+        private static bool CountNodesUpTo(Node node, int maxNodes, ref int count)
+        {
+            foreach (Node child in node.Children)
+            {
+                if (++count > maxNodes)
+                    return false;
+                if (!CountNodesUpTo(child, maxNodes, ref count))
+                    return false;
+            }
+            return true;
         }
 
         /// <summary>
