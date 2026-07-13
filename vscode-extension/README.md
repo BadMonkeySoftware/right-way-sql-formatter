@@ -7,7 +7,7 @@
 
 Format T-SQL in VS Code — the classic SSMS "Poor Man's T-SQL Formatter" style, modernized. Battle-tested against 396 real-world SQL files (First Responder Kit, Ola Hallengren, sp_WhoIsActive, DarlingData, tSQLt).
 
-![Formatting a messy T-SQL query with Right Way SQL: Format Document](images/demo.gif)
+![Formatting a messy T-SQL query with Right Way SQL: Format Document](https://github.com/BadMonkeySoftware/right-way-sql-formatter/raw/main/vscode-extension/images/demo.gif)
 
 ## Highlights
 
@@ -32,7 +32,7 @@ All commands are available in the right-click context menu when editing a `.sql`
 
 `Format Document (Preview)` shows the proposed formatting in VS Code's built-in diff editor — green/red change highlighting, side-by-side or inline — before anything touches your file. Choose **Apply** to apply (formatting re-runs against the document's current text, so it's safe even if you kept typing), or **Discard** to close the preview unchanged.
 
-![Format Document (Preview): review the diff, then Apply or Discard](images/preview-diff.gif)
+![Format Document (Preview): review the diff, then Apply or Discard](https://github.com/BadMonkeySoftware/right-way-sql-formatter/raw/main/vscode-extension/images/preview-diff.gif)
 
 ### Minimal edits
 

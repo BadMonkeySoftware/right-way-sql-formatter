@@ -6,7 +6,7 @@
     "type": "git",
     "url": "https://github.com/BadMonkeySoftware/right-way-sql-formatter.git"
   },
-  "version": "0.1.3",
+  "version": "0.1.4",
   "icon": "rightwayIcon.png",
   "publisher": "BadMonkeySoftware",
   "engines": {
@@ -95,7 +95,10 @@
         },
         "rightWaySqlFormatter.indentString": {
           "type": "string",
-          "enum": ["space", "tab"],
+          "enum": [
+            "space",
+            "tab"
+          ],
           "default": "space",
           "description": "Indent character to use. 'space' uses spaces (count set by indentSize), 'tab' uses a literal tab character."
         },
@@ -122,9 +125,7 @@
         "rightWaySqlFormatter.expandCommaLists": {
           "type": "boolean",
           "default": true,
-          "examples": [
-            
-          ],
+          "examples": [],
           "description": "Expand comma-separated lists onto separate lines."
         },
         "rightWaySqlFormatter.selectFirstColumnOnNewLine": {
@@ -174,7 +175,10 @@
         },
         "rightWaySqlFormatter.columnAliasStyle": {
           "type": "string",
-          "enum": ["as", "equals"],
+          "enum": [
+            "as",
+            "equals"
+          ],
           "default": "as",
           "description": "Column alias style: 'as' (col AS alias) or 'equals' (alias = col)."
         },
