@@ -35,6 +35,10 @@ This changelog aims to follow the structure laid out at [Keep a Changelog](http:
 
 ### Changed
 
+* Zero external runtime dependencies: the CLI's argument parsing is now
+  hand-rolled (System.CommandLine beta removed); the core library was already
+  pure BCL. Removed legacy upstream build tooling (ExternalBuildTools: ILRepack,
+  fart) and the legacy .sln (the .slnx solutions are canonical).
 * Test data files renamed to real extensions: `InputSql`/`StandardFormatSql`
   `*.txt` → `*.sql`, `ParsedSql` `*.txt` → `*.xml` (content byte-identical);
   `.editorconfig` now exempts `Data/**` from whitespace/EOL normalization.

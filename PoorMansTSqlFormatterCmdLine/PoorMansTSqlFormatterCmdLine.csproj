@@ -13,14 +13,6 @@
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="System.CommandLine" Version="2.0.0-beta4.22272.1" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\RightWaySqlFormatter\RightWaySqlFormatter.csproj" />
-  </ItemGroup>
-  <ItemGroup>
-    <!-- Exclude old framework replacement files and old Properties -->
-    <Compile Remove="FrameworkClassReplacements\**" />
-    <Compile Remove="Properties\AssemblyInfo.cs" />
   </ItemGroup>
 </Project>
