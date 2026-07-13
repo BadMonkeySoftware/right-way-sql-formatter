@@ -796,13 +796,19 @@ namespace PoorMansTSqlFormatterLib.Formatters
                                 string indent = line.Substring(0, line.Length - trimmed.Length);
                                 bool hadTrailingComma1 = colPart1.EndsWith(",");
                                 string colExpr1 = hadTrailingComma1 ? colPart1.Substring(0, colPart1.Length - 1).TrimEnd() : colPart1;
-                                var (rewritten, newCounter) = EnsureAlias(colExpr1, autoAliasCounter);
-                                autoAliasCounter = newCounter;
-                                string finalCol1 = rewritten + (hadTrailingComma1 ? "," : "");
-                                if (finalCol1 != colPart1)
-                                    lines[i] = indent + "SELECT " + modPrefix1 + finalCol1;
-                                // Track open parens from the inline column
-                                parenDepth += CountNetParens(rewritten != colExpr1 ? rewritten : colExpr1);
+                                int netParens1 = CountNetParens(colExpr1);
+                                //only alias when the inline expression is balanced (not the start
+                                // of a multi-line expression such as ROW_NUMBER() OVER ( )
+                                if (netParens1 <= 0 && CountNetCase(colExpr1) <= 0)
+                                {
+                                    var (rewritten, newCounter) = EnsureAlias(colExpr1, autoAliasCounter);
+                                    autoAliasCounter = newCounter;
+                                    string finalCol1 = rewritten + (hadTrailingComma1 ? "," : "");
+                                    if (finalCol1 != colPart1)
+                                        lines[i] = indent + "SELECT " + modPrefix1 + finalCol1;
+                                }
+                                parenDepth += netParens1;
+                                if (parenDepth < 0) parenDepth = 0;
                             }
                         }
                         continue;
@@ -831,12 +837,19 @@ namespace PoorMansTSqlFormatterLib.Formatters
                             string indent = line.Substring(0, line.Length - trimmed.Length);
                             bool hadTrailingComma1 = colPart1.EndsWith(",");
                             string colExpr1 = hadTrailingComma1 ? colPart1.Substring(0, colPart1.Length - 1).TrimEnd() : colPart1;
-                            var (rewritten, newCounter) = EnsureAlias(colExpr1, autoAliasCounter);
-                            autoAliasCounter = newCounter;
-                            string finalCol1 = rewritten + (hadTrailingComma1 ? "," : "");
-                            if (finalCol1 != colPart1)
-                                lines[i] = indent + "SELECT " + modPrefix1 + finalCol1;
-                            parenDepth += CountNetParens(rewritten != colExpr1 ? rewritten : colExpr1);
+                            int netParens1 = CountNetParens(colExpr1);
+                            //only alias when the inline expression is balanced (not the start
+                            // of a multi-line expression such as ROW_NUMBER() OVER ( )
+                            if (netParens1 <= 0 && CountNetCase(colExpr1) <= 0)
+                            {
+                                var (rewritten, newCounter) = EnsureAlias(colExpr1, autoAliasCounter);
+                                autoAliasCounter = newCounter;
+                                string finalCol1 = rewritten + (hadTrailingComma1 ? "," : "");
+                                if (finalCol1 != colPart1)
+                                    lines[i] = indent + "SELECT " + modPrefix1 + finalCol1;
+                            }
+                            parenDepth += netParens1;
+                            if (parenDepth < 0) parenDepth = 0;
                         }
                     }
                     continue;
@@ -845,6 +858,15 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 // --- Detect end of SELECT list ---
                 if (inSelectList)
                 {
+                    //the formatter never emits a blank line INSIDE a column list - a blank
+                    // line means the statement ended (guards against the tracker running on
+                    // into OPEN/DECLARE/etc. and column-izing arbitrary statements)
+                    if (string.IsNullOrWhiteSpace(trimmed))
+                    {
+                        inSelectList = false;
+                        parenDepth = 0;
+                        continue;
+                    }
                     // If we're inside an unbalanced open-paren (multi-line expression continuation),
                     // just track paren depth and skip alias processing for this line.
                     if (parenDepth > 0)
@@ -1111,8 +1133,12 @@ namespace PoorMansTSqlFormatterLib.Formatters
         {
             int dot = expr.LastIndexOf('.');
             string name = dot >= 0 ? expr.Substring(dot + 1) : expr;
-            string bare = name.Trim('[', ']');
-            return bare.Contains(' ') ? "[" + bare + "]" : bare;
+            //if the source column was bracket-quoted, the derived alias stays
+            // bracket-quoted: [Some] -> alias [Some], never bare Some (SOME is a
+            // reserved word; stripping the brackets produces invalid SQL)
+            if (name.StartsWith("["))
+                return name;
+            return name.Contains(' ') ? "[" + name + "]" : name;
         }
 
 
@@ -1159,6 +1185,12 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 // Detect end of SELECT list
                 if (inSelectList)
                 {
+                    //blank line = end of statement (see EnsureColumnAliases)
+                    if (string.IsNullOrWhiteSpace(trimmed))
+                    {
+                        inSelectList = false;
+                        continue;
+                    }
                     bool startsWithComma = trimmed.StartsWith(",");
                     if (!startsWithComma && IsClauseStartLine(trimmedUpper))
                     {
@@ -1202,9 +1234,17 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 || trimmedUpper.StartsWith("GROUP ") || trimmedUpper == "GROUP"
                 || trimmedUpper.StartsWith("ORDER ") || trimmedUpper == "ORDER"
                 || trimmedUpper.StartsWith("HAVING ") || trimmedUpper == "HAVING"
-                || trimmedUpper.StartsWith("UNION ") || trimmedUpper.StartsWith("INTERSECT ")
-                || trimmedUpper.StartsWith("EXCEPT ")
+                || trimmedUpper.StartsWith("UNION ") || trimmedUpper == "UNION"
+                || trimmedUpper.StartsWith("INTERSECT ") || trimmedUpper == "INTERSECT"
+                || trimmedUpper.StartsWith("EXCEPT ") || trimmedUpper == "EXCEPT"
                 || trimmedUpper.StartsWith("INTO ")
+                //select lists also end at cursor/query options and batch separators:
+                // FOR (cursor FOR READ ONLY / FOR XML / FOR UPDATE), OPTION(...) hints,
+                // GO, and INSERT's VALUES keyword
+                || trimmedUpper.StartsWith("FOR ") || trimmedUpper == "FOR"
+                || trimmedUpper.StartsWith("OPTION ") || trimmedUpper.StartsWith("OPTION(")
+                || trimmedUpper.StartsWith("GO ") || trimmedUpper == "GO"
+                || trimmedUpper.StartsWith("VALUES ") || trimmedUpper == "VALUES" || trimmedUpper.StartsWith("VALUES(")
                 || trimmedUpper.StartsWith(")") // subquery end
                 // CASE sub-expression keywords — not column expressions
                 || trimmedUpper.StartsWith("WHEN ") || trimmedUpper == "WHEN"
@@ -1430,6 +1470,8 @@ namespace PoorMansTSqlFormatterLib.Formatters
                         if (LineTouchesStringOrComment(insideStringOrComment, i))
                             break;
                         string t = lines[i].TrimStart();
+                        if (i > start && string.IsNullOrWhiteSpace(t))
+                            break; //blank line = end of statement
                         string tu = t.ToUpperInvariant();
                         if (i > start && !t.StartsWith(",") && IsClauseStartLine(tu))
                             break;

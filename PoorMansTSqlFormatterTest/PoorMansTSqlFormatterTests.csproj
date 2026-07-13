@@ -10,6 +10,7 @@
     <IsPackable>false</IsPackable>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Microsoft.SqlServer.TransactSql.ScriptDom" Version="180.37.3" />
     <PackageReference Include="NUnit" Version="4.3.2" />
     <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
