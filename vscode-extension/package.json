@@ -78,6 +78,21 @@
           "default": "",
           "description": "Path to the SqlFormatter executable. Leave empty to auto-detect from the extension's bundled binary or PATH."
         },
+        "rightWaySqlFormatter.compactRaiserror": {
+          "type": "boolean",
+          "default": false,
+          "description": "Keep RAISERROR(...) argument lists on a single line instead of expanding each argument."
+        },
+        "rightWaySqlFormatter.compactSingleStatementBlocks": {
+          "type": "boolean",
+          "default": false,
+          "description": "Render single-statement IF/ELSE/WHILE bodies (no BEGIN/END) on the same line as their control keyword when they fit maxLineWidth."
+        },
+        "rightWaySqlFormatter.alignTableJoinsAddAliases": {
+          "type": "boolean",
+          "default": true,
+          "description": "When alignTableJoins is enabled: also add aliases (derived from the table name) to tables that have none."
+        },
         "rightWaySqlFormatter.indentString": {
           "type": "string",
           "enum": ["space", "tab"],

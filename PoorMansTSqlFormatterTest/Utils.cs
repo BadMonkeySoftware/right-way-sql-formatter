@@ -119,6 +119,9 @@ namespace PoorMansTSqlFormatterTests
             { "AlignJoins",      "AlignTableJoins=True" },
             { "AlwaysAlias",     "ColumnAlwaysHasAlias=True" },
             { "FirstColNL",      "SelectFirstColumnOnNewLine=True" },
+            { "CompactRaiserror","CompactRaiserror=True" },
+            { "CompactBlocks",   "CompactSingleStatementBlocks=True" },
+            { "NoJoinAliases",   "AlignTableJoinsAddAliases=False" },
         };
 
         private const string CONFIG_MARKER = "__";

@@ -55,7 +55,10 @@ namespace PoorMansTSqlFormatterLib.Formatters
             AlignColumnDefinitionsInDDL = false;
             DDLConstraintsOnNewLine = false;
             AlignTableJoins = false;
+            AlignTableJoinsAddAliases = true;
             ColumnAlwaysHasAlias = false;
+            CompactRaiserror = false;
+            CompactSingleStatementBlocks = false;
 		}
 
         //Doesn't particularly need to be lazy-loaded, and doesn't need to be threadsafe.
@@ -99,7 +102,10 @@ namespace PoorMansTSqlFormatterLib.Formatters
 			else if (key == "AlignColumnDefinitionsInDDL") AlignColumnDefinitionsInDDL = Convert.ToBoolean(value);
 				else if (key == "DDLConstraintsOnNewLine") DDLConstraintsOnNewLine = Convert.ToBoolean(value);
 				else if (key == "AlignTableJoins") AlignTableJoins = Convert.ToBoolean(value);
+				else if (key == "AlignTableJoinsAddAliases") AlignTableJoinsAddAliases = Convert.ToBoolean(value);
 				else if (key == "ColumnAlwaysHasAlias") ColumnAlwaysHasAlias = Convert.ToBoolean(value);
+				else if (key == "CompactRaiserror") CompactRaiserror = Convert.ToBoolean(value);
+				else if (key == "CompactSingleStatementBlocks") CompactSingleStatementBlocks = Convert.ToBoolean(value);
 				else throw new ArgumentException("Unknown option: " + key);
             }
 
@@ -136,7 +142,10 @@ namespace PoorMansTSqlFormatterLib.Formatters
 			if (AlignColumnDefinitionsInDDL != _defaultOptions.AlignColumnDefinitionsInDDL) overrides.Add("AlignColumnDefinitionsInDDL", AlignColumnDefinitionsInDDL.ToString());
 			if (DDLConstraintsOnNewLine != _defaultOptions.DDLConstraintsOnNewLine) overrides.Add("DDLConstraintsOnNewLine", DDLConstraintsOnNewLine.ToString());
 			if (AlignTableJoins != _defaultOptions.AlignTableJoins) overrides.Add("AlignTableJoins", AlignTableJoins.ToString());
+			if (AlignTableJoinsAddAliases != _defaultOptions.AlignTableJoinsAddAliases) overrides.Add("AlignTableJoinsAddAliases", AlignTableJoinsAddAliases.ToString());
 			if (ColumnAlwaysHasAlias != _defaultOptions.ColumnAlwaysHasAlias) overrides.Add("ColumnAlwaysHasAlias", ColumnAlwaysHasAlias.ToString());
+			if (CompactRaiserror != _defaultOptions.CompactRaiserror) overrides.Add("CompactRaiserror", CompactRaiserror.ToString());
+			if (CompactSingleStatementBlocks != _defaultOptions.CompactSingleStatementBlocks) overrides.Add("CompactSingleStatementBlocks", CompactSingleStatementBlocks.ToString());
     
             if (overrides.Count == 0) return string.Empty;
             return string.Join(",", overrides.Select((kvp) => kvp.Key + "=" + kvp.Value).ToArray());
@@ -255,6 +264,25 @@ namespace PoorMansTSqlFormatterLib.Formatters
         /// - Columns that already have an alias are left unchanged.
         /// </summary>
         public bool ColumnAlwaysHasAlias { get; set; }
+
+        /// <summary>
+        /// When AlignTableJoins is active: also add an alias (derived from the table name)
+        /// to tables that have none. Default true (historical AlignTableJoins behavior);
+        /// set false to align only, without inventing aliases.
+        /// </summary>
+        public bool AlignTableJoinsAddAliases { get; set; }
+
+        /// <summary>
+        /// Keep RAISERROR(...) argument lists on a single line instead of expanding
+        /// each comma-separated argument (default false = historical behavior).
+        /// </summary>
+        public bool CompactRaiserror { get; set; }
+
+        /// <summary>
+        /// Render single-statement IF/ELSE/WHILE bodies (no BEGIN/END) on the same line
+        /// as their control keyword when the result is single-line and fits MaxLineWidth.
+        /// </summary>
+        public bool CompactSingleStatementBlocks { get; set; }
 
     }
 

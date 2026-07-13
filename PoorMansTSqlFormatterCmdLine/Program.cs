@@ -72,6 +72,15 @@ alignTableJoins.AddAlias("-atj");
 var columnAlwaysHasAlias = new Option<bool>("--column-always-has-alias", () => false, "Ensure every SELECT column has an explicit AS alias");
 columnAlwaysHasAlias.AddAlias("-caha");
 
+var alignTableJoinsAddAliases = new Option<bool>("--align-table-joins-add-aliases", () => true, "With --align-table-joins: add aliases to tables that have none (default true)");
+alignTableJoinsAddAliases.AddAlias("-atja");
+
+var compactRaiserror = new Option<bool>("--compact-raiserror", () => false, "Keep RAISERROR(...) argument lists on a single line");
+compactRaiserror.AddAlias("-cre");
+
+var compactSingleStatementBlocks = new Option<bool>("--compact-single-statement-blocks", () => false, "Render single-statement IF/ELSE/WHILE bodies (no BEGIN/END) inline when they fit");
+compactSingleStatementBlocks.AddAlias("-csb");
+
 var expandInLists = new Option<bool>("--expand-in-lists", () => true, "Expand IN lists");
 expandInLists.AddAlias("-eil");
 
@@ -99,6 +108,7 @@ var rootCommand = new RootCommand("Right Way SQL Formatter - formats T-SQL files
     expandCase, expandCommaLists, selectFirstColumnOnNewLine, expandInLists, breakJoin,
     uppercaseKeywords, standardizeKeywords, allowParsingErrors,
     aliasStyle, alignColumns, indentJoinOn, indentWhereAndOr, alignDdlColumns, ddlConstraintsNewLine, alignTableJoins, columnAlwaysHasAlias,
+    alignTableJoinsAddAliases, compactRaiserror, compactSingleStatementBlocks,
     outputFile, inputFile
 };
 
@@ -132,6 +142,9 @@ rootCommand.SetHandler(async (context) =>
         DDLConstraintsOnNewLine = context.ParseResult.GetValueForOption(ddlConstraintsNewLine),
         AlignTableJoins = context.ParseResult.GetValueForOption(alignTableJoins),
         ColumnAlwaysHasAlias = context.ParseResult.GetValueForOption(columnAlwaysHasAlias),
+        AlignTableJoinsAddAliases = context.ParseResult.GetValueForOption(alignTableJoinsAddAliases),
+        CompactRaiserror = context.ParseResult.GetValueForOption(compactRaiserror),
+        CompactSingleStatementBlocks = context.ParseResult.GetValueForOption(compactSingleStatementBlocks),
     };
 
     bool allowErrors = context.ParseResult.GetValueForOption(allowParsingErrors);

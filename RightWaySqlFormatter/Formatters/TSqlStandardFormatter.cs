@@ -390,10 +390,13 @@ namespace PoorMansTSqlFormatterLib.Formatters
             if (items.Count == 0) return blockLines;
 
             // ---- Pass 2: ensure every item has an alias ---------------------
-            foreach (var item in items)
+            if (Options.AlignTableJoinsAddAliases)
             {
-                if (string.IsNullOrEmpty(item.Alias))
-                    item.Alias = BaseTableName(item.Table);
+                foreach (var item in items)
+                {
+                    if (string.IsNullOrEmpty(item.Alias))
+                        item.Alias = BaseTableName(item.Table);
+                }
             }
 
             // ---- Pass 3: compute column positions --------------------------
@@ -478,7 +481,10 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 string kwTable = curItem.Keyword + " " + curItem.Table;
                 string tablepad = new string(' ', targetTableCol - kwTable.Length);
                 string aliasPad = new string(' ', maxAliasLen - curItem.Alias.Length);
-                string asPart = KW_AS + " " + curItem.Alias + aliasPad;
+                //no alias (AlignTableJoinsAddAliases=false): pad so ON stays aligned
+                string asPart = string.IsNullOrEmpty(curItem.Alias)
+                    ? new string(' ', KW_AS.Length + 1 + maxAliasLen)
+                    : KW_AS + " " + curItem.Alias + aliasPad;
                 string onPrefix = new string(' ', onPad) + KW_ON + "  ";
 
                 if (curItem.HasTrailingOn)
@@ -1758,6 +1764,36 @@ namespace PoorMansTSqlFormatterLib.Formatters
                             foreach (Node ifStatement in clause.ChildrenByName(SqlStructureConstants.ENAME_IF_STATEMENT))
                                 singleStatementIsIf = true;
 
+					//CompactSingleStatementBlocks: render a single-statement IF/ELSE/WHILE body
+					// inline on the same line when it stays single-line and fits MaxLineWidth.
+					if (Options.CompactSingleStatementBlocks
+						&& contentElement.Name.Equals(SqlStructureConstants.ENAME_CONTAINER_SINGLESTATEMENT)
+						&& !singleStatementIsIf
+						)
+					{
+						TSqlStandardFormattingState compactState = new TSqlStandardFormattingState(state);
+						compactState.BreakExpected = false;
+						compactState.StatementBreakExpected = false;
+						compactState.WordSeparatorExpected = false;
+						compactState.SourceBreakPending = false;
+						ProcessSqlNodeList(contentElement.Children, compactState);
+						if (!compactState.OutputContainsLineBreak
+							&& state.CurrentLineLength + 1 + compactState.CurrentLineLength <= Options.MaxLineWidth
+							)
+						{
+							state.WordSeparatorExpected = true;
+							WhiteSpace_SeparateWords(state);
+							state.Assimilate(compactState);
+							state.WordSeparatorExpected = false;
+							//mirror the standard exit: the OUTER statement owns statement
+							// separation; anything following (e.g. ELSE) starts on a new line
+							state.BreakExpected = true;
+							state.StatementBreakExpected = false;
+							state.UnIndentInitialBreak = false;
+							break;
+						}
+					}
+
 					if (singleStatementIsIf && contentElement.Parent!.Name.Equals(SqlStructureConstants.ENAME_ELSE_CLAUSE))
 					{
 						//artificially decrement indent and skip new statement break for "ELSE IF" constructs
@@ -1976,7 +2012,9 @@ namespace PoorMansTSqlFormatterLib.Formatters
 
                 case SqlStructureConstants.ENAME_AND_OPERATOR:
                 case SqlStructureConstants.ENAME_OR_OPERATOR:
-                    if (Options.ExpandBooleanExpressions)
+                    //IndentWhereAndOrConditions promises "AND/OR onto separate lines", so it
+                    // forces the break even when ExpandBooleanExpressions is disabled.
+                    if (Options.ExpandBooleanExpressions || Options.IndentWhereAndOrConditions)
                         state.BreakExpected = true;
                     if (Options.IndentWhereAndOrConditions)
                         state.IncrementIndent();
@@ -2135,6 +2173,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
 								&& !(contentElement.Parent!.Name.Equals(SqlStructureConstants.ENAME_DDLDETAIL_PARENS)
 									|| contentElement.Parent.Name.Equals(SqlStructureConstants.ENAME_FUNCTION_PARENS)
 									|| contentElement.Parent.Name.Equals(SqlStructureConstants.ENAME_IN_PARENS)
+									|| IsCompactRaiserrorArgs(contentElement)
 									)
 								)
 							|| (Options.ExpandInLists
@@ -2151,6 +2190,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
 								&& !(contentElement.Parent!.Name.Equals(SqlStructureConstants.ENAME_DDLDETAIL_PARENS)
 									|| contentElement.Parent.Name.Equals(SqlStructureConstants.ENAME_FUNCTION_PARENS)
 									|| contentElement.Parent.Name.Equals(SqlStructureConstants.ENAME_IN_PARENS)
+									|| IsCompactRaiserrorArgs(contentElement)
 									)
 								)
 							|| (Options.ExpandInLists
@@ -2402,6 +2442,25 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 return true;
             }
             return false;
+        }
+
+        /// <summary>
+        /// True when this comma belongs to a RAISERROR(...) argument list and the
+        /// CompactRaiserror option is active - such lists stay on one line.
+        /// </summary>
+        private bool IsCompactRaiserrorArgs(Node commaElement)
+        {
+            if (!Options.CompactRaiserror)
+                return false;
+            Node? parens = commaElement.Parent;
+            if (parens == null || !parens.Name.Equals(SqlStructureConstants.ENAME_EXPRESSION_PARENS))
+                return false;
+            Node? prev = parens.PreviousSibling();
+            while (prev != null && SqlStructureConstants.ENAMELIST_NONCONTENT.Contains(prev.Name))
+                prev = prev.PreviousSibling();
+            return prev != null
+                && prev.Name.Equals(SqlStructureConstants.ENAME_OTHERKEYWORD)
+                && "RAISERROR".Equals(prev.TextValue, StringComparison.OrdinalIgnoreCase);
         }
 
         private Node? FirstSemanticElementChild(Node? contentElement)

@@ -559,5 +559,9 @@ function buildArgs(): string[] {
     // Task 7: Column always has alias
     bool('columnAlwaysHasAlias',      'column-always-has-alias',  false);
 
+    bool('alignTableJoinsAddAliases', 'align-table-joins-add-aliases', true);
+    bool('compactRaiserror',          'compact-raiserror',        false);
+    bool('compactSingleStatementBlocks', 'compact-single-statement-blocks', false);
+
     return args;
 }
