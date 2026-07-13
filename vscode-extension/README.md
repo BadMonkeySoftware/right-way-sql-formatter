@@ -1,26 +1,20 @@
-# Right Way SQL Formatter — VSCode Extension
+# Right Way SQL Formatter
 
-VS Code extension that formats T-SQL using the `SqlFormatter` CLI.
+Formats T-SQL in VS Code — the classic SSMS "Poor Man's T-SQL Formatter" style, modernized. All formatting is done by a bundled native `SqlFormatter` binary (no .NET runtime required); the extension pipes SQL via stdin and applies the result as minimal edits.
 
-## How it works
+## Features
 
-The extension shells out to the `SqlFormatter` binary (built from the .NET project in this repo).
-SQL is piped via stdin, formatted output comes back on stdout.
-No language server, no parsing in JS — all formatting logic lives in the .NET core library.
+| Command | Description |
+|---|---|
+| Right Way SQL: Format Document | Formats the entire active SQL file |
+| Right Way SQL: Format Selection | Formats only the selected text |
+| Right Way SQL: Format Document (Preview) | Opens a native diff (current ↔ formatted) with Apply/Discard |
 
-## Commands
-
-| Command | Keyboard Shortcut | Description |
-|---|---|---|
-| Right Way SQL: Format Document | — | Formats the entire active SQL file (minimal edits) |
-| Right Way SQL: Format Selection | — | Formats only the selected text |
-| Right Way SQL: Format Document (Preview) | — | Opens a native diff (current ↔ formatted) with Apply/Discard |
-
-All commands are also available in the right-click context menu when editing a `.sql` file. The extension additionally registers as the document formatter for SQL, so `Format Document` (⇧⌥F / Shift+Alt+F) and format-on-save work too.
+All commands are available in the right-click context menu when editing a `.sql` file. The extension also registers as the document formatter for SQL, so `Format Document` (⇧⌥F / Shift+Alt+F) and format-on-save work too.
 
 ### Diff preview
 
-`Format Document (Preview)` shows the proposed formatting in VS Code's built-in diff editor — green/red change highlighting, side-by-side or inline — before anything touches your file. Choose **Apply** in the prompt to apply (formatting re-runs against the document's current text, so it's safe even if you kept typing), or **Discard** to close the preview unchanged.
+`Format Document (Preview)` shows the proposed formatting in VS Code's built-in diff editor — green/red change highlighting, side-by-side or inline — before anything touches your file. Choose **Apply** to apply (formatting re-runs against the document's current text, so it's safe even if you kept typing), or **Discard** to close the preview unchanged.
 
 ### Minimal edits
 
@@ -28,66 +22,7 @@ Formatting is applied as line-level minimal edits (computed with an LCS diff) ra
 
 ### Invalid SQL
 
-If the input can't be fully parsed, the formatter still produces best-effort output, prefixed with a comment describing what's wrong (e.g. unclosed string literal, unexpected token), and the extension shows a warning toast. The underlying CLI signals this with exit code 5.
-
-## Setup
-
-### 1. Build everything
-
-From the `vscode-extension/` directory:
-
-```bash
-npm install
-npm run build
-```
-
-That's it. `npm run build` will:
-- Find the .NET SDK automatically (checks `~/.dotnet`, system locations, then PATH)
-- Publish a self-contained `SqlFormatter` binary into `vscode-extension/bin/` — no .NET required at runtime
-- Compile the TypeScript extension
-
-### 2. Install the extension (dev mode)
-
-Open the **`vscode-extension/` folder** in VS Code (not the repo root — the folder itself).
-
-Then press `F5`. VS Code will launch an Extension Development Host window with the extension loaded.
-Open any `.sql` file in that window and right-click to format.
-
-> Tip: You need to open the `vscode-extension/` folder directly. If you open the repo root, `F5` won't find the extension manifest.
-
-### 3. Package for install
-
-```bash
-npm run package
-# Produces: right-way-sql-formatter-0.1.0.vsix
-```
-
-Install with:
-```bash
-code --install-extension right-way-sql-formatter-0.1.0.vsix
-```
-
-## Settings
-
-All settings are under `rightWaySqlFormatter.*`:
-
-| Setting | Default | Description |
-|---|---|---|
-| `executablePath` | `""` | Explicit path to SqlFormatter binary. Auto-detected if empty. |
-| `indentString` | `"\t"` | Indent character(s) per level |
-| `spacesPerTab` | `4` | Spaces per tab |
-| `maxLineWidth` | `999` | Max line width before wrapping |
-| `uppercaseKeywords` | `true` | Uppercase SQL keywords |
-| `standardizeKeywords` | `true` | Normalize keyword synonyms (e.g. `NATIONAL CHARACTER VARYING` → `NVARCHAR`) |
-| `expandCommaLists` | `true` | Expand comma lists onto separate lines |
-| `expandInLists` | `true` | Expand IN (...) lists |
-| `trailingCommas` | `false` | Trailing commas instead of leading |
-| `expandBooleanExpressions` | `true` | Expand AND/OR onto separate lines |
-| `expandCaseStatements` | `true` | Expand CASE/WHEN/THEN/END |
-| `expandBetweenConditions` | `true` | Expand BETWEEN ... AND ... |
-| `breakJoinOnSections` | `false` | Break JOIN clauses |
-| `newStatementLineBreaks` | `2` | Blank lines between statements |
-| `newClauseLineBreaks` | `1` | Blank lines between clauses |
+If the input can't be fully parsed, the formatter still produces best-effort output, prefixed with a comment describing what's wrong (with source line numbers — e.g. unclosed string literal, unexpected token), and the extension shows a warning toast. The underlying CLI signals this with exit code 5.
 
 ## Example
 
@@ -110,17 +45,94 @@ WHERE e.Active = 1
 ORDER BY e.LastName
 ```
 
-## Packaging
+## Settings
 
-To produce a `.vsix` for manual install:
+All settings are under `rightWaySqlFormatter.*`:
+
+### General
+
+| Setting | Default | Description |
+|---|---|---|
+| `executablePath` | `""` | Explicit path to the SqlFormatter binary. Auto-detected (bundled binary, then PATH) if empty. |
+| `indentString` | `"space"` | Indent character: `space` or `tab`. |
+| `indentSize` | `4` | Spaces per indent level (or tab display width). |
+| `maxLineWidth` | `999` | Max line width before wrapping. |
+| `newStatementLineBreaks` | `2` | Blank lines between statements. |
+| `newClauseLineBreaks` | `1` | Blank lines between clauses. |
+
+### Keywords
+
+| Setting | Default | Description |
+|---|---|---|
+| `uppercaseKeywords` | `true` | Uppercase SQL keywords. |
+| `standardizeKeywords` | `true` | Normalize keyword synonyms (e.g. `NATIONAL CHARACTER VARYING` → `NVARCHAR`). |
+
+### Expansion / line breaking
+
+| Setting | Default | Description |
+|---|---|---|
+| `expandCommaLists` | `true` | Expand comma-separated lists onto separate lines. |
+| `selectFirstColumnOnNewLine` | `false` | Break the first SELECT column to a new line instead of keeping it beside SELECT. |
+| `expandInLists` | `true` | Expand `IN (...)` lists. |
+| `trailingCommas` | `false` | Trailing commas instead of leading. |
+| `expandBooleanExpressions` | `true` | Expand AND/OR onto separate lines. |
+| `expandCaseStatements` | `true` | Expand CASE/WHEN/THEN/END. |
+| `expandBetweenConditions` | `true` | Expand `BETWEEN ... AND ...`. |
+| `breakJoinOnSections` | `false` | Break JOIN ON sections onto separate lines. |
+| `indentJoinOnClause` | `false` | Indent the ON clause an extra level relative to JOIN. |
+| `indentWhereAndOrConditions` | `false` | Put WHERE's AND/OR conditions on separate lines, aligned under the first condition. |
+
+### Aliases and alignment
+
+| Setting | Default | Description |
+|---|---|---|
+| `columnAliasStyle` | `"as"` | `as` (`col AS alias`) or `equals` (`alias = col`). Existing alias style is preserved either way. |
+| `columnAlwaysHasAlias` | `false` | Ensure every SELECT column has an explicit alias. |
+| `alignColumnDefinitions` | `false` | Align AS keywords vertically in the SELECT list (requires `expandCommaLists`). |
+| `alignColumnDefinitionsInDDL` | `false` | In CREATE TABLE, align name / type / nullability / constraints into columns. |
+| `ddlConstraintsOnNewLine` | `false` | In CREATE TABLE, each column constraint on its own line. |
+| `alignTableJoins` | `false` | Align FROM/JOIN table names, aliases, and ON conditions vertically across a query batch. |
+| `alignTableJoinsAddAliases` | `true` | With `alignTableJoins`: also add derived aliases to tables that have none. |
+
+### Compactness
+
+| Setting | Default | Description |
+|---|---|---|
+| `compactRaiserror` | `false` | Keep `RAISERROR(...)` argument lists on one line. |
+| `compactSingleStatementBlocks` | `false` | Render single-statement IF/ELSE/WHILE bodies (no BEGIN/END) on the control keyword's line when short enough. |
+
+## Development
+
+The extension lives in `vscode-extension/` of the [main repo](https://github.com/BadMonkeySoftware/right-way-sql-formatter); formatting logic lives in the repo's .NET core library — no language server, no parsing in JS.
+
+### Build
+
+From the `vscode-extension/` directory:
 
 ```bash
-cd vscode-extension
+npm install
+npm run build
+```
+
+`npm run build` finds the .NET SDK automatically (checks `~/.dotnet`, system locations, then PATH), publishes a self-contained `SqlFormatter` binary into `vscode-extension/bin/` for each supported platform, and compiles the TypeScript extension.
+
+### Run in dev mode
+
+Open the **`vscode-extension/` folder** in VS Code (not the repo root — otherwise `F5` won't find the extension manifest), then press `F5` to launch an Extension Development Host. Open any `.sql` file there and right-click to format.
+
+### Package
+
+```bash
 npm run package
-# Produces: right-way-sql-formatter-0.1.0.vsix
+# Produces: right-way-sql-formatter-<version>.vsix
 ```
 
-Install with:
+Install manually with:
+
 ```bash
-code --install-extension right-way-sql-formatter-0.1.0.vsix
+code --install-extension right-way-sql-formatter-<version>.vsix
 ```
+
+## License
+
+[AGPL-3.0-or-later](LICENSE.txt). Forked from Poor Man's T-SQL Formatter.
