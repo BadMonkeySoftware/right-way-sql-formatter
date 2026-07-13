@@ -1,4 +1,4 @@
-# Right Way SQL Formatter
+# Right Way T-SQL Formatter
 
 [![Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/BadMonkeySoftware.rightway-sql-formatter?label=Marketplace&color=0078d4)](https://marketplace.visualstudio.com/items?itemName=BadMonkeySoftware.rightway-sql-formatter)
 [![Installs](https://img.shields.io/visual-studio-marketplace/i/BadMonkeySoftware.rightway-sql-formatter?color=0078d4)](https://marketplace.visualstudio.com/items?itemName=BadMonkeySoftware.rightway-sql-formatter)

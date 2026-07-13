@@ -21,7 +21,7 @@ import * as fs from 'fs';
  * Registers the two formatting commands.
  */
 export function activate(context: vscode.ExtensionContext): void {
-    console.log('Right Way SQL Formatter activated');
+    console.log('Right Way T-SQL Formatter activated');
 
     // Serves formatted-SQL previews as read-only virtual documents for the diff view.
     const previewProvider = new FormatPreviewProvider();

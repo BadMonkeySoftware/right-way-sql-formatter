@@ -1,6 +1,6 @@
 {
   "name": "rightway-sql-formatter",
-  "displayName": "Right Way SQL Formatter",
+  "displayName": "Right Way T-SQL Formatter",
   "description": "T-SQL formatter for SSMS-style SQL — format document or selection with configurable rules.",
   "repository": {
     "type": "git",
@@ -71,7 +71,7 @@
       ]
     },
     "configuration": {
-      "title": "Right Way SQL Formatter",
+      "title": "Right Way T-SQL Formatter",
       "properties": {
         "rightWaySqlFormatter.executablePath": {
           "type": "string",
