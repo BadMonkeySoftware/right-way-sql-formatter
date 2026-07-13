@@ -1,8 +1,8 @@
 # Right Way SQL Formatter
 
-[![Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/bad-monkey-software.right-way-sql-formatter?label=Marketplace&color=0078d4)](https://marketplace.visualstudio.com/items?itemName=bad-monkey-software.right-way-sql-formatter)
-[![Installs](https://img.shields.io/visual-studio-marketplace/i/bad-monkey-software.right-way-sql-formatter?color=0078d4)](https://marketplace.visualstudio.com/items?itemName=bad-monkey-software.right-way-sql-formatter)
-[![Rating](https://img.shields.io/visual-studio-marketplace/r/bad-monkey-software.right-way-sql-formatter?color=0078d4)](https://marketplace.visualstudio.com/items?itemName=bad-monkey-software.right-way-sql-formatter&ssr=false#review-details)
+[![Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/BadMonkeySoftware.right-way-sql-formatter?label=Marketplace&color=0078d4)](https://marketplace.visualstudio.com/items?itemName=BadMonkeySoftware.right-way-sql-formatter)
+[![Installs](https://img.shields.io/visual-studio-marketplace/i/BadMonkeySoftware.right-way-sql-formatter?color=0078d4)](https://marketplace.visualstudio.com/items?itemName=BadMonkeySoftware.right-way-sql-formatter)
+[![Rating](https://img.shields.io/visual-studio-marketplace/r/BadMonkeySoftware.right-way-sql-formatter?color=0078d4)](https://marketplace.visualstudio.com/items?itemName=BadMonkeySoftware.right-way-sql-formatter&ssr=false#review-details)
 [![License: AGPL-3.0-or-later](https://img.shields.io/badge/License-AGPL--3.0--or--later-blue)](https://github.com/BadMonkeySoftware/right-way-sql-formatter/blob/main/LICENSE.txt)
 
 Format T-SQL in VS Code — the classic SSMS "Poor Man's T-SQL Formatter" style, modernized. Battle-tested against 396 real-world SQL files (First Responder Kit, Ola Hallengren, sp_WhoIsActive, DarlingData, tSQLt).
