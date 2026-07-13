@@ -11,7 +11,7 @@ dotnet build RightWaySqlFormatter.NoSSMS.slnx
 # Full solution build — Windows only (includes SSMS plugin)
 dotnet build RightWaySqlFormatter.slnx
 
-# Run all tests (expected: 349 total, 0 failed, 2 skipped)
+# Run all tests (expected: 414 total, 0 failed, 2 skipped)
 dotnet test RightWaySqlFormatter.NoSSMS.slnx
 
 # Regenerate expected-output files (deliberate use only — see Tests section)
@@ -71,7 +71,7 @@ Data files are byte-exact (BOM + CRLF significant); `.editorconfig` carves `Data
 **Regenerating expected files:** use the `[Explicit]` test `ExpectedOutputRegenerator.RegenerateExpectedFiles` (never runs in a normal `dotnet test`):
 
 ```bash
-REGEN_FILES="<expected-file>.sql;<expected-file>(Option=True).sql" \
+REGEN_FILES="<expected-file>.sql;<expected-file>__<Slug>.sql" \
   dotnet test RightWaySqlFormatter.NoSSMS.slnx --filter "Name~RegenerateExpectedFiles"
 ```
 

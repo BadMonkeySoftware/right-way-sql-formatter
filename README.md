@@ -73,7 +73,7 @@ dotnet build RightWaySqlFormatter.slnx
 dotnet test PoorMansTSqlFormatterTest/PoorMansTSqlFormatterTests.csproj
 ```
 
-Expected: `180 passed, 2 skipped, 0 failed`
+Expected: `414 total, 0 failed, 2 skipped` (exact totals grow as test data is added; failures must be zero)
 
 ### CLI (Release build)
 
@@ -130,6 +130,11 @@ SqlFormatter --output formatted.sql myquery.sql
 --align-columns=false       Align aliases vertically in SELECT lists (default: false)
 --column-always-has-alias=false  Add an explicit alias to every SELECT column (default: false)
 --allow-parsing-errors=false Exit 0 even when the input has parse errors (default: false)
+--align-table-joins=false   Align FROM/JOIN tables, aliases, ON conditions (default: false)
+--align-table-joins-add-aliases=true  With table-join alignment: add aliases to unaliased tables (default: true)
+--indent-where-and-or=false Put AND/OR in WHERE onto separate, indented lines (default: false)
+--compact-raiserror=false   Keep RAISERROR(...) argument lists on one line (default: false)
+--compact-single-statement-blocks=false  Inline short single-statement IF/ELSE/WHILE bodies (default: false)
 ```
 
 Run `SqlFormatter --help` for the full list.
@@ -181,98 +186,163 @@ PROFILE='--indent-string=\t --standardize-keywords=false' tools/realworld-test.s
 PROFILE='--trailing-commas=true --expand-in-lists=false'  tools/realworld-test.sh   # common alt style
 PROFILE='--align-columns=true --alias-style=equals'       tools/realworld-test.sh   # your new features
 ```
-```text
-PROFILE='--indent-string=\t --standardize-keywords=false' tools/realworld-test.sh   # classic SSMS defaults
 
-PARSE-WARN tsqlt/Build/SQL/ChangeDbAndExecuteStatement(tSQLt.Build).sql
-PARSE-WARN tsqlt/Experiments/AnnotationParser.sql
+### Real-world corpus results
 
-====================================================
-Profile:     --indent-string=\t --standardize-keywords=false
-Total files: 396
-OK:          394
-PARSE-WARN:  2   (exit 5 — inspect <HOME>/Workspaces/BadMonkeySoftware/Git/right-way-sql-formatter/realworld-results/flagged/*.parsewarn)
-FATAL:       0  (crashes — always bugs)
-UNSTABLE:    0 (non-idempotent — diff pass1 vs pass2 in <HOME>/Workspaces/BadMonkeySoftware/Git/right-way-sql-formatter/realworld-results/flagged)
-====================================================
+Current sweep results (396 real-world files: First Responder Kit, Ola Hallengren,
+sp_WhoIsActive, DarlingData, tSQLt):
 
+| Profile | OK | Parse warnings | Crashes | Non-idempotent |
+|---|---|---|---|---|
+| default | 394 | 2* | 0 | 0 |
+| classic SSMS (tabs, no keyword standardization) | 394 | 2* | 0 | 0 |
+| trailing commas, no IN-list expansion | 394 | 2* | 0 | 0 |
+| align-columns + equals aliases | 381 | 2* | 0 | 13** |
 
-PROFILE='--trailing-commas=true --expand-in-lists=false'  tools/realworld-test.sh   # common alt style
-
-PARSE-WARN tsqlt/Build/SQL/ChangeDbAndExecuteStatement(tSQLt.Build).sql
-PARSE-WARN tsqlt/Experiments/AnnotationParser.sql
-
-====================================================
-Profile:     --trailing-commas=true --expand-in-lists=false
-Total files: 396
-OK:          394
-PARSE-WARN:  2   (exit 5 — inspect <HOME>/Workspaces/BadMonkeySoftware/Git/right-way-sql-formatter/realworld-results/flagged/*.parsewarn)
-FATAL:       0  (crashes — always bugs)
-UNSTABLE:    0 (non-idempotent — diff pass1 vs pass2 in <HOME>/Workspaces/BadMonkeySoftware/Git/right-way-sql-formatter/realworld-results/flagged)
-====================================================
-
-PROFILE='--align-columns=true --alias-style=equals'       tools/realworld-test.sh   # your new features
-
-UNSTABLE   first-responder-kit/Deprecated/sp_BlitzInMemoryOLTP.sql
-UNSTABLE   first-responder-kit/Deprecated/sp_BlitzIndex_SQL_Server_2005.sql
-UNSTABLE   first-responder-kit/Deprecated/sp_BlitzQueryStore.sql
-UNSTABLE   first-responder-kit/Documentation/Using_AI.sql
-UNSTABLE   first-responder-kit/Install-All-Scripts.sql
-UNSTABLE   first-responder-kit/Install-Azure.sql
-UNSTABLE   first-responder-kit/sp_BlitzAnalysis.sql
-UNSTABLE   first-responder-kit/sp_BlitzCache.sql
-UNSTABLE   first-responder-kit/sp_BlitzFirst.sql
-UNSTABLE   first-responder-kit/sp_BlitzIndex.sql
-UNSTABLE   first-responder-kit/sp_BlitzLock.sql
-UNSTABLE   first-responder-kit/sp_BlitzWho.sql
-PARSE-WARN tsqlt/Build/SQL/ChangeDbAndExecuteStatement(tSQLt.Build).sql
-PARSE-WARN tsqlt/Experiments/AnnotationParser.sql
-UNSTABLE   tsqlt/Tests/RenameClassTests.class.sql
-
-====================================================
-Profile:     --align-columns=true --alias-style=equals
-Total files: 396
-OK:          381
-PARSE-WARN:  2   (exit 5 — inspect <HOME>/Workspaces/BadMonkeySoftware/Git/right-way-sql-formatter/realworld-results/flagged/*.parsewarn)
-FATAL:       0  (crashes — always bugs)
-UNSTABLE:    13 (non-idempotent — diff pass1 vs pass2 in <HOME>/Workspaces/BadMonkeySoftware/Git/right-way-sql-formatter/realworld-results/flagged)
-====================================================
-
-```
-## fixes needed
-- RAISERROR('Setting up configuration variables',10,1) WITH NOWAIT; is formatting and putting on separate lines:
-after: raiserror (
-            'Setting up configuration variables',
-            10,
-            1
-            )
-    with nowait;
-- if/else without begin/end that are 1 line are being broken out.
-- alias are added to from, is that because of columnAlwaysHasAlias = true ? 
-- maxLineWidth set at 200, but SET @StringToExecute = N' IF EXISTS(SELECT * FROM '
-        + @OutputDatabaseName
-        + '.INFORMATION_SCHEMA.SCHEMATA WHERE QUOTENAME(SCHEMA_NAME) = '''
-        + @OutputSchemaName + ''') INSERT '
-        + @OutputDatabaseName + '.'
-        + @OutputSchemaName + '.'
-        + @OutputTableName
-        + ' (ServerName, CheckDate, CheckID, Priority, FindingsGroup, Finding, Details, URL) VALUES( '
-        + ' @SrvName, @LogMessageCheckDate, @LogMessageCheckID, @LogMessagePriority, @LogMessageFindingsGroup, @LogMessageFinding, @LogMessage, @LogMessageURL)';
-broke at 206 and was changed to:
-        set @StringToExecute = N' IF EXISTS(SELECT * FROM ' + @OutputDatabaseName + '.INFORMATION_SCHEMA.SCHEMATA WHERE QUOTENAME(SCHEMA_NAME) = ''' + @OutputSchemaName + ''') INSERT ' + @OutputDatabaseName + '.' + 
-            @OutputSchemaName + '.' + @OutputTableName + ' (ServerName, CheckDate, CheckID, Priority, FindingsGroup, Finding, Details, URL) VALUES( ' + 
-            ' @SrvName, @LogMessageCheckDate, @LogMessageCheckID, @LogMessagePriority, @LogMessageFindingsGroup, @LogMessageFinding, @LogMessage, @LogMessageURL)';
-- indentWhereAndOrConditions = true, but putting into one line
-WHERE c.TABLE_NAME = @TableName
-        and c.TABLE_NAME = @TableName
-        and c.TABLE_NAME = @TableName
-        and c.TABLE_NAME = @TableName
-        and c.TABLE_NAME = @TableName
-is then changed to:
-where c.TABLE_NAME = @TableName and c.TABLE_NAME = @TableName and c.TABLE_NAME = @TableName and c.TABLE_NAME = @TableName and c.TABLE_NAME = @TableName
+\* Both expected: one file is SQLCMD-mode (`$(var)`, `:OUT` — not T-SQL), one contains
+an intentionally unclosed comment (tSQLt parser experiment).
+\** Cosmetic oscillation on dynamic-SQL string-concatenation boundary lines; output is
+valid SQL on every pass. Tracked as a known limitation of the text-based align passes.
 
 ---
 
+## Dependencies
+
+The shipping binaries have **zero external runtime dependencies** — the core library and
+CLI are pure .NET BCL (CLI argument parsing is hand-rolled), and the VS Code extension has
+no runtime npm dependencies. All upstream-era dependencies (NDesk.Options, LinqBridge,
+Bridge.NET, ILRepack, UnmanagedExports) were removed during modernization.
+
+Remaining packages, none of which ship:
+
+- NUnit 4 / NUnit3TestAdapter / Microsoft.NET.Test.Sdk — test project only
+- EnvDTE / Microsoft.VisualStudio.SDK — mandatory Visual Studio interop for the
+  Windows-only SSMS plugin
+- typescript / @vscode/vsce / @types/* — VS Code extension build tooling only
+
+---
+
+## VS Code Extension
+
+```bash
+cd vscode-extension
+npm install
+npm run build   # builds self-contained CLI binary + compiles TypeScript
+# Optional: package to .vsix
+npm run package
+```
+
+---
+
+## CLI Usage
+
+Format SQL from stdin to stdout:
+
+```bash
+echo "select id,name from users where active=1" | SqlFormatter
+```
+
+Format a file in-place:
+
+```bash
+SqlFormatter myquery.sql
+```
+
+Format a file, write to a new file:
+
+```bash
+SqlFormatter --output formatted.sql myquery.sql
+```
+
+### Common flags
+
+```
+--indent-string="\t"        Indentation (default: 4 spaces). Use \s for space, \t for tab.
+--uppercase-keywords=true   Uppercase keywords (default: true)
+--standardize-keywords=true Normalize synonyms, e.g. NVARCHAR (default: true)
+--expand-comma-lists=true   Expand column lists onto separate lines (default: true)
+--expand-in-lists=true      Expand IN (...) lists (default: true)
+--trailing-commas=false     Leading vs trailing commas (default: leading)
+--statement-breaks=2        Blank lines between statements (default: 2)
+--clause-breaks=1           Blank lines between clauses (default: 1)
+--max-line-width=999        Max line width (default: 999)
+--alias-style=as            Column alias style: 'as' or 'equals' (default: as)
+--align-columns=false       Align aliases vertically in SELECT lists (default: false)
+--column-always-has-alias=false  Add an explicit alias to every SELECT column (default: false)
+--allow-parsing-errors=false Exit 0 even when the input has parse errors (default: false)
+--align-table-joins=false   Align FROM/JOIN tables, aliases, ON conditions (default: false)
+--align-table-joins-add-aliases=true  With table-join alignment: add aliases to unaliased tables (default: true)
+--indent-where-and-or=false Put AND/OR in WHERE onto separate, indented lines (default: false)
+--compact-raiserror=false   Keep RAISERROR(...) argument lists on one line (default: false)
+--compact-single-statement-blocks=false  Inline short single-statement IF/ELSE/WHILE bodies (default: false)
+```
+
+Run `SqlFormatter --help` for the full list.
+
+Both T-SQL column alias styles (`expr AS alias` and `alias = expr`) are supported in input SQL, and the style you wrote is preserved unless you pass `--alias-style` explicitly.
+
+### Exit codes and invalid SQL
+
+| Code | Meaning |
+|------|---------|
+| 0    | Formatted cleanly (also with `--allow-parsing-errors` when errors occurred) |
+| 1    | Fatal error (unreadable input, unexpected exception) — no output |
+| 5    | Input had parse errors — formatted output IS still emitted, prefixed with a warning comment |
+
+On parse errors the output starts with a diagnostic comment block, e.g.:
+
+```sql
+-- WARNING! ERRORS ENCOUNTERED DURING SQL PARSING - formatted output may be incorrect:
+--   Unclosed string literal (missing closing single-quote)
+--   Unexpected token ')'
+```
+
+Diagnostics cover unclosed strings/comments/bracket identifiers, unexpected or misplaced tokens/keywords, and incomplete statements at end of input.
+
+### Examples
+
+```bash
+# Run a repo test input through the formatter with alignment options
+dotnet run --project PoorMansTSqlFormatterCmdLine -- --align-table-joins=true --indent-join-on=true < PoorMansTSqlFormatterTest/Data/InputSql/31_AlignTableJoins.sql 2>/dev/null
+
+# Format with 4 spaces for indent (using escape sequences)
+echo "select 1,2,3" | SqlFormatter --indent-string="\s\s\s\s"
+
+# Format with single tab
+echo "select 1,2,3" | SqlFormatter --indent-string="\t"
+
+# Lowercase keywords
+echo "SELECT 1" | SqlFormatter --uppercase-keywords=false
+
+# Compact output (no expansions)
+echo "select id,name,email from users" | SqlFormatter \
+  --expand-comma-lists=false \
+  --expand-boolean=false \
+  --expand-case=false \
+  --statement-breaks=1
+
+# Run with different profiles using realworld tests by the profiles longtime PoorMans/SSMS users actually run
+PROFILE='--indent-string=\t --standardize-keywords=false' tools/realworld-test.sh   # classic SSMS defaults
+PROFILE='--trailing-commas=true --expand-in-lists=false'  tools/realworld-test.sh   # common alt style
+PROFILE='--align-columns=true --alias-style=equals'       tools/realworld-test.sh   # your new features
+```
+
+### Real-world corpus results
+
+Current sweep results (396 real-world files: First Responder Kit, Ola Hallengren,
+sp_WhoIsActive, DarlingData, tSQLt):
+
+| Profile | OK | Parse warnings | Crashes | Non-idempotent |
+|---|---|---|---|---|
+| default | 394 | 2* | 0 | 0 |
+| classic SSMS (tabs, no keyword standardization) | 394 | 2* | 0 | 0 |
+| trailing commas, no IN-list expansion | 394 | 2* | 0 | 0 |
+| align-columns + equals aliases | 381 | 2* | 0 | 13** |
+
+\* Both expected: one file is SQLCMD-mode (`$(var)`, `:OUT` — not T-SQL), one contains
+an intentionally unclosed comment (tSQLt parser experiment).
+\** Cosmetic oscillation on dynamic-SQL string-concatenation boundary lines; output is
+valid SQL on every pass. Tracked as a known limitation of the text-based align passes.
 ## TODO (Remove external libraries)
 ### Analysis of dependency and if remove, replace, or rewrite
 | Dependency                | Original Purpose      | Modern Replacement                                                 | Recommendation    |

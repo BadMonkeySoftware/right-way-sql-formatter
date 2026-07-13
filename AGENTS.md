@@ -19,13 +19,13 @@ Expected output files live in `PoorMansTSqlFormatterTest/Data/StandardFormatSql/
 
 ### How to regenerate expected files correctly
 
-Use the formatter library directly, not the CLI — CLI defaults may differ from what the test harness uses. The test harness builds a `TSqlStandardFormatter` from `TSqlStandardFormatterOptions(configString)` where `configString` is the `(...)` portion of the filename.
+Use the formatter library directly, not the CLI — CLI defaults may differ from what the test harness uses. The test harness builds a `TSqlStandardFormatter` from `TSqlStandardFormatterOptions(configString)` where `configString` is derived from the filename's `__Slug1_Slug2` suffix via `Utils.CONFIG_SLUGS`.
 
 ---
 
 ## General Coding Rules
 
-- Run `dotnet test` before marking any task done. All tests must pass (baseline: 349 total, 0 failed, 2 skipped).
+- Run `dotnet test` before marking any task done. All tests must pass (baseline: 414 total, 0 failed, 2 skipped).
 - Do not suppress or skip tests without approval.
 - This is a personal project — no deadlines, but code quality matters. Don't cut corners.
 - SSMS plugin tasks require a Windows build environment and cannot be executed on this Mac dev machine — flag these explicitly rather than guessing.
