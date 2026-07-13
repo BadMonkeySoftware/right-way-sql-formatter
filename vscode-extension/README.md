@@ -1,8 +1,24 @@
 # Right Way SQL Formatter
 
-Formats T-SQL in VS Code — the classic SSMS "Poor Man's T-SQL Formatter" style, modernized. All formatting is done by a bundled native `SqlFormatter` binary (no .NET runtime required); the extension pipes SQL via stdin and applies the result as minimal edits.
+[![Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/bad-monkey-software.right-way-sql-formatter?label=Marketplace&color=0078d4)](https://marketplace.visualstudio.com/items?itemName=bad-monkey-software.right-way-sql-formatter)
+[![Installs](https://img.shields.io/visual-studio-marketplace/i/bad-monkey-software.right-way-sql-formatter?color=0078d4)](https://marketplace.visualstudio.com/items?itemName=bad-monkey-software.right-way-sql-formatter)
+[![Rating](https://img.shields.io/visual-studio-marketplace/r/bad-monkey-software.right-way-sql-formatter?color=0078d4)](https://marketplace.visualstudio.com/items?itemName=bad-monkey-software.right-way-sql-formatter&ssr=false#review-details)
+[![License: AGPL-3.0-or-later](https://img.shields.io/badge/License-AGPL--3.0--or--later-blue)](https://github.com/BadMonkeySoftware/right-way-sql-formatter/blob/main/LICENSE.txt)
 
-## Features
+Format T-SQL in VS Code — the classic SSMS "Poor Man's T-SQL Formatter" style, modernized. Battle-tested against 396 real-world SQL files (First Responder Kit, Ola Hallengren, sp_WhoIsActive, DarlingData, tSQLt).
+
+![Formatting a messy T-SQL query with Right Way SQL: Format Document](images/demo.gif)
+
+## Highlights
+
+- **Native speed, zero dependencies** — formatting runs in a bundled native binary (win-x64/arm64, macOS x64/arm64, Linux x64/arm64). No .NET runtime, no language server, nothing to install.
+- **Diff preview before you commit** — review proposed formatting in VS Code's built-in diff editor, then Apply or Discard.
+- **Minimal edits** — only changed lines are touched: cursor position survives, undo is one clean step.
+- **Never destroys invalid SQL** — unparseable input still gets best-effort formatting plus a diagnostic comment with line numbers, never a silent failure.
+- **Your style, preserved** — both `expr AS alias` and `alias = expr` column alias styles are kept as you wrote them.
+- **27 formatting options** — from classic SSMS defaults to trailing commas, vertical alignment of columns and JOINs, and compact single-statement blocks.
+
+## Commands
 
 | Command | Description |
 |---|---|
