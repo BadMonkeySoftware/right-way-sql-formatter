@@ -185,6 +185,9 @@ echo "select id,name,email from users" | SqlFormatter \
 PROFILE='--indent-string=\t --standardize-keywords=false' tools/realworld-test.sh   # classic SSMS defaults
 PROFILE='--trailing-commas=true --expand-in-lists=false'  tools/realworld-test.sh   # common alt style
 PROFILE='--align-columns=true --alias-style=equals'       tools/realworld-test.sh   # your new features
+
+# ultimate profile with new formatting way
+PROFILE='--expand-between=false --expand-boolean=false --expand-case=false --expand-in-lists=false --uppercase-keywords=false --standardize-keywords=false --trailing-commas=true --align-table-joins=true --column-always-has-alias=true --select-first-column-newline=true --align-columns=true --align-ddl-columns=true --alias-style=equals --indent-where-and-or=true --max-line-width=200 --compact-raiserror=true --compact-single-statement-blocks=true' tools/realworld-test.sh
 ```
 
 ### Real-world corpus results
