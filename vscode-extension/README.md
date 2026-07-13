@@ -1,8 +1,8 @@
 # Right Way SQL Formatter
 
-[![Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/BadMonkeySoftware.right-way-sql-formatter?label=Marketplace&color=0078d4)](https://marketplace.visualstudio.com/items?itemName=BadMonkeySoftware.right-way-sql-formatter)
-[![Installs](https://img.shields.io/visual-studio-marketplace/i/BadMonkeySoftware.right-way-sql-formatter?color=0078d4)](https://marketplace.visualstudio.com/items?itemName=BadMonkeySoftware.right-way-sql-formatter)
-[![Rating](https://img.shields.io/visual-studio-marketplace/r/BadMonkeySoftware.right-way-sql-formatter?color=0078d4)](https://marketplace.visualstudio.com/items?itemName=BadMonkeySoftware.right-way-sql-formatter&ssr=false#review-details)
+[![Marketplace Version](https://img.shields.io/visual-studio-marketplace/v/BadMonkeySoftware.rightway-sql-formatter?label=Marketplace&color=0078d4)](https://marketplace.visualstudio.com/items?itemName=BadMonkeySoftware.rightway-sql-formatter)
+[![Installs](https://img.shields.io/visual-studio-marketplace/i/BadMonkeySoftware.rightway-sql-formatter?color=0078d4)](https://marketplace.visualstudio.com/items?itemName=BadMonkeySoftware.rightway-sql-formatter)
+[![Rating](https://img.shields.io/visual-studio-marketplace/r/BadMonkeySoftware.rightway-sql-formatter?color=0078d4)](https://marketplace.visualstudio.com/items?itemName=BadMonkeySoftware.rightway-sql-formatter&ssr=false#review-details)
 [![License: AGPL-3.0-or-later](https://img.shields.io/badge/License-AGPL--3.0--or--later-blue)](https://github.com/BadMonkeySoftware/right-way-sql-formatter/blob/main/LICENSE.txt)
 
 Format T-SQL in VS Code — the classic SSMS "Poor Man's T-SQL Formatter" style, modernized. Battle-tested against 396 real-world SQL files (First Responder Kit, Ola Hallengren, sp_WhoIsActive, DarlingData, tSQLt).
@@ -145,7 +145,7 @@ Marketplace releases are **platform-specific** — each user downloads only thei
 
 ```bash
 npm run package:all
-# Produces: dist/right-way-sql-formatter-<target>-<version>.vsix (one per platform)
+# Produces: dist/rightway-sql-formatter-<target>-<version>.vsix (one per platform)
 
 # Publish all of them:
 npx vsce publish --packagePath dist/*.vsix
@@ -155,7 +155,7 @@ For a single universal .vsix (all platforms bundled, much larger — local insta
 
 ```bash
 npm run package
-# Produces: right-way-sql-formatter-<version>.vsix
+# Produces: rightway-sql-formatter-<version>.vsix
 ```
 
 Install a .vsix manually with:

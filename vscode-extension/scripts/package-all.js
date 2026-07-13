@@ -42,8 +42,8 @@ for (const target of TARGETS) {
         shell: process.platform === 'win32',
         env: { ...process.env, RWSQL_TARGET: target.vsce },
     });
-    const version = JSON.parse(fs.readFileSync(path.join(EXT_DIR, 'package.json'), 'utf8')).version;
-    const vsix = path.join(DIST_DIR, `right-way-sql-formatter-${target.vsce}-${version}.vsix`);
+    const pkg = JSON.parse(fs.readFileSync(path.join(EXT_DIR, 'package.json'), 'utf8'));
+    const vsix = path.join(DIST_DIR, `${pkg.name}-${target.vsce}-${pkg.version}.vsix`);
     if (!fs.existsSync(vsix)) {
         console.error(`ERROR: expected package not found: ${vsix}`);
         process.exit(1);

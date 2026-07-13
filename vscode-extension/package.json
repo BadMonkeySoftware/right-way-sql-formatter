@@ -1,12 +1,12 @@
 {
-  "name": "right-way-sql-formatter",
+  "name": "rightway-sql-formatter",
   "displayName": "Right Way SQL Formatter",
   "description": "T-SQL formatter for SSMS-style SQL — format document or selection with configurable rules.",
   "repository": {
     "type": "git",
     "url": "https://github.com/BadMonkeySoftware/right-way-sql-formatter.git"
   },
-  "version": "0.1.2",
+  "version": "0.1.3",
   "icon": "rightwayIcon.png",
   "publisher": "BadMonkeySoftware",
   "engines": {
