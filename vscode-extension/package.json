@@ -4,7 +4,7 @@
   "description": "T-SQL formatter for SSMS-style SQL — format document or selection with configurable rules.",
   "repository": {
     "type": "git",
-    "url": "git@github.com:BadMonkeySoftware/right-way-sql-formatter.git "
+    "url": "https://github.com/BadMonkeySoftware/right-way-sql-formatter.git"
   },
   "version": "0.1.1",
   "icon": "rightwayIcon.png",
@@ -15,7 +15,7 @@
   "categories": [
     "Formatters"
   ],
-  "license": "AGPL v3.0",
+  "license": "AGPL-3.0-or-later",
   "keywords": [
     "sql",
     "tsql",
