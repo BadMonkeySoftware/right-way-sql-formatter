@@ -32,6 +32,8 @@ All commands are available in the right-click context menu when editing a `.sql`
 
 `Format Document (Preview)` shows the proposed formatting in VS Code's built-in diff editor — green/red change highlighting, side-by-side or inline — before anything touches your file. Choose **Apply** to apply (formatting re-runs against the document's current text, so it's safe even if you kept typing), or **Discard** to close the preview unchanged.
 
+![Format Document (Preview): review the diff, then Apply or Discard](images/preview-diff.gif)
+
 ### Minimal edits
 
 Formatting is applied as line-level minimal edits (computed with an LCS diff) rather than replacing the whole document: cursor position survives, undo is a single clean step, and unchanged lines are untouched. Replacement text uses the document's own line endings.

@@ -7,6 +7,9 @@ node_modules/**
 package-lock.json
 *.vsix
 dist/**
+# README images load from GitHub (vsce rewrites relative links using the
+# repository URL) — no need to ship ~2.8 MB of GIFs in every platform package.
+images/**
 
 # Keep: LICENSE.txt, README.md, package.json, rightwayIcon.png,
 # out/extension.js, and bin/** (bundled SqlFormatter CLI).
