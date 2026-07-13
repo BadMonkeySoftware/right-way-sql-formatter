@@ -127,10 +127,11 @@ From the `vscode-extension/` directory:
 
 ```bash
 npm install
-npm run build
+npm run build:host   # fast dev loop: binary for this machine only + TypeScript
+npm run build        # binaries for all six platforms + TypeScript
 ```
 
-`npm run build` finds the .NET SDK automatically (checks `~/.dotnet`, system locations, then PATH), publishes a self-contained `SqlFormatter` binary into `vscode-extension/bin/` for each supported platform, and compiles the TypeScript extension.
+The build finds the .NET SDK automatically (checks `~/.dotnet`, system locations, then PATH) and publishes self-contained, trimmed `SqlFormatter` binaries into `vscode-extension/bin/<rid>/`. Supported platforms: win32-x64, win32-arm64, darwin-x64, darwin-arm64, linux-x64, linux-arm64. Set `RWSQL_NO_TRIM=1` to disable IL trimming when debugging the CLI.
 
 ### Run in dev mode
 
@@ -138,15 +139,27 @@ Open the **`vscode-extension/` folder** in VS Code (not the repo root — otherw
 
 ### Package
 
+Marketplace releases are **platform-specific** — each user downloads only their platform's binary (~12 MB) instead of all six (~44 MB):
+
+```bash
+npm run package:all
+# Produces: dist/right-way-sql-formatter-<target>-<version>.vsix (one per platform)
+
+# Publish all of them:
+npx vsce publish --packagePath dist/*.vsix
+```
+
+For a single universal .vsix (all platforms bundled, much larger — local installs only):
+
 ```bash
 npm run package
 # Produces: right-way-sql-formatter-<version>.vsix
 ```
 
-Install manually with:
+Install a .vsix manually with:
 
 ```bash
-code --install-extension right-way-sql-formatter-<version>.vsix
+code --install-extension <file>.vsix
 ```
 
 ## License

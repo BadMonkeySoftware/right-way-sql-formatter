@@ -218,11 +218,14 @@
   },
   "scripts": {
     "build:cli": "node scripts/build-cli.js",
+    "build:cli:host": "node scripts/build-cli.js --target host",
     "compile": "tsc -p ./",
     "build": "npm run build:cli && npm run compile",
+    "build:host": "npm run build:cli:host && npm run compile",
     "watch": "tsc -watch -p ./",
-    "package": "npm run build && vsce package",
-    "vscode:prepublish": "npm run build"
+    "package": "vsce package",
+    "package:all": "node scripts/package-all.js",
+    "vscode:prepublish": "npm run compile && node scripts/build-cli.js"
   },
   "devDependencies": {
     "@types/node": "^25.6.0",

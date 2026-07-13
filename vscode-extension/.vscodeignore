@@ -6,6 +6,7 @@ out/**/*.map
 node_modules/**
 package-lock.json
 *.vsix
+dist/**
 
 # Keep: LICENSE.txt, README.md, package.json, rightwayIcon.png,
 # out/extension.js, and bin/** (bundled SqlFormatter CLI).

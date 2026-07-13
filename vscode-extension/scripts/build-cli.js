@@ -2,18 +2,22 @@
 /**
  * build-cli.js
  *
- * Publishes self-contained SqlFormatter binaries for all major platforms into vscode-extension/bin/<rid>/.
- * Run via: npm run build:cli
+ * Publishes self-contained, trimmed SqlFormatter binaries into
+ * vscode-extension/bin/<rid>/SqlFormatter[.exe].
  *
- * What it does:
- *   1. Locates the .NET SDK (checks ~/.dotnet, then PATH)
- *   2. Runs `dotnet publish` for each target RID (win-x64, win-arm64, osx-x64, osx-arm64, linux-x64, linux-arm64)
- *   3. Outputs each binary to bin/<rid>/SqlFormatter[.exe]
- *   4. Makes non-Windows binaries executable
+ * Usage:
+ *   node scripts/build-cli.js                  # all six platforms (default)
+ *   node scripts/build-cli.js --target host    # just this machine (fast dev loop)
+ *   node scripts/build-cli.js --target darwin-arm64   # one platform (VS Code target or .NET RID)
  *
- * No manual exports, no manual copies. Just: npm run build:cli
+ * The target may also be set via the RWSQL_TARGET env var (used by package-all.js).
+ * Set RWSQL_NO_TRIM=1 to disable IL trimming (debugging escape hatch).
  *
- * If you add new platforms, update the targets array below and the extension's resolveExecutablePath().
+ * bin/ is cleaned before every run so a single-target build never packages
+ * stale binaries from other platforms.
+ *
+ * If you add new platforms, update TARGETS below, package-all.js, and the
+ * extension's resolveExecutablePath().
  */
 
 const { execFileSync } = require('child_process');
@@ -29,16 +33,19 @@ const os = require('os');
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
 const CLI_PROJECT = path.join(REPO_ROOT, 'RightWaySqlFormatter.CmdLine', 'RightWaySqlFormatter.CmdLine.csproj');
 const BIN_DIR = path.join(__dirname, '..', 'bin');
-const BINARY_NAME = process.platform === 'win32' ? 'SqlFormatter.exe' : 'SqlFormatter';
-const BINARY_PATH = path.join(BIN_DIR, BINARY_NAME);
 
-// Runtime identifier — matches the machine we're building on
-function getRid() {
-    const plat = process.platform;
-    const arch = process.arch;
-    if (plat === 'darwin') return arch === 'arm64' ? 'osx-arm64' : 'osx-x64';
-    if (plat === 'win32')  return arch === 'arm64' ? 'win-arm64' : 'win-x64';
-    return arch === 'arm64' ? 'linux-arm64' : 'linux-x64';
+const { TARGETS, hostRid } = require('./targets');
+
+function resolveTargets(spec) {
+    if (!spec || spec === 'all') return TARGETS;
+    if (spec === 'host') spec = hostRid();
+    const match = TARGETS.find(t => t.vsce === spec || t.rid === spec);
+    if (!match) {
+        console.error(`ERROR: unknown target '${spec}'.`);
+        console.error(`Valid targets: all, host, ${TARGETS.map(t => t.vsce).join(', ')} (or the equivalent .NET RIDs)`);
+        process.exit(1);
+    }
+    return [match];
 }
 
 // ---------------------------------------------------------------------------
@@ -69,8 +76,12 @@ function findDotnet() {
 // Main
 // ---------------------------------------------------------------------------
 
+const argIdx = process.argv.indexOf('--target');
+const targetSpec = argIdx >= 0 ? process.argv[argIdx + 1] : (process.env.RWSQL_TARGET || 'all');
+const targets = resolveTargets(targetSpec);
+const noTrim = process.env.RWSQL_NO_TRIM === '1';
 
-console.log('Building self-contained SqlFormatter binaries for all platforms...');
+console.log(`Building self-contained SqlFormatter binaries (${targets.map(t => t.rid).join(', ')})${noTrim ? ' [trimming disabled]' : ''}...`);
 
 const dotnet = findDotnet();
 if (!dotnet) {
@@ -88,15 +99,9 @@ if (!fs.existsSync(CLI_PROJECT)) {
     process.exit(1);
 }
 
-// Target RIDs for all major platforms
-const targets = [
-    { rid: 'win-x64',    exe: 'SqlFormatter.exe' },
-    { rid: 'win-arm64',  exe: 'SqlFormatter.exe' },
-    { rid: 'osx-x64',    exe: 'SqlFormatter' },
-    { rid: 'osx-arm64',  exe: 'SqlFormatter' },
-    { rid: 'linux-x64',  exe: 'SqlFormatter' },
-    { rid: 'linux-arm64',exe: 'SqlFormatter' },
-];
+// Clean bin/ so single-target packages never contain stale other-platform binaries
+fs.rmSync(BIN_DIR, { recursive: true, force: true });
+fs.mkdirSync(BIN_DIR, { recursive: true });
 
 for (const target of targets) {
     const outDir = path.join(BIN_DIR, target.rid);
@@ -109,6 +114,15 @@ for (const target of targets) {
             '-r', target.rid,
             '--self-contained', 'true',
             '-p:PublishSingleFile=true',
+            // Trimming + single-file compression come from the CmdLine csproj
+            // (PublishTrimmed / EnableCompressionInSingleFile). Do NOT pass
+            // -p:PublishTrimmed=true globally here: it flows into the core
+            // library's net472 (SSMS) restore and fails with NETSDK1124.
+            // A global =false is safe, so the escape hatch works as an override.
+            ...(noTrim ? ['-p:PublishTrimmed=false'] : []),
+            // No debug symbols in shipping binaries.
+            '-p:DebugType=none',
+            '-p:DebugSymbols=false',
             '-o', outDir,
             '--nologo',
         ], {
@@ -133,4 +147,4 @@ for (const target of targets) {
     }
 }
 
-console.log('\nAll platform binaries built successfully.');
+console.log('\nAll requested platform binaries built successfully.');
