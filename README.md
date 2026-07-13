@@ -175,9 +175,116 @@ echo "select id,name,email from users" | SqlFormatter \
   --expand-boolean=false \
   --expand-case=false \
   --statement-breaks=1
+
+# Run with different profiles using realworld tests by the profiles longtime PoorMans/SSMS users actually run
+PROFILE='--indent-string=\t --standardize-keywords=false' tools/realworld-test.sh   # classic SSMS defaults
+PROFILE='--trailing-commas=true --expand-in-lists=false'  tools/realworld-test.sh   # common alt style
+PROFILE='--align-columns=true --alias-style=equals'       tools/realworld-test.sh   # your new features
 ```
+```text
+PROFILE='--indent-string=\t --standardize-keywords=false' tools/realworld-test.sh   # classic SSMS defaults
+
+PARSE-WARN tsqlt/Build/SQL/ChangeDbAndExecuteStatement(tSQLt.Build).sql
+PARSE-WARN tsqlt/Experiments/AnnotationParser.sql
+
+====================================================
+Profile:     --indent-string=\t --standardize-keywords=false
+Total files: 396
+OK:          394
+PARSE-WARN:  2   (exit 5 — inspect <HOME>/Workspaces/BadMonkeySoftware/Git/right-way-sql-formatter/realworld-results/flagged/*.parsewarn)
+FATAL:       0  (crashes — always bugs)
+UNSTABLE:    0 (non-idempotent — diff pass1 vs pass2 in <HOME>/Workspaces/BadMonkeySoftware/Git/right-way-sql-formatter/realworld-results/flagged)
+====================================================
+
+
+PROFILE='--trailing-commas=true --expand-in-lists=false'  tools/realworld-test.sh   # common alt style
+
+PARSE-WARN tsqlt/Build/SQL/ChangeDbAndExecuteStatement(tSQLt.Build).sql
+PARSE-WARN tsqlt/Experiments/AnnotationParser.sql
+
+====================================================
+Profile:     --trailing-commas=true --expand-in-lists=false
+Total files: 396
+OK:          394
+PARSE-WARN:  2   (exit 5 — inspect <HOME>/Workspaces/BadMonkeySoftware/Git/right-way-sql-formatter/realworld-results/flagged/*.parsewarn)
+FATAL:       0  (crashes — always bugs)
+UNSTABLE:    0 (non-idempotent — diff pass1 vs pass2 in <HOME>/Workspaces/BadMonkeySoftware/Git/right-way-sql-formatter/realworld-results/flagged)
+====================================================
+
+PROFILE='--align-columns=true --alias-style=equals'       tools/realworld-test.sh   # your new features
+
+UNSTABLE   first-responder-kit/Deprecated/sp_BlitzInMemoryOLTP.sql
+UNSTABLE   first-responder-kit/Deprecated/sp_BlitzIndex_SQL_Server_2005.sql
+UNSTABLE   first-responder-kit/Deprecated/sp_BlitzQueryStore.sql
+UNSTABLE   first-responder-kit/Documentation/Using_AI.sql
+UNSTABLE   first-responder-kit/Install-All-Scripts.sql
+UNSTABLE   first-responder-kit/Install-Azure.sql
+UNSTABLE   first-responder-kit/sp_BlitzAnalysis.sql
+UNSTABLE   first-responder-kit/sp_BlitzCache.sql
+UNSTABLE   first-responder-kit/sp_BlitzFirst.sql
+UNSTABLE   first-responder-kit/sp_BlitzIndex.sql
+UNSTABLE   first-responder-kit/sp_BlitzLock.sql
+UNSTABLE   first-responder-kit/sp_BlitzWho.sql
+PARSE-WARN tsqlt/Build/SQL/ChangeDbAndExecuteStatement(tSQLt.Build).sql
+PARSE-WARN tsqlt/Experiments/AnnotationParser.sql
+UNSTABLE   tsqlt/Tests/RenameClassTests.class.sql
+
+====================================================
+Profile:     --align-columns=true --alias-style=equals
+Total files: 396
+OK:          381
+PARSE-WARN:  2   (exit 5 — inspect <HOME>/Workspaces/BadMonkeySoftware/Git/right-way-sql-formatter/realworld-results/flagged/*.parsewarn)
+FATAL:       0  (crashes — always bugs)
+UNSTABLE:    13 (non-idempotent — diff pass1 vs pass2 in <HOME>/Workspaces/BadMonkeySoftware/Git/right-way-sql-formatter/realworld-results/flagged)
+====================================================
+
+```
+## fixes needed
+- RAISERROR('Setting up configuration variables',10,1) WITH NOWAIT; is formatting and putting on separate lines:
+after: raiserror (
+            'Setting up configuration variables',
+            10,
+            1
+            )
+    with nowait;
+- if/else without begin/end that are 1 line are being broken out.
+- alias are added to from, is that because of columnAlwaysHasAlias = true ? 
+- maxLineWidth set at 200, but SET @StringToExecute = N' IF EXISTS(SELECT * FROM '
+        + @OutputDatabaseName
+        + '.INFORMATION_SCHEMA.SCHEMATA WHERE QUOTENAME(SCHEMA_NAME) = '''
+        + @OutputSchemaName + ''') INSERT '
+        + @OutputDatabaseName + '.'
+        + @OutputSchemaName + '.'
+        + @OutputTableName
+        + ' (ServerName, CheckDate, CheckID, Priority, FindingsGroup, Finding, Details, URL) VALUES( '
+        + ' @SrvName, @LogMessageCheckDate, @LogMessageCheckID, @LogMessagePriority, @LogMessageFindingsGroup, @LogMessageFinding, @LogMessage, @LogMessageURL)';
+broke at 206 and was changed to:
+        set @StringToExecute = N' IF EXISTS(SELECT * FROM ' + @OutputDatabaseName + '.INFORMATION_SCHEMA.SCHEMATA WHERE QUOTENAME(SCHEMA_NAME) = ''' + @OutputSchemaName + ''') INSERT ' + @OutputDatabaseName + '.' + 
+            @OutputSchemaName + '.' + @OutputTableName + ' (ServerName, CheckDate, CheckID, Priority, FindingsGroup, Finding, Details, URL) VALUES( ' + 
+            ' @SrvName, @LogMessageCheckDate, @LogMessageCheckID, @LogMessagePriority, @LogMessageFindingsGroup, @LogMessageFinding, @LogMessage, @LogMessageURL)';
+- indentWhereAndOrConditions = true, but putting into one line
+WHERE c.TABLE_NAME = @TableName
+        and c.TABLE_NAME = @TableName
+        and c.TABLE_NAME = @TableName
+        and c.TABLE_NAME = @TableName
+        and c.TABLE_NAME = @TableName
+is then changed to:
+where c.TABLE_NAME = @TableName and c.TABLE_NAME = @TableName and c.TABLE_NAME = @TableName and c.TABLE_NAME = @TableName and c.TABLE_NAME = @TableName
 
 ---
+
+## TODO (Remove external libraries)
+### Analysis of dependency and if remove, replace, or rewrite
+| Dependency                | Original Purpose      | Modern Replacement                                                 | Recommendation    |
+| ------------------------- | --------------------- | ------------------------------------------------------------------ | ----------------- |
+| NDesk.Options             | CLI parsing           | `System.CommandLine`, `Spectre.Console.Cli`, or hand-rolled parser | Remove            |
+| LinqBridge                | LINQ for .NET 2.0     | Built into .NET 3.5+                                               | Delete            |
+| NUnit                     | Unit tests            | xUnit or NUnit 4                                                   | Replace           |
+| UnmanagedExports          | Native DLL exports    | NativeAOT, CsWin32, or remove plugin                               | Depends           |
+| Notepad++ Plugin Template | Notepad++ integration | Modern C++ plugin or C# via .NET hosting                           | Rewrite if needed |
+| ILRepack                  | Merge DLLs            | Single-file publish                                                | Remove            |
+| Bridge.NET                | C# → JavaScript       | Blazor, TypeScript wrapper, or WebAssembly                         | Replace           |
+
 
 ## VS Code Extension
 
