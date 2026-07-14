@@ -2196,6 +2196,18 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 case SqlStructureConstants.ENAME_STRING:
                 case SqlStructureConstants.ENAME_NSTRING:
                     if (state.InSelectModifierZone) { state.InSelectModifierZone = false; state.BreakExpected = true; }
+                    // Empty string literals ('') are usually escaped quotes inside a
+                    // dynamic-SQL FRAGMENT being formatted on its own. When the source
+                    // had no whitespace between such a literal and a neighboring
+                    // word/value token, preserve that adjacency verbatim - injecting a
+                    // space would change the text the user pastes back inside the outer
+                    // string (upstream #200: ''.txt'' became ''.txt ''). Keyword and
+                    // comma spacing is unaffected (those are not word/value tokens).
+                    bool isEmptyStringLiteral = string.IsNullOrEmpty(contentElement.TextValue);
+                    if (isEmptyStringLiteral
+                        && !state.BreakExpected && state.AdditionalBreaksExpected == 0
+                        && IsAdjacencyPreservingToken(contentElement.PreviousSibling()))
+                        state.WordSeparatorExpected = false;
                     WhiteSpace_SeparateWords(state);
                     string? outValue = null;
                     if (contentElement.Name.Equals(SqlStructureConstants.ENAME_NSTRING))
@@ -2203,7 +2215,8 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     else
                         outValue = "'" + contentElement.TextValue!.Replace("'", "''") + "'";
                     state.AddOutputContent(outValue, SqlHtmlConstants.CLASS_STRING);
-                    state.WordSeparatorExpected = true;
+                    state.WordSeparatorExpected = !(isEmptyStringLiteral
+                        && IsAdjacencyPreservingToken(contentElement.NextSibling()));
                     break;
 
                 case SqlStructureConstants.ENAME_BRACKET_QUOTED_NAME:
@@ -2559,6 +2572,30 @@ namespace PoorMansTSqlFormatterLib.Formatters
             }
 
             return target;
+        }
+
+        /// <summary>
+        /// Word/value tokens whose direct source-adjacency to an EMPTY string literal
+        /// is preserved (see upstream #200). A sibling of one of these types means the
+        /// source had no whitespace in between (whitespace is its own sibling node).
+        /// Deliberately excludes keywords and commas so their spacing is untouched.
+        /// </summary>
+        private static bool IsAdjacencyPreservingToken(Node? node)
+        {
+            if (node == null) return false;
+            switch (node.Name)
+            {
+                case SqlStructureConstants.ENAME_OTHERNODE:
+                case SqlStructureConstants.ENAME_NUMBER_VALUE:
+                case SqlStructureConstants.ENAME_MONETARY_VALUE:
+                case SqlStructureConstants.ENAME_PERIOD:
+                case SqlStructureConstants.ENAME_STRING:
+                case SqlStructureConstants.ENAME_NSTRING:
+                case SqlStructureConstants.ENAME_BRACKET_QUOTED_NAME:
+                    return true;
+                default:
+                    return false;
+            }
         }
 
         private void WhiteSpace_SeparateWords(TSqlStandardFormattingState state)
