@@ -1607,6 +1607,9 @@ namespace PoorMansTSqlFormatterLib.Parsers
                     || uppercaseValue.Equals("SET")
                     || uppercaseValue.Equals("SETUSER")
                     || uppercaseValue.Equals("SHUTDOWN")
+                    // THROW (SQL 2012+) is a statement keyword; without this, "IF x THROW ..."
+                    // swallows the THROW into the boolean expression (upstream #266).
+                    || uppercaseValue.Equals("THROW")
                     || uppercaseValue.Equals("TRUNCATE")
                     || uppercaseValue.Equals("UPDATE")
                     || uppercaseValue.Equals("USE")
