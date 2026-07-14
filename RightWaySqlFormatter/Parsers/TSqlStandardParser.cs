@@ -503,6 +503,14 @@ namespace PoorMansTSqlFormatterLib.Parsers
                         {
                             sqlTree.EscapeAnySelectionTarget();
 
+                            // Nested joins chain their ON sections at the end
+                            // ("FROM a JOIN b JOIN c ON c=b ON b=a"): each subsequent ON
+                            // closes the previous join's ON section. JoinOn sections are
+                            // siblings within the clause, never nested (upstream #288/#241/#30).
+                            while (sqlTree.PathNameMatches(0, SqlStructureConstants.ENAME_CONTAINER_GENERALCONTENT)
+                                && sqlTree.PathNameMatches(1, SqlStructureConstants.ENAME_JOIN_ON_SECTION))
+                                sqlTree.MoveToAncestorContainer(2);
+
                             if (sqlTree.PathNameMatches(0, SqlStructureConstants.ENAME_MERGE_USING))
                             {
                                 sqlTree.MoveToAncestorContainer(1, SqlStructureConstants.ENAME_MERGE_CLAUSE);
