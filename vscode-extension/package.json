@@ -229,7 +229,8 @@
     "watch": "tsc -watch -p ./",
     "package": "vsce package",
     "package:all": "node scripts/package-all.js",
-    "vscode:prepublish": "npm run compile && node scripts/build-cli.js"
+    "vscode:prepublish": "npm run compile && node scripts/build-cli.js",
+    "changelog": "node scripts/changelog.js"
   },
   "devDependencies": {
     "@types/node": "^25.6.0",
