@@ -17,7 +17,9 @@ isn't part of this fork: SSMS installers, notepad++, poorsql.com, packaging),
 | # | Issue | Notes |
 |---|---|---|
 | [#4](https://github.com/TaoK/PoorMansTSqlFormatter/issues/4) | DDL triggers (FOR LOGON) | Formats sensibly now |
-| [#30](https://github.com/TaoK/PoorMansTSqlFormatter/issues/30) / [#241](https://github.com/TaoK/PoorMansTSqlFormatter/issues/241) / [#288](https://github.com/TaoK/PoorMansTSqlFormatter/issues/288) | Nested-join chained ON sections | Fixed 2026-07-14; NestedJoinTests (TDD, 5 variants) |
+| [#30](https://github.com/TaoK/PoorMansTSqlFormatter/issues/30) / [#241](https://github.com/TaoK/PoorMansTSqlFormatter/issues/241) / [#288](https://github.com/TaoK/PoorMansTSqlFormatter/issues/288) | Nested-join chained ON sections | Fixed 2026-07-14; NestedJoinTests (TDD, 5 variants) + data file 47_NestedJoins |
+| [#200](https://github.com/TaoK/PoorMansTSqlFormatter/issues/200) | Space injected into adjacent empty strings (`''.txt''`) | Fixed 2026-07-14; EmptyStringAdjacencyTests (TDD) |
+| [#266](https://github.com/TaoK/PoorMansTSqlFormatter/issues/266) | `IF … THROW` swallowed into boolean expression | Fixed 2026-07-14; ThrowStatementTests (TDD) |
 | [#45](https://github.com/TaoK/PoorMansTSqlFormatter/issues/45) | Better CLI error reporting | Line-numbered diagnostics, exit codes 0/1/5 |
 | [#112](https://github.com/TaoK/PoorMansTSqlFormatter/issues/112) | WITH XMLNAMESPACES | Test 40 |
 | [#179](https://github.com/TaoK/PoorMansTSqlFormatter/issues/179) | Service Broker + WAITFOR | Test 42 |
@@ -48,10 +50,8 @@ isn't part of this fork: SSMS installers, notepad++, poorsql.com, packaging),
 
 | # | Issue | Repro result today |
 |---|---|---|
-| [#266](https://github.com/TaoK/PoorMansTSqlFormatter/issues/266) | `IF … THROW n, 'msg', 1;` without BEGIN/END | Exit 5; THROW args treated as comma list; each subsequent IF indents deeper (cascade) |
 | [#215](https://github.com/TaoK/PoorMansTSqlFormatter/issues/215) / [#292](https://github.com/TaoK/PoorMansTSqlFormatter/issues/292)-partial | `--[noformat]` inside a statement | Block hoisted out of INSERT column list; blank line accumulates inside block (non-idempotent). Top-level noformat blocks are stable. |
 | [#240](https://github.com/TaoK/PoorMansTSqlFormatter/issues/240) | Space added before brackets: `table_[x]` → `table_ [x]` | Reproduces |
-| [#200](https://github.com/TaoK/PoorMansTSqlFormatter/issues/200) | `''.txt''` → `''.txt ''` (space inside doubled-quote string) | Reproduces; corrupts dynamic SQL text |
 | [#151](https://github.com/TaoK/PoorMansTSqlFormatter/issues/151) | `ALTER TABLE x ALTER COLUMN …` | Blank line inserted between the two clauses (parsed as 2 statements) |
 | [#128](https://github.com/TaoK/PoorMansTSqlFormatter/issues/128) | `INSERT /*+hint*/ INTO` | Hint comment moved after INTO (breaks Oracle/Vertica hints) |
 | [#272](https://github.com/TaoK/PoorMansTSqlFormatter/issues/272) | `definition` uppercased to DEFINITION | Reproduces (keyword list too aggressive; not a reserved word) |
