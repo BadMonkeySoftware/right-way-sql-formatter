@@ -102,13 +102,13 @@ Format SQL from stdin to stdout:
 echo "select id,name from users where active=1" | SqlFormatter
 ```
 
-Format a file in-place:
+Format a file to stdout:
 
 ```bash
 SqlFormatter myquery.sql
 ```
 
-Format a file, write to a new file:
+Format a file, write to a file (pass the same name to format in place):
 
 ```bash
 SqlFormatter --output formatted.sql myquery.sql
