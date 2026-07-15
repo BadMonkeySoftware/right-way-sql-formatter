@@ -25,8 +25,8 @@ Use the formatter library directly, not the CLI — CLI defaults may differ from
 
 ## General Coding Rules
 
-- Run `dotnet test` before marking any task done. All tests must pass (baseline: 461 total, 0 failed, 10 skipped).
+- Run `dotnet test` before marking any task done. All tests must pass (baseline: 0 failed, 10 skipped; total-count differs by runner — sandbox counter 589, VS/Mac runner ~691 discovered / 579 succeeded).
 - Do not suppress or skip tests without approval.
 - This is a personal project — no deadlines, but code quality matters. Don't cut corners.
-- SSMS plugin tasks require a Windows build environment and cannot be executed on this Mac dev machine — flag these explicitly rather than guessing.
+- SSMS plugin tasks require a Windows build environment and cannot be executed on this Mac dev machine — flag these explicitly rather than guessing. When running on Jeremy's Windows VM (SSMS 22), follow `docs/windows-ssms-dev.md`: VSSDK projects build with `msbuild` (not `dotnet build`), deployment is the manual Extensions-folder + `ssms.exe /setup` path, and Microsoft does not officially support SSMS 21/22 extensions.
 - Preserve existing SQL formatting behavior. New options are additive only.

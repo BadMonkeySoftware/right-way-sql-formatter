@@ -11,7 +11,8 @@ dotnet build RightWaySqlFormatter.NoSSMS.slnx
 # Full solution build — Windows only (includes SSMS plugin)
 dotnet build RightWaySqlFormatter.slnx
 
-# Run all tests (expected: 461 total, 0 failed, 10 skipped — 2 historical + 8 ScriptDom-oracle ignores)
+# Run all tests (expected: 0 failed, 10 skipped — 2 historical + 8 ScriptDom-oracle ignores;
+# total-count differs by runner: sandbox counter 589, VS/Mac runner discovers ~691 / 579 succeeded)
 dotnet test RightWaySqlFormatter.NoSSMS.slnx
 
 # Regenerate expected-output files (deliberate use only — see Tests section)
@@ -25,7 +26,15 @@ dotnet test RightWaySqlFormatter.NoSSMS.slnx --filter "TestName=TestCmdLineIO"
 dotnet test RightWaySqlFormatter.NoSSMS.slnx --filter "ClassName=TSqlStandardFormatterTests"
 
 # Build VS Code extension (compiles TypeScript + publishes self-contained CLI binary)
-cd vscode-extension && npm install && npm run build
+cd vscode-extension && npm install && npm run build      # all six platforms
+cd vscode-extension && npm run build:host                # fast dev loop (this machine only)
+
+# Release the extension (platform-specific .vsix per target, ~7 MB each)
+# 1. bump "version" in vscode-extension/package.json
+# 2. npm run changelog   (drafts from commits since last v* tag - EDIT it for users)
+# 3. commit, git tag v<version>, push --tags
+# 4. rm -rf dist && npm run package:all
+# 5. npx vsce publish --packagePath dist/*.vsix
 ```
 
 `dotnet` must be on PATH. If not found: `export PATH="$HOME/.dotnet:$PATH"`.
@@ -55,7 +64,9 @@ Entry point: `SqlFormattingManager.Format()` composes these via `ISqlTokenizer` 
 
 **VS Code extension** shells out to the `SqlFormatter` CLI binary; it does not call .NET APIs directly. It applies formatting as line-minimal edits (LCS diff in `computeMinimalEdits`) and offers a native diff preview command (`Format Document (Preview)`) backed by a `TextDocumentContentProvider` on the `rwsql-format-preview` scheme.
 
-**SSMS plugin** (`RightWaySqlFormatter.SSMSLib/`, `RightWaySqlFormatter.SSMSPackage/`) requires Windows + Visual Studio — cannot be built or tested on macOS.
+**SSMS plugin** (`RightWaySqlFormatter.SSMSLib/`, `RightWaySqlFormatter.SSMSPackage/`) requires Windows + Visual Studio — cannot be built or tested on macOS. Jeremy has a Windows VM with SSMS 22; the full playbook (machine setup, msbuild-not-dotnet for VSSDK projects, manual deployment into SSMS 22's Extensions folder, ActivityLog diagnostics, and the caveat that Microsoft doesn't officially support SSMS 21/22 extensions) is in [docs/windows-ssms-dev.md](docs/windows-ssms-dev.md).
+
+**Upstream issue triage**: [docs/upstream-issues-triage.md](docs/upstream-issues-triage.md) classifies all 149 open issues of the original PoorMansTSqlFormatter against this fork, with a prioritized still-present bug list. Consult it before hunting for formatter work.
 
 ## Tests
 
@@ -85,4 +96,4 @@ It formats the matching InputSql file through the library with the options encod
 - Every commit touching expected files must explain in the message *why* the expected output changed.
 - Run `dotnet test` before marking any task done. All tests must pass.
 - Formatting behavior is additive only — new options are fine, but breaking existing formatting is not.
-- SSMS plugin tasks require Windows; flag them explicitly rather than attempting them on macOS.
+- SSMS plugin tasks require Windows; on macOS flag them rather than attempting them. On the Windows VM, follow [docs/windows-ssms-dev.md](docs/windows-ssms-dev.md) (VSSDK projects build with `msbuild`, not `dotnet build`).

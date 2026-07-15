@@ -73,7 +73,7 @@ dotnet build RightWaySqlFormatter.NoSSMS.slnx
 dotnet test RightWaySqlFormatter.NoSSMS.slnx
 ```
 
-Expected: `461 total, 0 failed, 10 skipped` (exact totals grow as test data is added; failures must be zero)
+Expected: `0 failed, 10 skipped` (total counts grow as test data is added and differ by test runner; failures must be zero)
 
 ### CLI (Release build)
 
@@ -248,7 +248,9 @@ The `RightWaySqlFormatter.SSMSPackage/` project is the VS Package-style SSMS plu
 - Visual Studio 2019+ with VSIX development workload
 - SSMS 18+ (for testing)
 
-Build on Windows VM, install the resulting `.vsix`.
+Build on a Windows VM. SSMS 21/22 have no official extension support; see
+[docs/windows-ssms-dev.md](docs/windows-ssms-dev.md) for the manual deployment
+path (Extensions folder + `ssms.exe /setup`) and its caveats.
 
 ---
 
