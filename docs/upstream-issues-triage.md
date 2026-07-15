@@ -20,6 +20,9 @@ isn't part of this fork: SSMS installers, notepad++, poorsql.com, packaging),
 | [#30](https://github.com/TaoK/PoorMansTSqlFormatter/issues/30) / [#241](https://github.com/TaoK/PoorMansTSqlFormatter/issues/241) / [#288](https://github.com/TaoK/PoorMansTSqlFormatter/issues/288) | Nested-join chained ON sections | Fixed 2026-07-14; NestedJoinTests (TDD, 5 variants) + data file 47_NestedJoins |
 | [#200](https://github.com/TaoK/PoorMansTSqlFormatter/issues/200) | Space injected into adjacent empty strings (`''.txt''`) | Fixed 2026-07-14; EmptyStringAdjacencyTests (TDD) |
 | [#266](https://github.com/TaoK/PoorMansTSqlFormatter/issues/266) | `IF … THROW` swallowed into boolean expression | Fixed 2026-07-14; ThrowStatementTests (TDD) |
+| [#240](https://github.com/TaoK/PoorMansTSqlFormatter/issues/240) | Space injected before adjacent `[bracket]` names | Fixed 2026-07-14; CosmeticSpacingTests (TDD); minifier round-trip preserved |
+| [#151](https://github.com/TaoK/PoorMansTSqlFormatter/issues/151) | `ALTER TABLE … ALTER COLUMN` split in two | Fixed 2026-07-14; renders inline like ADD |
+| [#99](https://github.com/TaoK/PoorMansTSqlFormatter/issues/99) | Column-0 block comments got first-line indent | Fixed 2026-07-14; 7 expected files regenerated w/ sign-off |
 | [#45](https://github.com/TaoK/PoorMansTSqlFormatter/issues/45) | Better CLI error reporting | Line-numbered diagnostics, exit codes 0/1/5 |
 | [#112](https://github.com/TaoK/PoorMansTSqlFormatter/issues/112) | WITH XMLNAMESPACES | Test 40 |
 | [#179](https://github.com/TaoK/PoorMansTSqlFormatter/issues/179) | Service Broker + WAITFOR | Test 42 |
@@ -51,12 +54,9 @@ isn't part of this fork: SSMS installers, notepad++, poorsql.com, packaging),
 | # | Issue | Repro result today |
 |---|---|---|
 | [#215](https://github.com/TaoK/PoorMansTSqlFormatter/issues/215) / [#292](https://github.com/TaoK/PoorMansTSqlFormatter/issues/292)-partial | `--[noformat]` inside a statement | Block hoisted out of INSERT column list; blank line accumulates inside block (non-idempotent). Top-level noformat blocks are stable. |
-| [#240](https://github.com/TaoK/PoorMansTSqlFormatter/issues/240) | Space added before brackets: `table_[x]` → `table_ [x]` | Reproduces |
-| [#151](https://github.com/TaoK/PoorMansTSqlFormatter/issues/151) | `ALTER TABLE x ALTER COLUMN …` | Blank line inserted between the two clauses (parsed as 2 statements) |
 | [#128](https://github.com/TaoK/PoorMansTSqlFormatter/issues/128) | `INSERT /*+hint*/ INTO` | Hint comment moved after INTO (breaks Oracle/Vertica hints) |
 | [#272](https://github.com/TaoK/PoorMansTSqlFormatter/issues/272) | `definition` uppercased to DEFINITION | Reproduces (keyword list too aggressive; not a reserved word) |
 | [#293](https://github.com/TaoK/PoorMansTSqlFormatter/issues/293)-part2 | `a IS DISTINCT FROM b` (SQL 2022) | Exit 0 but FROM treated as clause start — `IS DISTINCT\nFROM b1` |
-| [#99](https://github.com/TaoK/PoorMansTSqlFormatter/issues/99) | First line of block comment gets indented | Reproduces (indent added; rest of comment untouched — stable, cosmetic) |
 | [#13](https://github.com/TaoK/PoorMansTSqlFormatter/issues/13) | Unary minus: `SELECT -1` → `SELECT - 1` | Reproduces (upstream: cosmetic only) |
 | [#17](https://github.com/TaoK/PoorMansTSqlFormatter/issues/17) | ODBC escapes: `{d'…'}` → `{d '…' }` | Reproduces (upstream marked very low priority) |
 | [#5](https://github.com/TaoK/PoorMansTSqlFormatter/issues/5)-partial | OVER() clauses | Now expands (better than upstream), but window-frame keywords not case-standardized: `ROWS BETWEEN unbounded preceding AND CURRENT row` |
