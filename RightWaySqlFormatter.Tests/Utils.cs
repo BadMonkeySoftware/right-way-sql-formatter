@@ -120,6 +120,7 @@ namespace PoorMansTSqlFormatterTests
             { "AlwaysAlias",     "ColumnAlwaysHasAlias=True" },
             { "FirstColNL",      "SelectFirstColumnOnNewLine=True" },
             { "CompactRaiserror","CompactRaiserror=True" },
+            { "RmBrackets","RemoveHarmlessBrackets=True" },
             { "CompactBlocks",   "CompactSingleStatementBlocks=True" },
             { "NoJoinAliases",   "AlignTableJoinsAddAliases=False" },
         };

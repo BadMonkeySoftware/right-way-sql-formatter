@@ -47,6 +47,7 @@ var optionDefs = new List<OptionDef>
     new("--align-table-joins-add-aliases",  "-atja", OptKind.Bool, "true",  "With --align-table-joins: add aliases to tables that have none"),
     new("--column-always-has-alias",        "-caha", OptKind.Bool, "false", "Ensure every SELECT column has an explicit AS alias"),
     new("--compact-raiserror",              "-cre",  OptKind.Bool, "false", "Keep RAISERROR(...) argument lists on a single line"),
+    new("--remove-harmless-brackets",       "-rhb",  OptKind.Bool, "false", "Strip [brackets] from names that provably don't need them"),
     new("--compact-single-statement-blocks","-csb",  OptKind.Bool, "false", "Render single-statement IF/ELSE/WHILE bodies (no BEGIN/END) inline when they fit"),
     new("--output",                         "-o",    OptKind.Str,  "",      "Output file path (default: stdout)"),
 };
@@ -177,6 +178,7 @@ var opts = new TSqlStandardFormatterOptions
     AlignTableJoinsAddAliases = B("--align-table-joins-add-aliases"),
     ColumnAlwaysHasAlias = B("--column-always-has-alias"),
     CompactRaiserror = B("--compact-raiserror"),
+    RemoveHarmlessBrackets = B("--remove-harmless-brackets"),
     CompactSingleStatementBlocks = B("--compact-single-statement-blocks"),
 };
 

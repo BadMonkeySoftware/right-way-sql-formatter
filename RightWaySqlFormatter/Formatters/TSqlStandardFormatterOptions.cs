@@ -59,6 +59,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
             ColumnAlwaysHasAlias = false;
             CompactRaiserror = false;
             CompactSingleStatementBlocks = false;
+            RemoveHarmlessBrackets = false;
 		}
 
         //Doesn't particularly need to be lazy-loaded, and doesn't need to be threadsafe.
@@ -105,6 +106,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
 				else if (key == "AlignTableJoinsAddAliases") AlignTableJoinsAddAliases = Convert.ToBoolean(value);
 				else if (key == "ColumnAlwaysHasAlias") ColumnAlwaysHasAlias = Convert.ToBoolean(value);
 				else if (key == "CompactRaiserror") CompactRaiserror = Convert.ToBoolean(value);
+				else if (key == "RemoveHarmlessBrackets") RemoveHarmlessBrackets = Convert.ToBoolean(value);
 				else if (key == "CompactSingleStatementBlocks") CompactSingleStatementBlocks = Convert.ToBoolean(value);
 				else throw new ArgumentException("Unknown option: " + key);
             }
@@ -145,6 +147,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
 			if (AlignTableJoinsAddAliases != _defaultOptions.AlignTableJoinsAddAliases) overrides.Add("AlignTableJoinsAddAliases", AlignTableJoinsAddAliases.ToString());
 			if (ColumnAlwaysHasAlias != _defaultOptions.ColumnAlwaysHasAlias) overrides.Add("ColumnAlwaysHasAlias", ColumnAlwaysHasAlias.ToString());
 			if (CompactRaiserror != _defaultOptions.CompactRaiserror) overrides.Add("CompactRaiserror", CompactRaiserror.ToString());
+			if (RemoveHarmlessBrackets != _defaultOptions.RemoveHarmlessBrackets) overrides.Add("RemoveHarmlessBrackets", RemoveHarmlessBrackets.ToString());
 			if (CompactSingleStatementBlocks != _defaultOptions.CompactSingleStatementBlocks) overrides.Add("CompactSingleStatementBlocks", CompactSingleStatementBlocks.ToString());
     
             if (overrides.Count == 0) return string.Empty;
@@ -277,6 +280,13 @@ namespace PoorMansTSqlFormatterLib.Formatters
         /// each comma-separated argument (default false = historical behavior).
         /// </summary>
         public bool CompactRaiserror { get; set; }
+
+        /// <summary>
+        /// Strip square brackets from names that provably don't need them: valid
+        /// regular identifiers that aren't keywords and aren't adjacent to tokens
+        /// they would merge with (upstream #133). Default false.
+        /// </summary>
+        public bool RemoveHarmlessBrackets { get; set; }
 
         /// <summary>
         /// Render single-statement IF/ELSE/WHILE bodies (no BEGIN/END) on the same line

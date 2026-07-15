@@ -2223,17 +2223,29 @@ namespace PoorMansTSqlFormatterLib.Formatters
 
                 case SqlStructureConstants.ENAME_BRACKET_QUOTED_NAME:
                     if (state.InSelectModifierZone) { state.InSelectModifierZone = false; state.BreakExpected = true; }
+                    // RemoveHarmlessBrackets (upstream #133, opt-in): strip brackets when
+                    // the name provably doesn't need them - a valid regular identifier,
+                    // not in the keyword list (keeps [Order]/[definition] safe from
+                    // reinterpretation and keyword-uppercasing on reformat), and not
+                    // directly adjacent to a token it would merge with.
+                    bool stripBrackets = Options.RemoveHarmlessBrackets
+                        && IsHarmlessUnbracketableName(contentElement.TextValue!)
+                        && !IsTokenMergeRisk(contentElement.PreviousSibling())
+                        && !IsTokenMergeRisk(contentElement.NextSibling());
                     // Preserve source adjacency between words and bracket names
                     // ("table_[some_id]" templating - upstream #240). Keywords and
                     // commas keep their usual spacing; whitespace in the source is
                     // its own sibling node, so adjacency here means "no gap written".
-                    if (!state.BreakExpected && state.AdditionalBreaksExpected == 0
+                    if (!stripBrackets
+                        && !state.BreakExpected && state.AdditionalBreaksExpected == 0
                         && IsAdjacencyPreservingToken(contentElement.PreviousSibling(), includeStrings: false))
                         state.WordSeparatorExpected = false;
                     WhiteSpace_SeparateWords(state);
-                    state.AddOutputContent("[" + contentElement.TextValue!.Replace("]", "]]") + "]");
-                    state.WordSeparatorExpected =
-                        !IsAdjacencyPreservingToken(contentElement.NextSibling(), includeStrings: false);
+                    state.AddOutputContent(stripBrackets
+                        ? contentElement.TextValue!
+                        : "[" + contentElement.TextValue!.Replace("]", "]]") + "]");
+                    state.WordSeparatorExpected = stripBrackets
+                        || !IsAdjacencyPreservingToken(contentElement.NextSibling(), includeStrings: false);
                     break;
 
                 case SqlStructureConstants.ENAME_QUOTED_STRING:
@@ -2590,6 +2602,41 @@ namespace PoorMansTSqlFormatterLib.Formatters
         /// source had no whitespace in between (whitespace is its own sibling node).
         /// Deliberately excludes keywords and commas so their spacing is untouched.
         /// </summary>
+        private static readonly Regex _regularIdentifierRegex = new Regex(@"^[A-Za-z_][A-Za-z0-9_]*$", RegexOptions.Compiled);
+
+        /// <summary>
+        /// True when a bracket-quoted name could safely be written without brackets:
+        /// a conservative regular-identifier shape (ASCII letter/underscore start,
+        /// letters/digits/underscores only) that is not in the T-SQL keyword list.
+        /// </summary>
+        private static bool IsHarmlessUnbracketableName(string name)
+        {
+            return _regularIdentifierRegex.IsMatch(name)
+                && !Parsers.TSqlStandardParser.KeywordList.ContainsKey(name.ToUpperInvariant());
+        }
+
+        /// <summary>
+        /// True when the sibling is a token that an unbracketed identifier would merge
+        /// with if the brackets between them disappeared (no whitespace node = direct
+        /// source adjacency). Periods, commas, operators and parens are safe separators.
+        /// </summary>
+        private static bool IsTokenMergeRisk(Node? node)
+        {
+            if (node == null) return false;
+            switch (node.Name)
+            {
+                case SqlStructureConstants.ENAME_OTHERNODE:
+                case SqlStructureConstants.ENAME_NUMBER_VALUE:
+                case SqlStructureConstants.ENAME_MONETARY_VALUE:
+                case SqlStructureConstants.ENAME_BRACKET_QUOTED_NAME:
+                case SqlStructureConstants.ENAME_STRING:
+                case SqlStructureConstants.ENAME_NSTRING:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
         private static bool IsAdjacencyPreservingToken(Node? node, bool includeStrings)
         {
             if (node == null) return false;

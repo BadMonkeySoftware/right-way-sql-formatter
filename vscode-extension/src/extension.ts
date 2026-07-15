@@ -561,6 +561,7 @@ function buildArgs(): string[] {
 
     bool('alignTableJoinsAddAliases', 'align-table-joins-add-aliases', true);
     bool('compactRaiserror',          'compact-raiserror',        false);
+    bool('removeHarmlessBrackets',    'remove-harmless-brackets', false);
     bool('compactSingleStatementBlocks', 'compact-single-statement-blocks', false);
 
     return args;

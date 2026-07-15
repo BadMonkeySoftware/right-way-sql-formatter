@@ -216,6 +216,11 @@
           "type": "boolean",
           "default": false,
           "description": "Ensure every column in a SELECT list has an explicit AS alias. Simple column references use the column name; complex expressions use ColumnAlias_N."
+        },
+        "rightWaySqlFormatter.removeHarmlessBrackets": {
+          "type": "boolean",
+          "default": false,
+          "description": "Strip square brackets from names that provably don't need them: valid regular identifiers that aren't T-SQL keywords and aren't directly adjacent to tokens they would merge with. Off by default."
         }
       }
     }

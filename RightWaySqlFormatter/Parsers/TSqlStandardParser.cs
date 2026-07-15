@@ -1279,6 +1279,15 @@ namespace PoorMansTSqlFormatterLib.Parsers
                         break;
 
                     case SqlTokenType.BracketQuotedName:
+                        // After a statement terminator a bracket-quoted name begins a new
+                        // statement, exactly as a bare identifier would (the OtherNode path
+                        // checks NewStatementDue). Without this, ";[x]" parses differently
+                        // from ";x", so RemoveHarmlessBrackets output reflowed on reformat.
+                        if (sqlTree.NewStatementDue)
+                            sqlTree.ConsiderStartingNewStatement();
+                        sqlTree.SaveNewElement(GetEquivalentSqlNodeName(token.Type), token.Value);
+                        break;
+
                     case SqlTokenType.Asterisk:
                     case SqlTokenType.Period:
                     case SqlTokenType.OtherOperator:
