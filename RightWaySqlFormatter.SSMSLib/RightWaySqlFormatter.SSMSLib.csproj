@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net472</TargetFramework>
-    <AssemblyName>PoorMansTSqlFormatterSSMSLib</AssemblyName>
+    <AssemblyName>RightWaySqlFormatter.SSMSLib</AssemblyName>
     <RootNamespace>PoorMansTSqlFormatterSSMSLib</RootNamespace>
     <Nullable>enable</Nullable>
     <LangVersion>latest</LangVersion>

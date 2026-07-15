@@ -52,13 +52,36 @@ EnvDTE types are fine in SSMSLib (same COM interop for both shells).
 
 ## Migration steps (on the VM, in order)
 
-1. DONE on macOS 2026-07-15 (rename half): folder + csproj renamed to
-   `RightWaySqlFormatter.SSMS18`, solution/doc references updated. The
-   csproj's internal RootNamespace/AssemblyName still say SSMSPackage -
-   left deliberately for the VM, because assembly-name changes ripple
-   into the pkgdef/vsixmanifest bindings and must be verified against a
-   real build. REMAINING on the VM: msbuild the renamed project, then
-   decide whether to align AssemblyName (and pkgdef) with the new name.
+1. DONE. macOS 2026-07-15 (rename half): folder + csproj renamed to
+   `RightWaySqlFormatter.SSMS18`, solution/doc references updated.
+   VM 2026-07-15 (build + AssemblyName decision): built green with
+   `msbuild` under VS 18 Community (0 errors; 14 pre-existing warnings).
+   Decision (Jeremy): align the AssemblyName of ALL THREE plugin
+   assemblies now, not piecemeal — `PoorMansTSqlFormatterSSMSPackage` ->
+   `RightWaySqlFormatter.SSMS18`, `PoorMansTSqlFormatterSSMSLib` ->
+   `RightWaySqlFormatter.SSMSLib`, `PoorMansTSqlFormatterPluginShared` ->
+   `RightWaySqlFormatter.PluginShared`.
+   - Convention: changed `AssemblyName` ONLY; C# namespaces stay
+     `PoorMansTSqlFormatter*` (matches the core project, which is
+     `AssemblyName=RightWaySqlFormatter` / `RootNamespace=PoorMansTSqlFormatter`).
+     Keeping the namespaces protects the hard-coded resource base name
+     (`GenericVSHelper` `ResourceManager("PoorMansTSqlFormatterSSMSLib.GeneralLanguageContent")`)
+     and the settings section (`PoorMansTSqlFormatterSSMSLib.Properties.Settings`
+     in app.config) — both are namespace-based, not assembly-name-based.
+   - Verified against a real build (the whole reason this was deferred to
+     the VM): pkgdef regenerates `CodeBase=$PackageFolder$\RightWaySqlFormatter.SSMS18.dll`
+     and keeps `Class=PoorMansTSqlFormatterSSMSPackage.FormatterPackage`
+     (namespace unchanged, type still present) — both resolve. Package
+     GUID `{247609b1-...}` (the actual registration identity) unchanged.
+     VSIX payload is a consistent matched set (renamed DLLs + satellites
+     `RightWaySqlFormatter.SSMSLib.resources.dll` + `.dll.config`, `<Asset
+     Path="RightWaySqlFormatter.SSMS18.pkgdef">`); no stale `PoorMans*`
+     output files. `dotnet test RightWaySqlFormatter.NoSSMS.slnx` still
+     0 failed / 579 passed / 10 skipped.
+   - Deferred cosmetic leftovers (no functional ripple, not done here):
+     `AssemblyTitle`/`AssemblyProduct` strings in both AssemblyInfo.cs,
+     the `ProductName` in `VSPackage.resx` (Help>About text), and the two
+     stale `<ProjectReference><Name>` hints in the SSMS18 csproj.
 2. Extract any Shell.*-dependent code that crept into SSMSLib into the
    SSMS18 project (SSMSLib must compile against no VSSDK, only EnvDTE).
    Verified 2026-07-15: SSMSLib currently has NO Microsoft.VisualStudio.Shell

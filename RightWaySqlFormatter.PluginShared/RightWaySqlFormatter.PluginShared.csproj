@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net472</TargetFramework>
-    <AssemblyName>PoorMansTSqlFormatterPluginShared</AssemblyName>
+    <AssemblyName>RightWaySqlFormatter.PluginShared</AssemblyName>
     <RootNamespace>PoorMansTSqlFormatterPluginShared</RootNamespace>
     <Nullable>enable</Nullable>
     <NoWarn>$(NoWarn);NU1603</NoWarn>
