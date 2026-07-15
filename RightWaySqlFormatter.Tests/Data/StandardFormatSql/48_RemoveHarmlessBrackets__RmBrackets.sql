@@ -11,7 +11,7 @@ SELECT [Order]
     ,[User]
     ,[From]
     ,[Some]
-    ,[definition]
+    ,definition
 FROM dbo.Widgets
 
 SELECT [Some Name]

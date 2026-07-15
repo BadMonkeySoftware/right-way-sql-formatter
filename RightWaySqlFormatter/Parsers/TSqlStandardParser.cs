@@ -1941,7 +1941,13 @@ namespace PoorMansTSqlFormatterLib.Parsers
             KeywordList.Add("DECIMAL", KeywordType.DataTypeKeyword);
             KeywordList.Add("DECLARE", KeywordType.OtherKeyword);
             KeywordList.Add("DEFAULT", KeywordType.OtherKeyword);
-            KeywordList.Add("DEFINITION", KeywordType.OtherKeyword);
+            // DEFINITION and STATUS were evicted from this list (upstream #272): they
+            // have no keyword role anywhere in the T-SQL grammar but are very common
+            // catalog/table column names (sys.sql_modules.definition,
+            // sys.dm_exec_requests.status). Keyword classification uppercased the
+            // user's identifiers and blocked RemoveHarmlessBrackets. Eviction
+            // criterion: no syntax role AND no parser-decision usage AND common
+            // identifier. Genuine soft keywords (LEVEL, STATE, MATCHED, ...) stay.
             KeywordList.Add("DEGREES", KeywordType.FunctionKeyword);
             KeywordList.Add("DELAY", KeywordType.OtherKeyword);
             KeywordList.Add("DELETE", KeywordType.OtherKeyword);
@@ -2258,7 +2264,6 @@ namespace PoorMansTSqlFormatterLib.Parsers
             KeywordList.Add("STATISTICS", KeywordType.OtherKeyword);
             KeywordList.Add("STATIC", KeywordType.OtherKeyword);
             KeywordList.Add("STATS_DATE", KeywordType.FunctionKeyword);
-            KeywordList.Add("STATUS", KeywordType.OtherKeyword);
             KeywordList.Add("STDEV", KeywordType.FunctionKeyword);
             KeywordList.Add("STDEVP", KeywordType.FunctionKeyword);
             KeywordList.Add("STOPLIST", KeywordType.OtherKeyword);

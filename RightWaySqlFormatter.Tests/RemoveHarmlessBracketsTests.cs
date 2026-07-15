@@ -50,6 +50,10 @@ namespace PoorMansTSqlFormatterTests
         [TestCase("SELECT [t].[Col_1] FROM [MyTable] [t]", "t.Col_1")]
         [TestCase("SELECT [t].[Col_1] FROM [MyTable] [t]", "MyTable t")]
         [TestCase("SELECT [_x] FROM t", "_x")]
+        // definition/status: evicted from the keyword list (upstream #272) -
+        // they have no T-SQL keyword role, so their brackets are harmless too.
+        [TestCase("SELECT [definition] FROM sys.sql_modules", "definition")]
+        [TestCase("SELECT [status] FROM sys.dm_exec_requests", "status")]
         public void HarmlessBracketsAreRemoved(string input, string mustContain)
         {
             string output = Format(input, true, out bool errors);
@@ -63,7 +67,6 @@ namespace PoorMansTSqlFormatterTests
         [TestCase("SELECT [User] FROM t", "[User]")]
         [TestCase("SELECT [From] FROM t", "[From]")]
         [TestCase("SELECT [Some] FROM t", "[Some]")]
-        [TestCase("SELECT [definition] FROM sys.sql_modules", "[definition]")]
         // Not valid regular identifiers:
         [TestCase("SELECT [Some Name] FROM t", "[Some Name]")]
         [TestCase("SELECT [2Col] FROM t", "[2Col]")]
