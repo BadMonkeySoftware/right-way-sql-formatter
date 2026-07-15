@@ -52,10 +52,13 @@ EnvDTE types are fine in SSMSLib (same COM interop for both shells).
 
 ## Migration steps (on the VM, in order)
 
-1. Rename the existing `RightWaySqlFormatter.SSMSPackage` ->
-   `RightWaySqlFormatter.SSMS18` (it is already the SSMS 18-era package).
-   Verify it still builds with msbuild and deploys to SSMS 18 if present;
-   otherwise verify against upstream's known-working configuration.
+1. DONE on macOS 2026-07-15 (rename half): folder + csproj renamed to
+   `RightWaySqlFormatter.SSMS18`, solution/doc references updated. The
+   csproj's internal RootNamespace/AssemblyName still say SSMSPackage -
+   left deliberately for the VM, because assembly-name changes ripple
+   into the pkgdef/vsixmanifest bindings and must be verified against a
+   real build. REMAINING on the VM: msbuild the renamed project, then
+   decide whether to align AssemblyName (and pkgdef) with the new name.
 2. Extract any Shell.*-dependent code that crept into SSMSLib into the
    SSMS18 project (SSMSLib must compile against no VSSDK, only EnvDTE).
    Verified 2026-07-15: SSMSLib currently has NO Microsoft.VisualStudio.Shell

@@ -71,7 +71,7 @@ The SSMS projects are classic VSSDK projects: build them with **msbuild, not
 ```powershell
 msbuild RightWaySqlFormatter.slnx /restore /p:Configuration=Release
 # Or just the package:
-msbuild RightWaySqlFormatter.SSMSPackage\RightWaySqlFormatter.SSMSPackage.csproj /restore /p:Configuration=Release
+msbuild RightWaySqlFormatter.SSMS18\RightWaySqlFormatter.SSMS18.csproj /restore /p:Configuration=Release
 ```
 
 **Expected migration work (first task on this VM):** the package was written

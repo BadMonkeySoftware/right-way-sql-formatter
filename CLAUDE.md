@@ -64,7 +64,7 @@ Entry point: `SqlFormattingManager.Format()` composes these via `ISqlTokenizer` 
 
 **VS Code extension** shells out to the `SqlFormatter` CLI binary; it does not call .NET APIs directly. It applies formatting as line-minimal edits (LCS diff in `computeMinimalEdits`) and offers a native diff preview command (`Format Document (Preview)`) backed by a `TextDocumentContentProvider` on the `rwsql-format-preview` scheme.
 
-**SSMS plugin** (`RightWaySqlFormatter.SSMSLib/`, `RightWaySqlFormatter.SSMSPackage/`) requires Windows + Visual Studio — cannot be built or tested on macOS. Jeremy has a Windows VM with SSMS 22; the full playbook (machine setup, msbuild-not-dotnet for VSSDK projects, manual deployment into SSMS 22's Extensions folder, ActivityLog diagnostics, and the caveat that Microsoft doesn't officially support SSMS 21/22 extensions) is in [docs/windows-ssms-dev.md](docs/windows-ssms-dev.md).
+**SSMS plugin** (`RightWaySqlFormatter.SSMSLib/`, `RightWaySqlFormatter.SSMS18/`) requires Windows + Visual Studio — cannot be built or tested on macOS. Jeremy has a Windows VM with SSMS 22; the full playbook (machine setup, msbuild-not-dotnet for VSSDK projects, manual deployment into SSMS 22's Extensions folder, ActivityLog diagnostics, and the caveat that Microsoft doesn't officially support SSMS 21/22 extensions) is in [docs/windows-ssms-dev.md](docs/windows-ssms-dev.md).
 
 **Upstream issue triage**: [docs/upstream-issues-triage.md](docs/upstream-issues-triage.md) classifies all 149 open issues of the original PoorMansTSqlFormatter against this fork, with a prioritized still-present bug list. Consult it before hunting for formatter work.
 

@@ -14,7 +14,7 @@ Targets: **SSMS plugin**, **VS Code extension**, **CLI tool** — all powered by
 |---|---|
 | `RightWaySqlFormatter/` | Core formatting library (.NET 10) |
 | `RightWaySqlFormatter.CmdLine/` | CLI tool — `SqlFormatter` binary |
-| `RightWaySqlFormatter.SSMSPackage/` | SSMS plugin (Windows build only) |
+| `RightWaySqlFormatter.SSMS18/` | SSMS plugin (Windows build only) |
 | `RightWaySqlFormatter.SSMSLib/` | Shared SSMS helper library |
 | `RightWaySqlFormatter.Tests/` | NUnit 4 test suite |
 | `vscode-extension/` | VS Code extension (TypeScript, shells out to CLI) |
@@ -243,7 +243,7 @@ Use **"Right Way SQL: Format Document (Preview)"** to review changes in VS Code'
 
 ## SSMS Plugin
 
-The `RightWaySqlFormatter.SSMSPackage/` project is the VS Package-style SSMS plugin. Build requires:
+The `RightWaySqlFormatter.SSMS18/` project is the VS Package-style SSMS plugin. Build requires:
 - Windows
 - Visual Studio 2019+ with VSIX development workload
 - SSMS 18+ (for testing)
