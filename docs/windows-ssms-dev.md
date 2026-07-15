@@ -46,7 +46,16 @@ winget install Microsoft.VisualStudio.2022.Community
 # 4. Claude Code
 winget install Anthropic.ClaudeCode   # or: npm install -g @anthropic-ai/claude-code
 
-# 5. Clone SHALLOW in the path sense - C:\src keeps MAX_PATH at bay
+# 5. SSMS 18.12.1 (final 18.x) for testing the SSMS18 package - installs
+#    side by side with SSMS 21/22 (different install models; the 21+
+#    version/channel-uniqueness rule doesn't apply against 18.x).
+#    Download: https://learn.microsoft.com/en-us/ssms/install/install
+#    (release history) / KB5014879. Installs to
+#    C:\Program Files (x86)\Microsoft SQL Server Management Studio 18.
+#    Niggles: last-registered SSMS wins the .sql file association; the
+#    18.x installer may request a reboot.
+
+# 6. Clone SHALLOW in the path sense - C:\src keeps MAX_PATH at bay
 git clone https://github.com/BadMonkeySoftware/right-way-sql-formatter.git C:\src\rwsql
 ```
 
