@@ -4,6 +4,29 @@ All notable changes to the Right Way T-SQL Formatter extension.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.1.6] - 2026-07-15
+
+Nine formatting-engine fixes (from a full triage of the original
+PoorMansTSqlFormatter's open issues) and one new opt-in setting.
+
+### Added
+
+- New setting `removeHarmlessBrackets` (default **off**): strips square brackets from names that provably don't need them — valid plain identifiers that aren't reserved words and wouldn't merge with adjacent text. `[Name]` → `Name`, `[dbo].[MyTable] [t]` → `dbo.MyTable t`, while `[Order]`, `[Some Name]`, and `table_[some_id]` keep their brackets.
+
+### Fixed
+
+- Nested joins with chained ON clauses (`FROM a JOIN b JOIN c ON … ON …`) now parse and format cleanly — previously flagged as a parse error with unstable output.
+- `IF @x IS NULL THROW 50001, 'msg', 1;` without BEGIN/END: the THROW is no longer swallowed into the IF condition, so consecutive IF…THROW lines don't nest ever deeper.
+- Dynamic-SQL fragments survive formatting untouched: no space injected inside doubled-quote text (`''.txt''` previously became `''.txt ''`) or before directly adjacent bracket names (`table_[some_id]` previously became `table_ [some_id]`).
+- `ALTER TABLE … ALTER COLUMN …` is formatted as the single statement it is — no more blank line splitting it in two.
+- Multi-line banner comments that start at column 0 keep their first line at column 0, so box-art comment blocks stay aligned.
+- `--[noformat]` regions inside statements are no longer moved out of their surrounding parentheses, and a blank line no longer accumulates inside the region on every reformat.
+- `definition` and `status` are no longer treated as keywords (they're everyday catalog column names): your casing is preserved instead of being uppercased, and `removeHarmlessBrackets` treats them as unbracketable.
+
+### Changed
+
+- Dev-dependency updates (Dependabot: form-data, markdown-it, tmp, js-yaml, undici) and npm audit fix; debug launch configs now isolate the extension under development.
+
 ## [0.1.5] - 2026-07-14
 
 ### Added

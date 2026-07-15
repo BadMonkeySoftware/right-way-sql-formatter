@@ -41,9 +41,11 @@ try {
     range = `${lastTag}..HEAD`;
 } catch { /* no tags yet */ }
 
-const log = git(['log', range, '--format=%s', '--', '.']);
+// Whole repo, not just vscode-extension/: the extension ships the formatter
+// library as its bundled CLI, so parser/formatter fixes are user-facing here.
+const log = git(['log', range, '--format=%s']);
 if (!log) {
-    console.log(`No commits touching vscode-extension/ in ${range} — nothing to draft.`);
+    console.log(`No commits in ${range} — nothing to draft.`);
     process.exit(0);
 }
 
