@@ -2088,9 +2088,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
                         if (skippedXml != null)
                         {
                             TSqlIdentityFormatter tempFormatter = new TSqlIdentityFormatter(Options.HTMLColoring);
-                            state.AddOutputContentRaw(tempFormatter.FormatSQLTree(skippedXml));
-                            state.WordSeparatorExpected = false;
-                            state.BreakExpected = false;
+                            state.EmitSpecialRegionContent(tempFormatter.FormatSQLTree(skippedXml));
                         }
                         state.SpecialRegionActive = null;
                         state.RegionStartNode = null;
@@ -2102,11 +2100,9 @@ namespace PoorMansTSqlFormatterLib.Formatters
                         {
                             TSqlObfuscatingFormatter tempFormatter = new TSqlObfuscatingFormatter();
                             if (HTMLFormatted)
-                                state.AddOutputContentRaw(Utils.HtmlEncode(tempFormatter.FormatSQLTree(skippedXml))!);
+                                state.EmitSpecialRegionContent(Utils.HtmlEncode(tempFormatter.FormatSQLTree(skippedXml))!);
                             else
-                                state.AddOutputContentRaw(tempFormatter.FormatSQLTree(skippedXml));
-                            state.WordSeparatorExpected = false;
-                            state.BreakExpected = false;
+                                state.EmitSpecialRegionContent(tempFormatter.FormatSQLTree(skippedXml));
                         }
                         state.SpecialRegionActive = null;
                         state.RegionStartNode = null;
@@ -2160,9 +2156,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
                         if (skippedXml != null)
                         {
                             TSqlIdentityFormatter tempFormatter = new TSqlIdentityFormatter(Options.HTMLColoring);
-                            state.AddOutputContentRaw(tempFormatter.FormatSQLTree(skippedXml));
-                            state.WordSeparatorExpected = false;
-                            state.BreakExpected = false;
+                            state.EmitSpecialRegionContent(tempFormatter.FormatSQLTree(skippedXml));
                         }
                         state.SpecialRegionActive = null;
                         state.RegionStartNode = null;
@@ -2174,11 +2168,9 @@ namespace PoorMansTSqlFormatterLib.Formatters
                         {
                             TSqlObfuscatingFormatter tempFormatter = new TSqlObfuscatingFormatter();
                             if (HTMLFormatted)
-                                state.AddOutputContentRaw(Utils.HtmlEncode(tempFormatter.FormatSQLTree(skippedXml))!);
+                                state.EmitSpecialRegionContent(Utils.HtmlEncode(tempFormatter.FormatSQLTree(skippedXml))!);
                             else
-                                state.AddOutputContentRaw(tempFormatter.FormatSQLTree(skippedXml));
-                            state.WordSeparatorExpected = false;
-                            state.BreakExpected = false;
+                                state.EmitSpecialRegionContent(tempFormatter.FormatSQLTree(skippedXml));
                         }
                         state.SpecialRegionActive = null;
                         state.RegionStartNode = null;
@@ -2772,6 +2764,28 @@ namespace PoorMansTSqlFormatterLib.Formatters
             {
                 if (SpecialRegionActive == null)
                     _outBuilder.Append(" ");
+            }
+
+            /// <summary>
+            /// Emits the verbatim (identity- or minify-rendered) content of a special
+            /// region and synchronizes line-state bookkeeping with it. During the region,
+            /// suppressed AddOutputContent calls left CurrentLineHasContent stale, so the
+            /// closing marker's comment-separation logic added a line break even when the
+            /// region text already ended with one - accumulating a blank line inside the
+            /// region on every pass (upstream #215/#292).
+            /// </summary>
+            internal void EmitSpecialRegionContent(string regionContent)
+            {
+                AddOutputContentRaw(regionContent);
+                WordSeparatorExpected = false;
+                BreakExpected = false;
+                // SourceBreakPending is deliberately left alone: for minified regions
+                // (whose rendering strips newlines) it still reflects whether the SOURCE
+                // broke the line before the closing marker.
+                bool endsWithLineBreak = regionContent.EndsWith("\n") || regionContent.EndsWith("\r");
+                CurrentLineHasContent = !endsWithLineBreak;
+                if (endsWithLineBreak)
+                    CurrentLineLength = 0;
             }
 
             public void Indent(int indentLevel)

@@ -292,6 +292,18 @@ namespace PoorMansTSqlFormatterLib
                     migrationCandidate = migrationCandidate.PreviousSibling();
                     continue;
                 }
+                else if (!migrationContext.Equals(previousContainerElement)
+                    && SqlStructureConstants.ENAMELIST_COMMENT.Contains(migrationCandidate.Name)
+                    && ContainsSpecialRegionMarker(migrationCandidate))
+                {
+                    // Never migrate --[noformat]/--[minify] marker comments out of a
+                    // SUBSTRUCTURE (migrationContext deeper than the container we started
+                    // from): relocating a marker moves the protected region - e.g.
+                    // hoisting a noformat block out of an INSERT column list's parens
+                    // (upstream #215/#292). Statement-level reattachment of markers at the
+                    // same level is harmless and keeps historical behavior.
+                    migrationCandidate = null;
+                }
                 else if (migrationCandidate.PreviousSibling() != null
                     && SqlStructureConstants.ENAMELIST_COMMENT.Contains(migrationCandidate.Name)
                     && SqlStructureConstants.ENAMELIST_NONCONTENT.Contains(migrationCandidate.PreviousSibling()!.Name)
@@ -345,6 +357,13 @@ namespace PoorMansTSqlFormatterLib
                     migrationCandidate = migrationCandidate.Children.LastOrDefault();
                 }
             }
+        }
+
+        private static bool ContainsSpecialRegionMarker(Node comment)
+        {
+            string text = (comment.TextValue ?? "").ToUpperInvariant();
+            return text.Contains("[NOFORMAT]") || text.Contains("[/NOFORMAT]")
+                || text.Contains("[MINIFY]") || text.Contains("[/MINIFY]");
         }
 
         /// <summary>
