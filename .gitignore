@@ -39,6 +39,9 @@ vscode-extension/dist/
 Thumbs.db
 Desktop.ini
 
+# Claude Code local overrides
+.claude/settings.local.json
+
 # Logs
 *.log
 realworld-results/
