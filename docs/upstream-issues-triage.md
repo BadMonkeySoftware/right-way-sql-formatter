@@ -49,6 +49,7 @@ isn't part of this fork: SSMS installers, notepad++, poorsql.com, packaging),
 | [#111](https://github.com/TaoK/PoorMansTSqlFormatter/issues/111) | Don't touch keyword case | `uppercaseKeywords=false` + `standardizeKeywords=false` |
 | [#290](https://github.com/TaoK/PoorMansTSqlFormatter/issues/290) | WHERE conditions aligned under first | `indentWhereAndOrConditions` |
 | [#299](https://github.com/TaoK/PoorMansTSqlFormatter/issues/299) | Leading commas in VS Code | Leading is the default; `trailingCommas` toggles |
+| [#133](https://github.com/TaoK/PoorMansTSqlFormatter/issues/133) | Remove square brackets on harmless names | `removeHarmlessBrackets` (added 2026-07-15, default off) |
 
 ## Still present — T-SQL bugs (fix candidates, priority order)
 
@@ -93,7 +94,6 @@ Formatting options: [#302](https://github.com/TaoK/PoorMansTSqlFormatter/issues/
 [#172](https://github.com/TaoK/PoorMansTSqlFormatter/issues/172) "remove clutter" profile ·
 [#169](https://github.com/TaoK/PoorMansTSqlFormatter/issues/169) variable case standardization ·
 [#163](https://github.com/TaoK/PoorMansTSqlFormatter/issues/163) column-name comments in long INSERTs ·
-[#133](https://github.com/TaoK/PoorMansTSqlFormatter/issues/133) remove harmless `[]` ·
 [#122](https://github.com/TaoK/PoorMansTSqlFormatter/issues/122) / [#57](https://github.com/TaoK/PoorMansTSqlFormatter/issues/57) uppercase built-in functions ·
 [#117](https://github.com/TaoK/PoorMansTSqlFormatter/issues/117) line-width break preferences ·
 [#114](https://github.com/TaoK/PoorMansTSqlFormatter/issues/114) / [#123](https://github.com/TaoK/PoorMansTSqlFormatter/issues/123) keep-on-one-line marker / auto-ignore ·

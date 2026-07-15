@@ -16,7 +16,7 @@ Format T-SQL in VS Code — the classic SSMS "Poor Man's T-SQL Formatter" style,
 - **Minimal edits** — only changed lines are touched: cursor position survives, undo is one clean step.
 - **Never destroys invalid SQL** — unparseable input still gets best-effort formatting plus a diagnostic comment with line numbers, never a silent failure.
 - **Your style, preserved** — both `expr AS alias` and `alias = expr` column alias styles are kept as you wrote them.
-- **27 formatting options** — from classic SSMS defaults to trailing commas, vertical alignment of columns and JOINs, and compact single-statement blocks.
+- **28 formatting options** — from classic SSMS defaults to trailing commas, vertical alignment of columns and JOINs, and compact single-statement blocks.
 
 ## Commands
 
@@ -111,6 +111,7 @@ All settings are under `rightWaySqlFormatter.*`:
 | `ddlConstraintsOnNewLine` | `false` | In CREATE TABLE, each column constraint on its own line. |
 | `alignTableJoins` | `false` | Align FROM/JOIN table names, aliases, and ON conditions vertically across a query batch. |
 | `alignTableJoinsAddAliases` | `true` | With `alignTableJoins`: also add derived aliases to tables that have none. |
+| `removeHarmlessBrackets` | `false` | Strip `[brackets]` from names that provably don't need them (valid identifiers, not keywords, no token-merge risk). |
 
 ### Compactness
 

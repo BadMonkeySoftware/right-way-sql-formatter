@@ -134,6 +134,7 @@ SqlFormatter --output formatted.sql myquery.sql
 --align-table-joins-add-aliases=true  With table-join alignment: add aliases to unaliased tables (default: true)
 --indent-where-and-or=false Put AND/OR in WHERE onto separate, indented lines (default: false)
 --compact-raiserror=false   Keep RAISERROR(...) argument lists on one line (default: false)
+--remove-harmless-brackets=false  Strip [brackets] from names that provably don't need them (default: false)
 --compact-single-statement-blocks=false  Inline short single-statement IF/ELSE/WHILE bodies (default: false)
 ```
 
