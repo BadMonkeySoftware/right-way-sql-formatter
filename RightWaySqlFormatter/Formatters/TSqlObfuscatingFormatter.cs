@@ -212,8 +212,15 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     break;
 
                 case SqlStructureConstants.ENAME_BRACKET_QUOTED_NAME:
-                    state.SpaceExpected = false;
+                    // The standard formatter preserves word<->bracket source adjacency
+                    // (upstream #240), so minification must not erase a gap the source
+                    // had - otherwise minify->reformat would diverge from direct
+                    // formatting. Only cancel the pending space when the source was
+                    // truly adjacent, and keep a source gap on the trailing side too.
+                    if (!(contentElement.PreviousSibling()?.Name.Equals(SqlStructureConstants.ENAME_WHITESPACE) ?? false))
+                        state.SpaceExpected = false;
                     state.AddOutputContent("[" + contentElement.TextValue!.Replace("]", "]]") + "]");
+                    state.SpaceExpected = contentElement.NextSibling()?.Name.Equals(SqlStructureConstants.ENAME_WHITESPACE) ?? false;
                     break;
 
                 case SqlStructureConstants.ENAME_QUOTED_STRING:

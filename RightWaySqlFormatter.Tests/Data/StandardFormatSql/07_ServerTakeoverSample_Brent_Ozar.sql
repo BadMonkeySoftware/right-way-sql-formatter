@@ -744,7 +744,7 @@ ORDER BY databaseName
     ,schemaName
     ,tableName
 OPTION (MAXDOP 1);
-    /*
+/*
 	Finally, let's go back to the users and ask questions:
 	- Can the business operate if this server is down?
 	- How many employees have to stop working if this server goes down?

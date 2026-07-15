@@ -304,6 +304,14 @@ namespace PoorMansTSqlFormatterLib.Parsers
                             sqlTree.CurrentContainer = sqlTree.SaveNewElement(SqlStructureConstants.ENAME_DDL_DECLARE_BLOCK, "");
                             sqlTree.SaveNewElement(SqlStructureConstants.ENAME_OTHERKEYWORD, token.Value);
                         }
+                        else if (significantTokensString.StartsWith("ALTER COLUMN "))
+                        {
+                            // ALTER COLUMN is a clause of an ALTER TABLE statement, never a
+                            // statement of its own - starting a new statement here split
+                            // "ALTER TABLE x ALTER COLUMN ..." in two with a blank line
+                            // between them (upstream #151). Render inline, like ADD.
+                            sqlTree.SaveNewElement(SqlStructureConstants.ENAME_OTHERKEYWORD, token.Value);
+                        }
                         else if (significantTokensString.StartsWith("CREATE ")
                             || significantTokensString.StartsWith("ALTER ")
                             )

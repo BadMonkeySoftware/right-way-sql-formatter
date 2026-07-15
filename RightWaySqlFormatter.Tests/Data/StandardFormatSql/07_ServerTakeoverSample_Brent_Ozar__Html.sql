@@ -744,7 +744,7 @@ http://www.sqlskills.com/BLOGS/PAUL/post/A-little-known-sign-of-impending-doom-e
     <span class="SQLOperator">,</span>schemaName
     <span class="SQLOperator">,</span>tableName
 <span class="SQLKeyword">OPTION</span> <span class="SQLOperator">(</span><span class="SQLKeyword">MAXDOP</span> 1<span class="SQLOperator">)</span><span class="SQLOperator">;</span>
-    <span class="SQLComment">/*
+<span class="SQLComment">/*
 	Finally, let's go back to the users and ask questions:
 	- Can the business operate if this server is down?
 	- How many employees have to stop working if this server goes down?

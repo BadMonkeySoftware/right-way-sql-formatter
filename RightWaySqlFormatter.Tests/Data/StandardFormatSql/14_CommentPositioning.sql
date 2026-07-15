@@ -11,7 +11,7 @@ CREATE PROCEDURE MyTestProc
     WITH RECOMPILE
 AS
 BEGIN
-    /*
+/*
 
 This is where some explanation of the proc's purpose and usage might go.
 
@@ -84,7 +84,7 @@ SELECT 1
     ,2
     ,3
     ,
-    /*******************    
+/*******************    
 Multi-line Block Comment - earlier and later content should be on new line, respecting the linebreaks in the source
 *******************/
     4

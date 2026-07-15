@@ -2112,8 +2112,18 @@ namespace PoorMansTSqlFormatterLib.Formatters
                         state.RegionStartNode = null;
                     }
 
+                    // A multi-line comment that started at column 0 in the source keeps
+                    // column 0: indenting only its FIRST line (subsequent lines are
+                    // emitted verbatim) breaks box-art banner alignment (upstream #99).
+                    bool keepCommentAtColumnZero = state.SpecialRegionActive == null
+                        && contentElement.TextValue != null
+                        && contentElement.TextValue.Contains('\n')
+                        && CommentStartsAtSourceColumnZero(contentElement);
+                    if (keepCommentAtColumnZero)
+                        state.OmitIndentOnFlushedBreaks = true;
                     WhiteSpace_SeparateComment(contentElement, state);
                     state.AddOutputContent("/*" + contentElement.TextValue + "*/", SqlHtmlConstants.CLASS_COMMENT);
+                    state.OmitIndentOnFlushedBreaks = false;
                     if (contentElement.Parent!.Name.Equals(SqlStructureConstants.ENAME_SQL_STATEMENT)
                         || (contentElement.NextSibling() != null
                             && contentElement.NextSibling()!.Name.Equals(SqlStructureConstants.ENAME_WHITESPACE)
@@ -2206,7 +2216,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     bool isEmptyStringLiteral = string.IsNullOrEmpty(contentElement.TextValue);
                     if (isEmptyStringLiteral
                         && !state.BreakExpected && state.AdditionalBreaksExpected == 0
-                        && IsAdjacencyPreservingToken(contentElement.PreviousSibling()))
+                        && IsAdjacencyPreservingToken(contentElement.PreviousSibling(), includeStrings: true))
                         state.WordSeparatorExpected = false;
                     WhiteSpace_SeparateWords(state);
                     string? outValue = null;
@@ -2216,14 +2226,22 @@ namespace PoorMansTSqlFormatterLib.Formatters
                         outValue = "'" + contentElement.TextValue!.Replace("'", "''") + "'";
                     state.AddOutputContent(outValue, SqlHtmlConstants.CLASS_STRING);
                     state.WordSeparatorExpected = !(isEmptyStringLiteral
-                        && IsAdjacencyPreservingToken(contentElement.NextSibling()));
+                        && IsAdjacencyPreservingToken(contentElement.NextSibling(), includeStrings: true));
                     break;
 
                 case SqlStructureConstants.ENAME_BRACKET_QUOTED_NAME:
                     if (state.InSelectModifierZone) { state.InSelectModifierZone = false; state.BreakExpected = true; }
+                    // Preserve source adjacency between words and bracket names
+                    // ("table_[some_id]" templating - upstream #240). Keywords and
+                    // commas keep their usual spacing; whitespace in the source is
+                    // its own sibling node, so adjacency here means "no gap written".
+                    if (!state.BreakExpected && state.AdditionalBreaksExpected == 0
+                        && IsAdjacencyPreservingToken(contentElement.PreviousSibling(), includeStrings: false))
+                        state.WordSeparatorExpected = false;
                     WhiteSpace_SeparateWords(state);
                     state.AddOutputContent("[" + contentElement.TextValue!.Replace("]", "]]") + "]");
-                    state.WordSeparatorExpected = true;
+                    state.WordSeparatorExpected =
+                        !IsAdjacencyPreservingToken(contentElement.NextSibling(), includeStrings: false);
                     break;
 
                 case SqlStructureConstants.ENAME_QUOTED_STRING:
@@ -2580,7 +2598,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
         /// source had no whitespace in between (whitespace is its own sibling node).
         /// Deliberately excludes keywords and commas so their spacing is untouched.
         /// </summary>
-        private static bool IsAdjacencyPreservingToken(Node? node)
+        private static bool IsAdjacencyPreservingToken(Node? node, bool includeStrings)
         {
             if (node == null) return false;
             switch (node.Name)
@@ -2589,10 +2607,14 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 case SqlStructureConstants.ENAME_NUMBER_VALUE:
                 case SqlStructureConstants.ENAME_MONETARY_VALUE:
                 case SqlStructureConstants.ENAME_PERIOD:
-                case SqlStructureConstants.ENAME_STRING:
-                case SqlStructureConstants.ENAME_NSTRING:
                 case SqlStructureConstants.ENAME_BRACKET_QUOTED_NAME:
                     return true;
+                case SqlStructureConstants.ENAME_STRING:
+                case SqlStructureConstants.ENAME_NSTRING:
+                    // Strings only count for the empty-string fragment scenario (#200);
+                    // bracket adjacency (#240) excludes them so "[col] 'alias'" keeps
+                    // its historical readable spacing.
+                    return includeStrings;
                 default:
                     return false;
             }
@@ -2614,6 +2636,19 @@ namespace PoorMansTSqlFormatterLib.Formatters
             state.UnIndentInitialBreak = false;
             state.SourceBreakPending = false;
             state.WordSeparatorExpected = false;
+        }
+
+        /// <summary>
+        /// True when the comment began at column 0 in the source: its preceding sibling
+        /// is whitespace ending in a line break (no horizontal offset after it).
+        /// </summary>
+        private static bool CommentStartsAtSourceColumnZero(Node contentElement)
+        {
+            Node? prev = contentElement.PreviousSibling();
+            if (prev == null || !prev.Name.Equals(SqlStructureConstants.ENAME_WHITESPACE))
+                return false;
+            string? ws = prev.TextValue;
+            return !string.IsNullOrEmpty(ws) && (ws!.EndsWith("\n") || ws.EndsWith("\r"));
         }
 
         private void WhiteSpace_SeparateComment(Node contentElement, TSqlStandardFormattingState state)
@@ -2749,10 +2784,17 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 }
             }
 
+            /// <summary>
+            /// When set, breaks flushed by WhiteSpace_BreakToNextLine skip the indent -
+            /// used to keep column-0 multi-line comments at column 0 (upstream #99).
+            /// </summary>
+            internal bool OmitIndentOnFlushedBreaks;
+
             internal void WhiteSpace_BreakToNextLine()
             {
                 AddOutputLineBreak();
-                Indent(IndentLevel);
+                if (!OmitIndentOnFlushedBreaks)
+                    Indent(IndentLevel);
                 BreakExpected = false;
                 SourceBreakPending = false;
                 WordSeparatorExpected = false;

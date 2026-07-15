@@ -19,7 +19,7 @@ CREATE PROCEDURE sp_ScriptTable (
     )
 AS
 BEGIN
-    /* 
+/* 
 
 Script taken from http://blogs.techrepublic.com.com/datacenter/?p=431&tag=content;leftCol
 Originally by Tim Chapman, August 18th, 2008.
