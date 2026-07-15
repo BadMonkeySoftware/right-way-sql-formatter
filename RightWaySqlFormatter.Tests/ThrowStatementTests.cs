@@ -91,7 +91,7 @@ ELSE THROW 50001, 'unexpected', 1;",
                 if (!boolExpr.Name.Equals(SqlStructureConstants.ENAME_BOOLEAN_EXPRESSION))
                     continue;
                 foreach (Node child in AllDescendants(boolExpr))
-                    Assert.That(child.TextValue.ToUpperInvariant(), Is.Not.EqualTo("THROW"),
+                    Assert.That(child.TextValue?.ToUpperInvariant(), Is.Not.EqualTo("THROW"),
                         "THROW starts the IF/ELSE body; it must never be part of the boolean condition");
             }
         }
