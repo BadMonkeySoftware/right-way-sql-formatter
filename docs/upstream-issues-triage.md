@@ -23,6 +23,7 @@ isn't part of this fork: SSMS installers, notepad++, poorsql.com, packaging),
 | [#240](https://github.com/TaoK/PoorMansTSqlFormatter/issues/240) | Space injected before adjacent `[bracket]` names | Fixed 2026-07-14; CosmeticSpacingTests (TDD); minifier round-trip preserved |
 | [#151](https://github.com/TaoK/PoorMansTSqlFormatter/issues/151) | `ALTER TABLE … ALTER COLUMN` split in two | Fixed 2026-07-14; renders inline like ADD |
 | [#99](https://github.com/TaoK/PoorMansTSqlFormatter/issues/99) | Column-0 block comments got first-line indent | Fixed 2026-07-14; 7 expected files regenerated w/ sign-off |
+| [#215](https://github.com/TaoK/PoorMansTSqlFormatter/issues/215) / [#292](https://github.com/TaoK/PoorMansTSqlFormatter/issues/292) | `--[noformat]` regions inside statements hoisted + blank-line growth | Fixed 2026-07-14; NoFormatRegionTests (TDD); no expected files touched |
 | [#45](https://github.com/TaoK/PoorMansTSqlFormatter/issues/45) | Better CLI error reporting | Line-numbered diagnostics, exit codes 0/1/5 |
 | [#112](https://github.com/TaoK/PoorMansTSqlFormatter/issues/112) | WITH XMLNAMESPACES | Test 40 |
 | [#179](https://github.com/TaoK/PoorMansTSqlFormatter/issues/179) | Service Broker + WAITFOR | Test 42 |
@@ -53,7 +54,6 @@ isn't part of this fork: SSMS installers, notepad++, poorsql.com, packaging),
 
 | # | Issue | Repro result today |
 |---|---|---|
-| [#215](https://github.com/TaoK/PoorMansTSqlFormatter/issues/215) / [#292](https://github.com/TaoK/PoorMansTSqlFormatter/issues/292)-partial | `--[noformat]` inside a statement | Block hoisted out of INSERT column list; blank line accumulates inside block (non-idempotent). Top-level noformat blocks are stable. |
 | [#128](https://github.com/TaoK/PoorMansTSqlFormatter/issues/128) | `INSERT /*+hint*/ INTO` | Hint comment moved after INTO (breaks Oracle/Vertica hints) |
 | [#272](https://github.com/TaoK/PoorMansTSqlFormatter/issues/272) | `definition` uppercased to DEFINITION | Reproduces (keyword list too aggressive; not a reserved word) |
 | [#293](https://github.com/TaoK/PoorMansTSqlFormatter/issues/293)-part2 | `a IS DISTINCT FROM b` (SQL 2022) | Exit 0 but FROM treated as clause start — `IS DISTINCT\nFROM b1` |
