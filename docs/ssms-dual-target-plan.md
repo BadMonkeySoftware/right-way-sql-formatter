@@ -82,12 +82,12 @@ EnvDTE types are fine in SSMSLib (same COM interop for both shells).
      `AssemblyTitle`/`AssemblyProduct` strings in both AssemblyInfo.cs,
      the `ProductName` in `VSPackage.resx` (Help>About text), and the two
      stale `<ProjectReference><Name>` hints in the SSMS18 csproj.
-2. Extract any Shell.*-dependent code that crept into SSMSLib into the
-   SSMS18 project (SSMSLib must compile against no VSSDK, only EnvDTE).
-   Verified 2026-07-15: SSMSLib currently has NO Microsoft.VisualStudio.Shell
-   references (GenericVSHelper is EnvDTE-only) - this step is likely a no-op;
-   just keep it true. The existing SSMSPackage references Shell.15.0,
-   confirming it is the SSMS 18-era package.
+2. DONE 2026-07-15 (confirmed no-op, both axes): SSMSLib references only
+   the EnvDTE/EnvDTE80 interop packages (17.6.36 - COM interfaces, stable
+   across both shells) and PluginShared references nothing VS-related;
+   neither project's source uses any Microsoft.VisualStudio.* type.
+   Standing rule remains: if code needs a Shell.* type it belongs in a
+   package project, not SSMSLib.
 3. Create `RightWaySqlFormatter.SSMS22`: new VSIX project on VSSDK 17.x,
    AsyncPackage, same .vsct commands, referencing SSMSLib. Manifest
    InstallationTarget must match the SSMS 22 shell identity (discover it
