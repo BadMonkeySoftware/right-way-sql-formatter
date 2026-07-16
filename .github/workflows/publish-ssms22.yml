@@ -1,17 +1,24 @@
 name: Publish SSMS 22 extension
 
-# Builds the RightWaySqlFormatter.SSMS22 VSIX and publishes it to the community
-# Open VSIX Gallery (and the SSMS-filtered instance). Manual trigger only — click
-# "Run workflow" when you want to ship a build. Publishing is token-less and does
-# not require signing; the galleries read metadata from the .vsix manifest.
+# Builds the RightWaySqlFormatter.SSMS22 VSIX and (optionally) publishes it to the
+# community Open VSIX Gallery (and the SSMS-filtered instance). Manual trigger only.
+# By default this is a DRY RUN: it builds and uploads the .vsix as a workflow
+# artifact for inspection. Tick "publish" when you actually want to ship — publishing
+# is token-less and does not require signing; the galleries read metadata from the
+# .vsix manifest.
 on:
   workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish to the VSIX galleries (unticked = build-only dry run)
+        type: boolean
+        default: false
 
 jobs:
   publish:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@v3
@@ -40,20 +47,33 @@ jobs:
       - name: Build VSIX
         run: msbuild RightWaySqlFormatter.SSMS22/RightWaySqlFormatter.SSMS22.csproj /t:Build /p:Configuration=Release /p:DeployExtension=false
 
+      # SDK-style projects append the TFM to the output dir (bin/Release/net48/),
+      # so resolve the built .vsix rather than hard-coding the path.
+      - name: Locate built VSIX
+        id: vsix
+        shell: pwsh
+        run: |
+          $f = Get-ChildItem RightWaySqlFormatter.SSMS22/bin/Release -Recurse -Filter RightWaySqlFormatter.SSMS22.vsix | Select-Object -First 1
+          if (-not $f) { throw 'RightWaySqlFormatter.SSMS22.vsix not found under bin/Release' }
+          "path=$($f.FullName)" | Out-File $env:GITHUB_OUTPUT -Append
+          Write-Host "Found VSIX: $($f.FullName) ($([math]::Round($f.Length/1KB)) KB)"
+
       - name: Upload VSIX artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: RightWaySqlFormatter.SSMS22.vsix
-          path: RightWaySqlFormatter.SSMS22/bin/Release/RightWaySqlFormatter.SSMS22.vsix
+          path: ${{ steps.vsix.outputs.path }}
           if-no-files-found: error
 
       - name: Publish to Open VSIX Gallery
+        if: ${{ inputs.publish }}
         uses: madskristensen/publish-vsixgallery@v1
         with:
-          vsix-file: RightWaySqlFormatter.SSMS22/bin/Release/RightWaySqlFormatter.SSMS22.vsix
+          vsix-file: ${{ steps.vsix.outputs.path }}
 
       - name: Publish to Open SSMS VSIX Gallery
+        if: ${{ inputs.publish }}
         uses: madskristensen/publish-vsixgallery@v1
         with:
-          vsix-file: RightWaySqlFormatter.SSMS22/bin/Release/RightWaySqlFormatter.SSMS22.vsix
+          vsix-file: ${{ steps.vsix.outputs.path }}
           gallery-url: https://ssmsgallery.azurewebsites.net
