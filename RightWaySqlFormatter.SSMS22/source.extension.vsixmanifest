@@ -2,15 +2,16 @@
 <PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
   <Metadata>
     <Identity Id="e857c020-26ea-4b6f-b0d0-d97fb572ee81" Version="2.0.0" Language="en-US" Publisher="right-way-sql-formatter" />
-    <DisplayName>Right Way SQL Formatter — SSMS 21/22 Extension</DisplayName>
-    <Description xml:space="preserve">T-SQL formatting extension for SSMS 21 and 22 (VS 2022 shell). For SSMS 17-20 use the SSMS18 build.</Description>
+    <DisplayName>Right Way SQL Formatter — SSMS 22 Extension</DisplayName>
+    <Description xml:space="preserve">T-SQL formatting extension for SQL Server Management Studio 22 (VS 2022 shell). For SSMS 17-20 use the SSMS18 build.</Description>
+    <MoreInfo>https://github.com/BadMonkeySoftware/right-way-sql-formatter</MoreInfo>
     <License>LICENSE.rtf</License>
   </Metadata>
   <Installation>
-    <InstallationTarget Version="[21.0,)" Id="Microsoft.VisualStudio.Ssms">
+    <InstallationTarget Version="[22.0,)" Id="Microsoft.VisualStudio.Ssms">
         <ProductArchitecture>amd64</ProductArchitecture>
     </InstallationTarget>
-    <InstallationTarget Version="[21.0,)" Id="Microsoft.VisualStudio.Ssms">
+    <InstallationTarget Version="[22.0,)" Id="Microsoft.VisualStudio.Ssms">
         <ProductArchitecture>arm64</ProductArchitecture>
     </InstallationTarget>
   </Installation>
@@ -18,7 +19,7 @@
     <Prerequisite Id="Microsoft.VisualStudio.Component.CoreEditor" Version="[17.0,)" DisplayName="Visual Studio core editor" />
   </Prerequisites>
   <Dependencies>
-    <Dependency Id="Microsoft.Framework.NDP" DisplayName="Microsoft .NET Framework" d:Source="Manual" Version="[4.7.2,)" />
+    <Dependency Id="Microsoft.Framework.NDP" DisplayName="Microsoft .NET Framework" d:Source="Manual" Version="[4.8,)" />
   </Dependencies>
   <Assets>
     <Asset Type="Microsoft.VisualStudio.VsPackage" d:Source="Project" d:ProjectName="%CurrentProject%" Path="|%CurrentProject%;PkgdefProjectOutputGroup|" />

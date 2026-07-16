@@ -106,19 +106,18 @@ EnvDTE types are fine in SSMSLib (same COM interop for both shells).
      twice (ProductArchitecture amd64 + arm64); Prerequisite CoreEditor [17.0,).
    - Added a `Microsoft.VisualStudio.Threading` ref (JoinableTaskFactory) and a
      `ForceEmbedEnvDTE` post-RAR target (see step 4's EnvDTE fix).
-   DEFERRED shipping-quality alternative — ErikEJ's SqlAnalyzerSsms
-   (https://github.com/ErikEJ/SqlServer.Rules/tree/master/tools/SqlAnalyzerSsms),
-   a shipping SSMS 22 extension: SDK-style csproj (`Microsoft.NET.Sdk`), TFM
-   `net48`, `Microsoft.VisualStudio.SDK` 17.14.x + `Microsoft.VSSDK.BuildTools`
-   18.5.x (+ optional `Community.VisualStudio.Toolkit.17`), PackageManifest v2
-   (`[22.0,)` amd64+arm64, Asset from PkgdefProjectOutputGroup). NOTE: that
-   migration is ORTHOGONAL to the bugs fixed here — the EnvDTE embed fix lives
-   at the shared-SSMSLib boundary and transfers to such a project UNCHANGED
-   (SSMSLib still embeds classic EnvDTE; `Community.Toolkit` can't drop it
-   because SSMSLib's text manipulation is built on EnvDTE). Pursue only for
-   gallery-distribution polish: a "native" VSSDK-17 project + signed VSIX for
-   the Open SSMS VSIX Gallery (https://ssmsgallery.azurewebsites.net/,
-   published via the madskristensen/publish-vsixgallery GitHub Action).
+   THEN REBUILT to the shipping-quality template 2026-07-16 (Jeremy chose this
+   for gallery publishing): the project was converted IN PLACE to SDK-style
+   (`Microsoft.NET.Sdk`, TFM `net48`, `Microsoft.VisualStudio.SDK` 17.14 +
+   `Microsoft.VSSDK.BuildTools` 18.5), modeled on ErikEJ's SqlAnalyzerSsms
+   (https://github.com/ErikEJ/SqlServer.Rules/tree/master/tools/SqlAnalyzerSsms).
+   Same folder / GUIDs / identity `{e857c020-...}` / `.vsct` / AsyncPackage
+   class; only the toolchain modernized to bind the NATIVE VS17 shell (not the
+   Shell.15.0 compat assembly the packages.config build rode) and target
+   `[22.0,)` amd64+arm64. The `Microsoft.VisualStudio.Threading` ref and
+   `ForceEmbedEnvDTE` target from the packages.config build were DROPPED — see
+   step 4's EnvDTE note for why the SDK-17 build needed a different (cleaner)
+   EnvDTE strategy.
 4. Deploy: SSMS 18 = manual Extensions-folder copy + `ssms.exe /setup`
    (`C:\Program Files (x86)\...\SSMS 18\Common7\IDE\Extensions\`), per
    windows-ssms-dev.md. SSMS 22 = the built .vsix INSTALLS directly
@@ -180,10 +179,46 @@ EnvDTE types are fine in SSMSLib (same COM interop for both shells).
      GUID → `DTE2` unifies by construction, independent of the shell's EnvDTE.
      Verified at artifact level: SSMS22.dll references no EnvDTE/EnvDTE80/Interop.
      (This is the robust general fix; the SSMS18 package relies on GAC luck.)
+   - **EnvDTE, take 2 — the SDK-17 rebuild.** When SSMS22 was rebuilt on the
+     VS17 SDK (step 3), `ForceEmbedEnvDTE` no longer worked: the SDK 17.x
+     meta-package's MODERN EnvDTE type-forwards `DTE2` to
+     `Microsoft.VisualStudio.Interop`, so it cannot be embedded (CS1747/CS1759),
+     and injecting the vendored classic instead collides with Interop's `DTE2`
+     (CS0433) — and Interop can't be aliased away because it also houses
+     `VSConstants`. Fixed at the ARCHITECTURE level instead: added
+     `GenericVSHelper.FormatSqlInTextDoc(object)` to SSMSLib (a COM
+     QueryInterface cast to its embedded `DTE2`). The SSMS22 package now hands
+     the DTE across as `object`, so NO interop type crosses the assembly
+     boundary — it uses the modern SDK EnvDTE cleanly with zero vendoring /
+     embedding, and there is no cross-assembly unification to get right. The
+     overload is additive; the SSMS18 package keeps calling the typed `DTE2`
+     overload and is untouched. This is the cleaner general pattern; the
+     SSMS18/packages.config embed dance above stays only because SSMS 18 lacks
+     Interop 17 and must embed the classic PIA.
 5. Add both projects to `RightWaySqlFormatter.slnx` (Windows-only solution);
    NoSSMS.slnx stays untouched.
 6. Update README project table + windows-ssms-dev.md with what actually
    worked (paths, InstallationTarget values, gotchas).
+7. Publish SSMS 22 to the community Open VSIX Gallery (Jeremy, 2026-07-16).
+   Research (primary-sourced): publishing is a token-less single HTTP POST of
+   the `.vsix`; **no signing required** (signing is only end-user SmartScreen
+   trust, decoupled); the galleries read metadata from the `.vsix` manifest
+   only — they do not care how it was built. Two galleries: the main
+   `vsixgallery.com` and the SSMS-filtered `ssmsgallery.azurewebsites.net`.
+   - CI: `.github/workflows/publish-ssms22.yml` — `workflow_dispatch` (manual),
+     `windows-latest`, `microsoft/setup-msbuild`, stamps the manifest Identity
+     version `2.0.<run_number>`, msbuilds the SSMS22 project, publishes via
+     `madskristensen/publish-vsixgallery@v1` to BOTH galleries (second step
+     overrides `gallery-url`). Token-less; no secrets.
+   - End-user install (SSMS 21/22 has no Extensions UI): explicit
+     `...\SSMS 22\...\IDE\VSIXInstaller.exe <file>.vsix`; double-clicking routes
+     to Visual Studio's installer if VS is present, so document the SSMS-path
+     invocation. Uninstall by manifest `Identity Id`
+     (`VSIXInstaller.exe /uninstall:e857c020-...`). AnyCPU + amd64/arm64 targets
+     are the real must-haves (ARM64 SSMS runs an ARM64 runtime).
+   - Optional later polish: code-sign the VSIX (Azure Trusted Signing, as
+     ErikEJ does) for SmartScreen trust; a tag/release trigger instead of
+     manual dispatch. Not required to publish.
 
 ## Constraints and cautions
 

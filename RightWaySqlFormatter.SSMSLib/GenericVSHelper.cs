@@ -89,6 +89,21 @@ namespace PoorMansTSqlFormatterSSMSLib
             return rawDefault.Replace("Text Editor", scopeName);
         }
         
+        /// <summary>
+        /// Object-typed entry point for callers that reference a DIFFERENT EnvDTE than the
+        /// classic v8 interop this library embeds — specifically the SDK-17 SSMS 22 package,
+        /// built against the modern EnvDTE / Microsoft.VisualStudio.Interop. Passing the DTE
+        /// as object means no interop type crosses the assembly boundary, so no cross-assembly
+        /// embedded-interop type unification is needed; the cast below is a COM QueryInterface
+        /// by IID onto this library's embedded DTE2 (the DTE COM object implements DTE2, and the
+        /// DTE2 IID is identical across the classic and modern interop, so the QI succeeds).
+        /// The SSMS 18 package keeps calling the strongly-typed DTE2 overload and is unaffected.
+        /// </summary>
+        public void FormatSqlInTextDoc(object dte)
+        {
+            FormatSqlInTextDoc((DTE2)dte);
+        }
+
         public void FormatSqlInTextDoc(DTE2 dte)
         {
 

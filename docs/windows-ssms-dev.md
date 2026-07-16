@@ -85,30 +85,40 @@ msbuild RightWaySqlFormatter.SSMS22\RightWaySqlFormatter.SSMS22.csproj /t:Restor
 ```
 
 **Two package projects, one per shell (DONE 2026-07-16).** `SSMS18` is a
-synchronous `Package` for SSMS 17–20; `SSMS22` is an `AsyncPackage` for
-SSMS 21/22. Both build with the same toolchain (packages.config +
+synchronous `Package` for SSMS 17–20, built the classic way (packages.config +
 `Microsoft.VisualStudio.SDK` 15.0.1 + `Microsoft.VSSDK.BuildTools` 17.12,
-Shell.15.0, net472, AnyCPU) and share the shell-agnostic SSMSLib. The two
-things the VS 2022 shell forced (neither is a toolchain change — SSMS22 was
-cloned from SSMS18 with only these deltas):
+Shell.15.0, net472, AnyCPU). `SSMS22` is an `AsyncPackage` for SSMS 21/22,
+built SDK-style (`Microsoft.NET.Sdk` + net48 + `Microsoft.VisualStudio.SDK`
+17.14 + `Microsoft.VSSDK.BuildTools` 18.5 + AnyCPU) so it binds the NATIVE VS17
+shell — this is the gallery-shipping artifact. Both share the shell-agnostic
+SSMSLib. What the VS 2022 shell forced for SSMS22:
 
 - **AsyncPackage + background load.** VS17 refuses synchronous autoload, so
   SSMS22 uses `AsyncPackage`, `[PackageRegistration(AllowsBackgroundLoading = true)]`,
   and `[ProvideAutoLoad(..., PackageAutoLoadFlags.BackgroundLoad)]`. Verify the
   generated `.pkgdef` has `AllowsBackgroundLoad=dword:00000001` and an
   `AutoLoadPackages` entry of `dword:00000002`.
-- **Embed EnvDTE in the package too.** SSMSLib embeds `EnvDTE`/`EnvDTE80`
-  (No-PIA); the package must embed the *same* classic 8.0.0.0 interop so the
-  `DTE2` types unify at runtime (else `MissingMethodException` on the first
-  format). The SDK meta-package ships a non-embedded EnvDTE that shadows the
-  direct `<Reference EmbedInteropTypes>` flag, so SSMS22 adds a `ForceEmbedEnvDTE`
-  target (`AfterTargets="ResolveAssemblyReferences"`) that flips
-  `EmbedInteropTypes=true` on the resolved EnvDTE/EnvDTE80 `ReferencePath`
-  items. **Gate:** reflect the built package DLL — it must reference no
-  `EnvDTE`/`EnvDTE80`/`Microsoft.VisualStudio.Interop`.
+- **EnvDTE across the SSMSLib boundary.** SSMSLib embeds classic `EnvDTE`/`EnvDTE80`
+  (No-PIA) for SSMS 18's sake. The SDK-17 package can't embed the same classic
+  copy — the SDK's modern EnvDTE forwards `DTE2` to
+  `Microsoft.VisualStudio.Interop` (CS1747/CS1759 if embedded; CS0433 if the
+  vendored classic is injected alongside). Solved architecturally: SSMSLib
+  exposes `FormatSqlInTextDoc(object)` (an internal COM QueryInterface cast to
+  its embedded `DTE2`), and the SSMS22 package hands the DTE across as `object`
+  — no interop type crosses the boundary, so the package uses the modern SDK
+  EnvDTE with no embedding at all. (The earlier packages.config SSMS22 build
+  instead used a `ForceEmbedEnvDTE` target to embed the vendored classic; that
+  approach is retained only conceptually — the object boundary superseded it.)
 
 Upstream demand signal for SSMS 22 support:
 [#297](https://github.com/TaoK/PoorMansTSqlFormatter/issues/297)/[#301](https://github.com/TaoK/PoorMansTSqlFormatter/issues/301).
+
+**Publishing SSMS22 to the Open VSIX Gallery** is automated in
+`.github/workflows/publish-ssms22.yml` (manual `workflow_dispatch`): it stamps
+the manifest version `2.0.<run_number>`, msbuilds the VSIX on `windows-latest`,
+and publishes token-lessly via `madskristensen/publish-vsixgallery@v1` to both
+`vsixgallery.com` and `ssmsgallery.azurewebsites.net`. No signing/secrets
+required. End users install with the SSMS-path `VSIXInstaller.exe` (see below).
 
 ## Deploying to SSMS 22 (manual, unsupported-by-Microsoft path)
 

@@ -1,0 +1,59 @@
+name: Publish SSMS 22 extension
+
+# Builds the RightWaySqlFormatter.SSMS22 VSIX and publishes it to the community
+# Open VSIX Gallery (and the SSMS-filtered instance). Manual trigger only — click
+# "Run workflow" when you want to ship a build. Publishing is token-less and does
+# not require signing; the galleries read metadata from the .vsix manifest.
+on:
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v3
+
+      # Give each published build a distinct version (the gallery keys on the
+      # manifest Identity Version). CAREFUL: the manifest carries Version="2.0.0"
+      # TWICE — on <Identity> (bump this) and on <PackageManifest> (the vsx SCHEMA
+      # version, must stay 2.0.0). Anchor on the extension GUID so ONLY the
+      # Identity is rewritten; the [22.0,)/[17.0,)/[4.8,) ranges are untouched too.
+      - name: Stamp VSIX version 2.0.${{ github.run_number }}
+        shell: pwsh
+        run: |
+          $m = 'RightWaySqlFormatter.SSMS22/source.extension.vsixmanifest'
+          $text = Get-Content $m -Raw
+          $pattern = 'Id="e857c020-26ea-4b6f-b0d0-d97fb572ee81" Version="2\.0\.0"'
+          $new = 'Id="e857c020-26ea-4b6f-b0d0-d97fb572ee81" Version="2.0.${{ github.run_number }}"'
+          $updated = [regex]::Replace($text, $pattern, $new)
+          if ($updated -eq $text) { throw 'Identity version stamp did not match - manifest layout changed?' }
+          if ($updated -notmatch '<PackageManifest Version="2\.0\.0"') { throw 'PackageManifest schema version was altered - aborting.' }
+          Set-Content $m -Value $updated -NoNewline
+          Write-Host 'Stamped Identity version = 2.0.${{ github.run_number }} (schema version 2.0.0 preserved)'
+
+      - name: Restore
+        run: msbuild RightWaySqlFormatter.SSMS22/RightWaySqlFormatter.SSMS22.csproj /t:Restore /p:Configuration=Release
+
+      - name: Build VSIX
+        run: msbuild RightWaySqlFormatter.SSMS22/RightWaySqlFormatter.SSMS22.csproj /t:Build /p:Configuration=Release /p:DeployExtension=false
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RightWaySqlFormatter.SSMS22.vsix
+          path: RightWaySqlFormatter.SSMS22/bin/Release/RightWaySqlFormatter.SSMS22.vsix
+          if-no-files-found: error
+
+      - name: Publish to Open VSIX Gallery
+        uses: madskristensen/publish-vsixgallery@v1
+        with:
+          vsix-file: RightWaySqlFormatter.SSMS22/bin/Release/RightWaySqlFormatter.SSMS22.vsix
+
+      - name: Publish to Open SSMS VSIX Gallery
+        uses: madskristensen/publish-vsixgallery@v1
+        with:
+          vsix-file: RightWaySqlFormatter.SSMS22/bin/Release/RightWaySqlFormatter.SSMS22.vsix
+          gallery-url: https://ssmsgallery.azurewebsites.net

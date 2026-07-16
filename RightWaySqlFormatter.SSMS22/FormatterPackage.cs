@@ -90,7 +90,10 @@ namespace PoorMansTSqlFormatterSSMSPackage
 
         private void FormatSqlCallback(object sender, EventArgs e)
         {
-            DTE2 dte = (DTE2)GetService(typeof(DTE));
+            // Hand the DTE to SSMSLib as object: SSMSLib embeds the classic EnvDTE interop,
+            // this package uses the modern SDK interop, and passing object (SSMSLib QIs it
+            // internally) avoids any cross-assembly interop type-identity mismatch.
+            object dte = GetService(typeof(DTE));
             _SSMSHelper.FormatSqlInTextDoc(dte);
         }
 
