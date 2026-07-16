@@ -20,8 +20,6 @@
     <RootNamespace>PoorMansTSqlFormatterSSMSPackage</RootNamespace>
     <AssemblyName>RightWaySqlFormatter.SSMS18</AssemblyName>
     <TargetFrameworkVersion>v4.7.2</TargetFrameworkVersion>
-    <SignAssembly>true</SignAssembly>
-    <AssemblyOriginatorKeyFile>Key.snk</AssemblyOriginatorKeyFile>
     <Deterministic>false</Deterministic>
     <NoWarn>$(NoWarn);NU1603</NoWarn>
     <UseWindowsForms>true</UseWindowsForms>
@@ -49,12 +47,14 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="EnvDTE">
-      <HintPath>..\packages\EnvDTE.17.6.36\lib\net45\EnvDTE.dll</HintPath>
-      <EmbedInteropTypes>False</EmbedInteropTypes>
+      <HintPath>..\lib\interop\EnvDTE.dll</HintPath>
+      <EmbedInteropTypes>True</EmbedInteropTypes>
+      <Private>False</Private>
     </Reference>
     <Reference Include="EnvDTE80">
-      <HintPath>..\packages\EnvDTE80.17.6.36\lib\net45\EnvDTE80.dll</HintPath>
-      <EmbedInteropTypes>False</EmbedInteropTypes>
+      <HintPath>..\lib\interop\EnvDTE80.dll</HintPath>
+      <EmbedInteropTypes>True</EmbedInteropTypes>
+      <Private>False</Private>
     </Reference>
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="Microsoft.VisualStudio.OLE.Interop">

@@ -98,6 +98,30 @@ EnvDTE types are fine in SSMSLib (same COM interop for both shells).
    SSMS 18 variant goes to
    `C:\Program Files (x86)\...\SSMS 18\Common7\IDE\Extensions\`,
    SSMS 22 to `C:\Program Files\...\SSMS 22\Release\Common7\IDE\Extensions\`.
+   SSMS 18: DONE 2026-07-15 — deploys, loads, and formats (whole document +
+   selection); options dialog and localized (es/fr) resources OK. Deploy the
+   extracted VSIX payload into `...\SSMS 18\Common7\IDE\Extensions\RightWaySqlFormatter\`,
+   then run `Ssms.exe /setup` **elevated**. Registration is by package GUID
+   `{247609b1-...}`. ActivityLog for SSMS 18 is at
+   `%AppData%\Microsoft\AppEnv\15.0\ActivityLog.xml` (VS15 isolation root),
+   not the `SQL Server Management Studio\18.0_*` path. Two PRE-EXISTING
+   incompatibilities surfaced on the first real load and were fixed (both
+   shell-integration only, no formatter change):
+   - **Strong-name mismatch.** The signed package + SSMSLib referenced the
+     unsigned core + PluginShared → `SetSite failed ... A strongly-named
+     assembly is required` (HRESULT 0x80131044). Fix: un-signed all four
+     plugin assemblies (removed `SignAssembly`/`Key.snk`) for a consistent
+     weak-named chain; unsigned VSIX-style extensions load fine.
+   - **EnvDTE interop version.** The modern EnvDTE 17.6.36 packages bind to
+     `Microsoft.VisualStudio.Interop 17.0.0.0` (a VS2022 assembly SSMS 18
+     lacks), so the command handlers/`QueryClose` threw at JIT. Fix: use the
+     classic embeddable EnvDTE/EnvDTE80 **v8.0.0.0** PIAs (vendored under
+     `lib/interop/`) with `EmbedInteropTypes=true`. SSMSLib now embeds them
+     with ZERO external EnvDTE/Interop reference (needed a `Microsoft.CSharp`
+     ref for the late-bound `object`->`TextSelection` COM casts, CS0656).
+     The package project still resolves EnvDTE 8.0.0.0 from the shell (the
+     VS SDK meta-package's copy wins over the vendored ref) — acceptable, as
+     it is shell-specific and both SSMS 18 and 22 provide EnvDTE 8.0.0.0.
 5. Add both projects to `RightWaySqlFormatter.slnx` (Windows-only solution);
    NoSSMS.slnx stays untouched.
 6. Update README project table + windows-ssms-dev.md with what actually

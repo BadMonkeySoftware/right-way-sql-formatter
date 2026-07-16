@@ -9,17 +9,32 @@
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <Deterministic>false</Deterministic>
     <NoWarn>$(NoWarn);NU1603</NoWarn>
-    <SignAssembly>true</SignAssembly>
-    <AssemblyOriginatorKeyFile>Key.snk</AssemblyOriginatorKeyFile>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\RightWaySqlFormatter\RightWaySqlFormatter.csproj" />
     <ProjectReference Include="..\RightWaySqlFormatter.PluginShared\RightWaySqlFormatter.PluginShared.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <!-- EnvDTE COM interop — shipped with Visual Studio; referenced via NuGet on Windows -->
-    <PackageReference Include="EnvDTE" Version="17.6.36" />
-    <PackageReference Include="EnvDTE80" Version="17.6.36" />
+    <!-- Classic EnvDTE/EnvDTE80 v8.0.0.0 PIAs (vendored under lib/interop) + EmbedInteropTypes=true
+         bakes the version-stable COM interfaces into our DLLs, so we depend on NO external EnvDTE.dll
+         or Microsoft.VisualStudio.Interop.dll at runtime — the CLR binds to the live DTE by COM GUID.
+         The modern EnvDTE 17.x packages forward their base interfaces to Microsoft.VisualStudio.Interop
+         (a VS2022 assembly SSMS 18 lacks) and EmbedInteropTypes is unreliable via PackageReference, so
+         we vendor the self-contained v8 PIAs. This lets one SSMSLib load in both SSMS 18 (VS15 shell)
+         and SSMS 21/22 (VS17 shell). -->
+    <Reference Include="EnvDTE">
+      <HintPath>..\lib\interop\EnvDTE.dll</HintPath>
+      <EmbedInteropTypes>true</EmbedInteropTypes>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="EnvDTE80">
+      <HintPath>..\lib\interop\EnvDTE80.dll</HintPath>
+      <EmbedInteropTypes>true</EmbedInteropTypes>
+      <Private>false</Private>
+    </Reference>
+    <!-- Late-bound (object -> embedded-interop) COM casts in GenericVSHelper compile to
+         Binder.Convert once the EnvDTE types are embedded (CS0656). Framework assembly; no runtime dep. -->
+    <Reference Include="Microsoft.CSharp" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Update="GeneralLanguageContent.resx" />
