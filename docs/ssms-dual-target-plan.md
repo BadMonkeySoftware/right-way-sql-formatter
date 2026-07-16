@@ -88,27 +88,37 @@ EnvDTE types are fine in SSMSLib (same COM interop for both shells).
    neither project's source uses any Microsoft.VisualStudio.* type.
    Standing rule remains: if code needs a Shell.* type it belongs in a
    package project, not SSMSLib.
-3. Create `RightWaySqlFormatter.SSMS22` following the WORKING TEMPLATE:
-   ErikEJ's SqlAnalyzerSsms (https://github.com/ErikEJ/SqlServer.Rules/tree/master/tools/SqlAnalyzerSsms),
-   a shipping SSMS 22 extension. Key facts lifted from it (2026-07-15):
-   - SDK-style csproj (`Microsoft.NET.Sdk`), TargetFramework `net48`, with
-     `VSSDKBuildToolsAutoSetup`, `GeneratePkgDefFile`, `UseCodebase`,
-     `VsixDeployOnDebug` properties + `<ProjectCapability Include="CreateVsixContainer" />`.
-   - Packages: `Microsoft.VisualStudio.SDK` 17.14.x (ExcludeAssets=runtime),
-     `Microsoft.VSSDK.BuildTools` 18.5.x, and optionally
-     `Community.VisualStudio.Toolkit.17` for pleasant command/options wiring.
-   - Manifest (PackageManifest v2 schema): InstallationTarget
-     `Id="Microsoft.VisualStudio.Ssms" Version="[22.0,)"` declared TWICE,
-     once with ProductArchitecture amd64 and once arm64; Prerequisite
-     `Microsoft.VisualStudio.Component.CoreEditor [17.0,)`; Asset
-     `Microsoft.VisualStudio.VsPackage` from PkgdefProjectOutputGroup.
-   - AsyncPackage + same .vsct commands as SSMS18, referencing SSMSLib.
-   - PRECONDITION CHECK IN FLIGHT: SSMSLib's EnvDTE embed made the fixed
-     SSMS18 package potentially loadable on SSMS 22 as-is (SSMS 22 ships a
-     Shell.15.0 v18.8 compat assembly). Testing that before authoring this
-     project; even if it loads, this properly-targeted project remains the
-     shipping artifact (sync-Package load is deprecation-path, the Shell.15.0
-     shim is undocumented compat, and the gallery expects a real [22.0,) VSIX).
+3. DONE 2026-07-16 — created `RightWaySqlFormatter.SSMS22` by CLONING the
+   working SSMS18 project and applying ONLY the async delta (recovered from
+   the historical `PoorMansTSqlFormatterVSPackage2019` AsyncPackage in git).
+   Chosen over a modern-template rewrite because the SSMS 22 load failure was
+   never a toolchain problem (see step 4): the ActivityLog showed VS17 reached
+   the autoload REQUEST for our package using the packages.config / Shell.15.0
+   / VSSDK-BuildTools-17.12 / embedded-EnvDTE / net472 / AnyCPU toolchain — so
+   registration + pkgdef parsing already worked on VS17, and only the loading
+   model needed changing. What differs from SSMS18:
+   - `AsyncPackage` (not `Package`), `[PackageRegistration(..., AllowsBackgroundLoading = true)]`,
+     `[ProvideAutoLoad(..., PackageAutoLoadFlags.BackgroundLoad)]`, `InitializeAsync`
+     + `SwitchToMainThreadAsync`. Drops the SSMS-2015 `SkipLoading` reg hack.
+   - Fresh distinct identity: pkg `{e857c020-...}`, cmdset `{1a2afa6c-...}`,
+     ProjectGuid `{CACE487F-...}` — no collision with the SSMS18 registration.
+   - Manifest InstallationTarget `Microsoft.VisualStudio.Ssms [21.0,)`, declared
+     twice (ProductArchitecture amd64 + arm64); Prerequisite CoreEditor [17.0,).
+   - Added a `Microsoft.VisualStudio.Threading` ref (JoinableTaskFactory) and a
+     `ForceEmbedEnvDTE` post-RAR target (see step 4's EnvDTE fix).
+   DEFERRED shipping-quality alternative — ErikEJ's SqlAnalyzerSsms
+   (https://github.com/ErikEJ/SqlServer.Rules/tree/master/tools/SqlAnalyzerSsms),
+   a shipping SSMS 22 extension: SDK-style csproj (`Microsoft.NET.Sdk`), TFM
+   `net48`, `Microsoft.VisualStudio.SDK` 17.14.x + `Microsoft.VSSDK.BuildTools`
+   18.5.x (+ optional `Community.VisualStudio.Toolkit.17`), PackageManifest v2
+   (`[22.0,)` amd64+arm64, Asset from PkgdefProjectOutputGroup). NOTE: that
+   migration is ORTHOGONAL to the bugs fixed here — the EnvDTE embed fix lives
+   at the shared-SSMSLib boundary and transfers to such a project UNCHANGED
+   (SSMSLib still embeds classic EnvDTE; `Community.Toolkit` can't drop it
+   because SSMSLib's text manipulation is built on EnvDTE). Pursue only for
+   gallery-distribution polish: a "native" VSSDK-17 project + signed VSIX for
+   the Open SSMS VSIX Gallery (https://ssmsgallery.azurewebsites.net/,
+   published via the madskristensen/publish-vsixgallery GitHub Action).
 4. Deploy: SSMS 18 = manual Extensions-folder copy + `ssms.exe /setup`
    (`C:\Program Files (x86)\...\SSMS 18\Common7\IDE\Extensions\`), per
    windows-ssms-dev.md. SSMS 22 = the built .vsix INSTALLS directly
@@ -142,6 +152,34 @@ EnvDTE types are fine in SSMSLib (same COM interop for both shells).
      The package project still resolves EnvDTE 8.0.0.0 from the shell (the
      VS SDK meta-package's copy wins over the vendored ref) — acceptable, as
      it is shell-specific and both SSMS 18 and 22 provide EnvDTE 8.0.0.0.
+   SSMS 22: DONE 2026-07-16 — deploys, loads, and formats (whole document +
+   selection); options dialog OK; exactly one set of menu items. Deploy the
+   extracted VSIX payload into
+   `...\SSMS 22\Release\Common7\IDE\Extensions\RightWaySqlFormatter.SSMS22\`,
+   then run `SSMS.exe /setup` **elevated**. ActivityLog for SSMS 22 is at
+   `%AppData%\Microsoft\SSMS\22.0_<hash>\ActivityLog.xml` (VS17 isolation) —
+   parse it as UTF-16 XML (grep sees only nulls). Two blockers surfaced and
+   were fixed (shell integration only, no formatter change):
+   - **Synchronous autoload rejected.** VS17 IGNORES sync-autoload packages
+     (ActivityLog: AutoLoadManager "ignored because package does not support
+     background loading" + SyncAutoLoadedExtensions "synchronous autoload ...
+     deprecated"). `Initialize()` never ran → both commands stayed at their
+     `.vsct` DefaultDisabled (greyed out). Fix: `AsyncPackage` +
+     `AllowsBackgroundLoading` + `BackgroundLoad` autoload — the pkgdef then
+     emits `AllowsBackgroundLoad=dword:1` and the autoload value `dword:2`.
+   - **EnvDTE type-identity mismatch.** Once it loaded, invoking Format threw
+     `MissingMethodException: FormatSqlInTextDoc(EnvDTE80.DTE2)`. SSMSLib
+     EMBEDS `DTE2`; the package passed a plain-PIA `DTE2`, and on the VS17
+     runtime the two `DTE2` types did not unify (they do on SSMS 18 only
+     because its GAC PIA identity happens to match the vendored embed). Fix:
+     a `ForceEmbedEnvDTE` target (`AfterTargets="ResolveAssemblyReferences"`)
+     flips `EmbedInteropTypes=true` on the EnvDTE/EnvDTE80 `ReferencePath`
+     items, defeating the SDK meta-package's non-embedded copy that shadows
+     the direct `<Reference>` flag. Now BOTH the package AND SSMSLib embed the
+     same classic 8.0.0.0 interop types → identical `[TypeIdentifier]` scope
+     GUID → `DTE2` unifies by construction, independent of the shell's EnvDTE.
+     Verified at artifact level: SSMS22.dll references no EnvDTE/EnvDTE80/Interop.
+     (This is the robust general fix; the SSMS18 package relies on GAC luck.)
 5. Add both projects to `RightWaySqlFormatter.slnx` (Windows-only solution);
    NoSSMS.slnx stays untouched.
 6. Update README project table + windows-ssms-dev.md with what actually

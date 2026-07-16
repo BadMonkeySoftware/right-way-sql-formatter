@@ -79,17 +79,36 @@ The SSMS projects are classic VSSDK projects: build them with **msbuild, not
 
 ```powershell
 msbuild RightWaySqlFormatter.slnx /restore /p:Configuration=Release
-# Or just the package:
-msbuild RightWaySqlFormatter.SSMS18\RightWaySqlFormatter.SSMS18.csproj /restore /p:Configuration=Release
+# Or just one package (restore first if the obj\ cache is cold):
+msbuild RightWaySqlFormatter.SSMS18\RightWaySqlFormatter.SSMS18.csproj /t:Restore;Build /p:Configuration=Release
+msbuild RightWaySqlFormatter.SSMS22\RightWaySqlFormatter.SSMS22.csproj /t:Restore;Build /p:Configuration=Release
 ```
 
-**Expected migration work (first task on this VM):** the package was written
-against the SSMS 18-era shell (VS2019 SDK). For the VS 2022 shell it will
-likely need: VSSDK 17.x package references, `PlatformTarget` AnyCPU
-(Prefer32Bit off), and a `source.extension.vsixmanifest` InstallationTarget
-that matches the SSMS 22 shell identity. Treat upstream issues
-[#297](https://github.com/TaoK/PoorMansTSqlFormatter/issues/297)/[#301](https://github.com/TaoK/PoorMansTSqlFormatter/issues/301)
-as the demand signal for this work.
+**Two package projects, one per shell (DONE 2026-07-16).** `SSMS18` is a
+synchronous `Package` for SSMS 17–20; `SSMS22` is an `AsyncPackage` for
+SSMS 21/22. Both build with the same toolchain (packages.config +
+`Microsoft.VisualStudio.SDK` 15.0.1 + `Microsoft.VSSDK.BuildTools` 17.12,
+Shell.15.0, net472, AnyCPU) and share the shell-agnostic SSMSLib. The two
+things the VS 2022 shell forced (neither is a toolchain change — SSMS22 was
+cloned from SSMS18 with only these deltas):
+
+- **AsyncPackage + background load.** VS17 refuses synchronous autoload, so
+  SSMS22 uses `AsyncPackage`, `[PackageRegistration(AllowsBackgroundLoading = true)]`,
+  and `[ProvideAutoLoad(..., PackageAutoLoadFlags.BackgroundLoad)]`. Verify the
+  generated `.pkgdef` has `AllowsBackgroundLoad=dword:00000001` and an
+  `AutoLoadPackages` entry of `dword:00000002`.
+- **Embed EnvDTE in the package too.** SSMSLib embeds `EnvDTE`/`EnvDTE80`
+  (No-PIA); the package must embed the *same* classic 8.0.0.0 interop so the
+  `DTE2` types unify at runtime (else `MissingMethodException` on the first
+  format). The SDK meta-package ships a non-embedded EnvDTE that shadows the
+  direct `<Reference EmbedInteropTypes>` flag, so SSMS22 adds a `ForceEmbedEnvDTE`
+  target (`AfterTargets="ResolveAssemblyReferences"`) that flips
+  `EmbedInteropTypes=true` on the resolved EnvDTE/EnvDTE80 `ReferencePath`
+  items. **Gate:** reflect the built package DLL — it must reference no
+  `EnvDTE`/`EnvDTE80`/`Microsoft.VisualStudio.Interop`.
+
+Upstream demand signal for SSMS 22 support:
+[#297](https://github.com/TaoK/PoorMansTSqlFormatter/issues/297)/[#301](https://github.com/TaoK/PoorMansTSqlFormatter/issues/301).
 
 ## Deploying to SSMS 22 (manual, unsupported-by-Microsoft path)
 
@@ -97,23 +116,33 @@ SSMS 22 installs at
 `C:\Program Files\Microsoft SQL Server Management Studio 22\Release\Common7\IDE`
 (confirm on the VM; SSMS 21 used the same pattern with `21`).
 
-1. Close SSMS.
-2. Create `...\Common7\IDE\Extensions\RightWaySqlFormatter\` and copy the
-   package build output into it: the plugin DLLs, `*.pkgdef`, and
-   `extension.vsixmanifest`.
+1. Close SSMS (**all** instances — SSMS 18 and 22 share the `Ssms` process name).
+2. Extract the built `.vsix` (it is a zip) into
+   `...\Common7\IDE\Extensions\RightWaySqlFormatter.SSMS22\`: the plugin DLLs,
+   `*.pkgdef`, `extension.vsixmanifest`, and the `es/` `fr/` satellites. Remove
+   any prior deployment folder first so stale pkgdef GUIDs don't linger.
 3. From an **elevated** prompt, rebuild the extension/package cache:
 
    ```powershell
-   & "C:\Program Files\Microsoft SQL Server Management Studio 22\Release\Common7\IDE\ssms.exe" /setup
+   & "C:\Program Files\Microsoft SQL Server Management Studio 22\Release\Common7\IDE\SSMS.exe" /setup
    ```
 
-4. Start SSMS and check for the formatter menu/commands.
-5. If nothing appears: run `ssms.exe /log`, then inspect `ActivityLog.xml`
-   (`%AppData%\Microsoft\SQL Server Management Studio\<version>\ActivityLog.xml`).
-   No "BeginLoad" for the package = manifest/InstallationTarget or pkgdef
-   problem; a load exception = dependency/architecture problem.
+4. Start SSMS (`SSMS.exe /log`) and check Tools ▸ **Format T-SQL Code** /
+   **T-SQL Formatting Options...** — they should be enabled and format.
+5. If the commands are missing or greyed out, inspect the ActivityLog. For
+   SSMS 22 it is at
+   `%AppData%\Microsoft\SSMS\22.0_<hash>\ActivityLog.xml` (VS17 isolation root,
+   **not** the old `SQL Server Management Studio\<version>` path). It is
+   **UTF-16** — `grep` sees only null bytes; parse it as XML (e.g. PowerShell
+   `[xml]`). Signatures seen in practice:
+   - `AutoLoadManager … ignored because package does not support background loading`
+     + `SyncAutoLoadedExtensions … synchronous autoload … deprecated` = the
+     package is a synchronous `Package`; it needs AsyncPackage + background load.
+   - Commands load and enable but formatting throws
+     `MissingMethodException: FormatSqlInTextDoc(EnvDTE80.DTE2)` = the EnvDTE
+     embed mismatch above (package didn't embed EnvDTE).
 
-To remove: delete the folder and run `ssms.exe /setup` again.
+To remove: delete the folder and run `SSMS.exe /setup` again.
 
 ## Rules of engagement for Claude Code on the VM
 

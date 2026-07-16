@@ -14,8 +14,10 @@ Targets: **SSMS plugin**, **VS Code extension**, **CLI tool** — all powered by
 |---|---|
 | `RightWaySqlFormatter/` | Core formatting library (.NET 10) |
 | `RightWaySqlFormatter.CmdLine/` | CLI tool — `SqlFormatter` binary |
-| `RightWaySqlFormatter.SSMS18/` | SSMS plugin (Windows build only) |
-| `RightWaySqlFormatter.SSMSLib/` | Shared SSMS helper library |
+| `RightWaySqlFormatter.SSMS18/` | SSMS plugin for SSMS 17–20 (Windows build only) |
+| `RightWaySqlFormatter.SSMS22/` | SSMS plugin for SSMS 21/22 (AsyncPackage, Windows build only) |
+| `RightWaySqlFormatter.SSMSLib/` | Shared, shell-agnostic SSMS helper library |
+| `RightWaySqlFormatter.PluginShared/` | Generic plugin glue (shared by both SSMS builds) |
 | `RightWaySqlFormatter.Tests/` | NUnit 4 test suite |
 | `vscode-extension/` | VS Code extension (TypeScript, shells out to CLI) |
 
@@ -243,14 +245,25 @@ Use **"Right Way SQL: Format Document (Preview)"** to review changes in VS Code'
 
 ## SSMS Plugin
 
-The `RightWaySqlFormatter.SSMS18/` project is the VS Package-style SSMS plugin. Build requires:
+Two package projects ship one plugin per shell generation, both built on the
+shared, shell-agnostic `RightWaySqlFormatter.SSMSLib`:
+
+- `RightWaySqlFormatter.SSMS18/` — synchronous `Package`, for SSMS **17–20**
+  (VS 2017-era shell, 32-bit).
+- `RightWaySqlFormatter.SSMS22/` — `AsyncPackage` with background load, for
+  SSMS **21/22** (VS 2022 shell, 64-bit). SSMS 22 (VS17) refuses synchronous
+  autoload, so this variant must be async.
+
+Build requires:
 - Windows
-- Visual Studio 2019+ with VSIX development workload
+- Visual Studio 2019+ with VSIX development workload (VSSDK projects build with
+  `msbuild`, not `dotnet build`)
 - SSMS 18+ (for testing)
 
 Build on a Windows VM. SSMS 21/22 have no official extension support; see
 [docs/windows-ssms-dev.md](docs/windows-ssms-dev.md) for the manual deployment
-path (Extensions folder + `ssms.exe /setup`) and its caveats.
+path (Extensions folder + `ssms.exe /setup`) and the SSMS-22 gotchas
+(AsyncPackage requirement, EnvDTE embedding, UTF-16 ActivityLog).
 
 ---
 

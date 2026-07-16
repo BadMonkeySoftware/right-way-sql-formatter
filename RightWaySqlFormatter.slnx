@@ -6,6 +6,7 @@
     <Project Path="RightWaySqlFormatter.PluginShared/RightWaySqlFormatter.PluginShared.csproj" />
     <Project Path="RightWaySqlFormatter.SSMSLib/RightWaySqlFormatter.SSMSLib.csproj" />
     <Project Path="RightWaySqlFormatter.SSMS18/RightWaySqlFormatter.SSMS18.csproj" />
+    <Project Path="RightWaySqlFormatter.SSMS22/RightWaySqlFormatter.SSMS22.csproj" />
   </Folder>
   <Project Path="RightWaySqlFormatter.CmdLine/RightWaySqlFormatter.CmdLine.csproj" />
   <Project Path="RightWaySqlFormatter/RightWaySqlFormatter.csproj" />
