@@ -34,7 +34,11 @@
     <EnableDefaultEmbeddedResourceItems>false</EnableDefaultEmbeddedResourceItems>
     <EnableDefaultNoneItems>false</EnableDefaultNoneItems>
 
-    <!-- VSSDK / VSIX packaging (targets provided by Microsoft.VSSDK.BuildTools) -->
+    <!-- VSSDK / VSIX packaging (targets provided by Microsoft.VSSDK.BuildTools).
+         VSSDKBuildToolsAutoSetup=true is REQUIRED: it is what imports the package's
+         self-contained VSSDK targets (CreateVsixContainer / GeneratePkgDef / VSCTCompile)
+         — without it an SDK-style project builds only the DLL and produces NO .vsix. -->
+    <VSSDKBuildToolsAutoSetup>true</VSSDKBuildToolsAutoSetup>
     <GeneratePkgDefFile>true</GeneratePkgDefFile>
     <UseCodebase>true</UseCodebase>
     <DeployExtension>false</DeployExtension>

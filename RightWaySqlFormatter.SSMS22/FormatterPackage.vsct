@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <Parent guid="guidPoorMansTSqlFormatterSSMSVSPackageCmdSet" id="MyMenuGroup" />
         <CommandFlag>DefaultDisabled</CommandFlag>
         <Strings>
-          <ButtonText>Format T-SQL Code</ButtonText>
+          <ButtonText>Format T-SQL Code (Right Way)</ButtonText>
         </Strings>
       </Button>
 
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <Parent guid="guidPoorMansTSqlFormatterSSMSVSPackageCmdSet" id="MyMenuGroup" />
         <CommandFlag>DefaultDisabled</CommandFlag>
         <Strings>
-          <ButtonText>T-SQL Formatting Options...</ButtonText>
+          <ButtonText>T-SQL Formatting Options (Right Way)...</ButtonText>
         </Strings>
       </Button>
 

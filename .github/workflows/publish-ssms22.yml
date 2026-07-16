@@ -44,16 +44,16 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: RightWaySqlFormatter.SSMS22.vsix
-          path: RightWaySqlFormatter.SSMS22/bin/Release/RightWaySqlFormatter.SSMS22.vsix
+          path: RightWaySqlFormatter.SSMS22/bin/Release/net48/RightWaySqlFormatter.SSMS22.vsix
           if-no-files-found: error
 
       - name: Publish to Open VSIX Gallery
         uses: madskristensen/publish-vsixgallery@v1
         with:
-          vsix-file: RightWaySqlFormatter.SSMS22/bin/Release/RightWaySqlFormatter.SSMS22.vsix
+          vsix-file: RightWaySqlFormatter.SSMS22/bin/Release/net48/RightWaySqlFormatter.SSMS22.vsix
 
       - name: Publish to Open SSMS VSIX Gallery
         uses: madskristensen/publish-vsixgallery@v1
         with:
-          vsix-file: RightWaySqlFormatter.SSMS22/bin/Release/RightWaySqlFormatter.SSMS22.vsix
+          vsix-file: RightWaySqlFormatter.SSMS22/bin/Release/net48/RightWaySqlFormatter.SSMS22.vsix
           gallery-url: https://ssmsgallery.azurewebsites.net
