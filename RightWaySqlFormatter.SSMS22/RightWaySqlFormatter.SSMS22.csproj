@@ -83,6 +83,13 @@
     <Content Include="LICENSE.rtf">
       <IncludeInVSIX>true</IncludeInVSIX>
     </Content>
+    <!-- Manifest Icon/PreviewImage — shown by VSIXInstaller and the Open VSIX Gallery -->
+    <Content Include="icon.png">
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
+    <Content Include="preview.png">
+      <IncludeInVSIX>true</IncludeInVSIX>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>

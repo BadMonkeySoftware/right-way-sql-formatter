@@ -154,6 +154,40 @@ SSMS 22 installs at
 
 To remove: delete the folder and run `SSMS.exe /setup` again.
 
+## Signing the VSIX (Azure Trusted Signing)
+
+Decision (Jeremy, 2026-07-16): sign the SSMS 22 VSIX with **Azure Trusted
+Signing** (a.k.a. Artifact Signing; ~$9.99/mo Basic; publisher = validated
+identity). Unsigned VSIXes install fine — the signature only changes the
+"Digital Signature: None" line in VSIXInstaller to a verified publisher.
+The publish workflow already contains the signing steps; they are skipped
+until the secrets below exist, so nothing breaks in the meantime.
+
+One-time Azure setup (portal, done by Jeremy — cannot be automated):
+
+1. Paid Azure subscription (Trusted Signing rejects free/trial subs).
+2. Create a **Trusted Signing account** (Basic SKU) in a supported region —
+   note the region's endpoint, e.g. East US = `https://eus.codesigning.azure.net`.
+3. Complete **identity validation**. Individual validation (US/Canada) means
+   the certificate CN — what VSIXInstaller shows as publisher — is the
+   validated **personal legal name**, not "BadMonkeySoftware" (org validation
+   requires a registered legal entity with a verifiable track record).
+4. Create a **certificate profile** (type: Public Trust) on the account.
+5. Create an Entra **app registration** with a **federated credential** for
+   GitHub OIDC (issuer `https://token.actions.githubusercontent.com`, subject
+   `repo:BadMonkeySoftware/right-way-sql-formatter:ref:refs/heads/main`), and
+   grant it the **Trusted Signing Certificate Profile Signer** role on the
+   signing account. No client secret needed — the workflow uses `azure/login`
+   OIDC.
+6. Add the repo Actions secrets: `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`,
+   `AZURE_SUBSCRIPTION_ID`, `TRUSTED_SIGNING_ENDPOINT`,
+   `TRUSTED_SIGNING_ACCOUNT`, `TRUSTED_SIGNING_CERT_PROFILE`.
+
+The workflow then signs via the `dotnet sign` CLI (`sign code trusted-signing`),
+which supports VSIX natively and timestamps automatically. Verify a signed
+build by opening the .vsix in VSIXInstaller — the Digital Signature line should
+name the validated identity.
+
 ## Rules of engagement for Claude Code on the VM
 
 - Same repo rules as everywhere: never modify expected Data files without

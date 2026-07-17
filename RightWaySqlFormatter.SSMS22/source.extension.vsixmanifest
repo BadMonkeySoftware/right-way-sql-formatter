@@ -6,6 +6,9 @@
     <Description xml:space="preserve">T-SQL formatting extension for SQL Server Management Studio 22 (VS 2022 shell). For SSMS 17-20 use the SSMS18 build.</Description>
     <MoreInfo>https://github.com/BadMonkeySoftware/right-way-sql-formatter</MoreInfo>
     <License>LICENSE.rtf</License>
+    <Icon>icon.png</Icon>
+    <PreviewImage>preview.png</PreviewImage>
+    <Tags>SQL, T-SQL, SSMS, formatter, format, beautifier, pretty-print</Tags>
   </Metadata>
   <Installation>
     <InstallationTarget Version="[22.0,)" Id="Microsoft.VisualStudio.Ssms">
