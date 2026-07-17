@@ -21,6 +21,10 @@ jobs:
     permissions:
       id-token: write
       contents: read
+    # secrets.* isn't readable in step-level `if:` — mirror the gate secret into
+    # env so the signing steps can test whether Azure signing is configured.
+    env:
+      SIGNING_CONFIGURED: ${{ secrets.AZURE_CLIENT_ID }}
     steps:
       - uses: actions/checkout@v5
 
@@ -72,7 +76,7 @@ jobs:
       # TRUSTED_SIGNING_ENDPOINT (e.g. https://eus.codesigning.azure.net),
       # TRUSTED_SIGNING_ACCOUNT, TRUSTED_SIGNING_CERT_PROFILE.
       - name: Azure login (OIDC)
-        if: ${{ secrets.AZURE_CLIENT_ID != '' }}
+        if: ${{ env.SIGNING_CONFIGURED != '' }}
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
@@ -80,7 +84,7 @@ jobs:
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
       - name: Sign VSIX (Trusted Signing)
-        if: ${{ secrets.AZURE_CLIENT_ID != '' }}
+        if: ${{ env.SIGNING_CONFIGURED != '' }}
         shell: pwsh
         run: |
           dotnet tool install --global sign --prerelease
