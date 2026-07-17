@@ -18,20 +18,15 @@ namespace PoorMansTSqlFormatterTests
     [TestFixture]
     public class ScriptDomValidationTests
     {
-        // Always-run matrix: the default profile must NEVER produce output that fails
-        // the real T-SQL grammar. The heavier text-pass profiles are validated by the
-        // [Explicit] hunt test below until their remaining known gaps are fixed.
+        // Always-run matrix: NO profile here may ever produce output that fails the
+        // real T-SQL grammar. AlignEquals and HeavyEditor started life as [Explicit]
+        // "hunt" profiles with known gaps; all 17 remaining failures were fixed
+        // 2026-07-17 (align/alias text-pass corruption of non-table-source FROMs,
+        // TVF calls, derived tables, table variables, CASE-arm continuations, and
+        // string-literal '=' aliases), so they are now enforced on every run.
         private static readonly (string name, string config)[] PROFILES =
         {
             ("Default", ""),
-        };
-
-        // Under active bug-hunting (run via: --filter "Name~ScriptDomHunt"). Known
-        // remaining failures as of 2026-07-13: AlignEquals on 26; HeavyEditor on
-        // 07/08/09/10/11/14/17/18/21/24/26/42/43 - mostly trailing-comma / compact /
-        // width-200 interactions in the text passes.
-        private static readonly (string name, string config)[] HUNT_PROFILES =
-        {
             ("AlignEquals", "AlignColumnDefinitions=True,ColumnAliasStyle=EqualSign,ColumnAlwaysHasAlias=True"),
             ("HeavyEditor", "ExpandBetweenConditions=false,ExpandBooleanExpressions=false,ExpandCaseStatements=false,"
                 + "ExpandInLists=false,UppercaseKeywords=false,TrailingCommas=True,AlignTableJoins=True,"
@@ -47,18 +42,6 @@ namespace PoorMansTSqlFormatterTests
                     yield return new TestCaseData(fileName, config)
                         .SetName($"ScriptDomValid_{name}_{fileName}");
         }
-
-        public static IEnumerable<TestCaseData> GetHuntCases()
-        {
-            foreach (string fileName in Utils.GetInputSqlFileNames())
-                foreach (var (name, config) in HUNT_PROFILES)
-                    yield return new TestCaseData(fileName, config)
-                        .SetName($"ScriptDomHunt_{name}_{fileName}");
-        }
-
-        [Test, TestCaseSource(nameof(GetHuntCases)), Explicit("known gaps under heavy profiles - run while bug-hunting")]
-        public void HuntFormattedOutputParsesCleanUnderScriptDom(string fileName, string configString)
-            => FormattedOutputParsesCleanUnderScriptDom(fileName, configString);
 
         [Test, TestCaseSource(nameof(GetValidationCases))]
         public void FormattedOutputParsesCleanUnderScriptDom(string fileName, string configString)

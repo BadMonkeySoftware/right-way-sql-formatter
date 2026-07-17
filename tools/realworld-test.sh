@@ -27,7 +27,8 @@ OUT="$WORK/flagged"
 PROFILE="${PROFILE:-}"
 
 echo "== Building CLI (Release) =="
-dotnet build -c Release RightWaySqlFormatter.CmdLine/RightWaySqlFormatter.CmdLine.csproj || exit 1
+# RWSQL_NO_TRIM=1: skip trimming (sandbox/offline environments lack ILLink runtime packs)
+dotnet build -c Release ${RWSQL_NO_TRIM:+-p:PublishTrimmed=false} RightWaySqlFormatter.CmdLine/RightWaySqlFormatter.CmdLine.csproj || exit 1
 FMT="$ROOT/RightWaySqlFormatter.CmdLine/bin/Release/net10.0/SqlFormatter"
 [ -x "$FMT" ] || { echo "CLI binary not found at $FMT"; exit 1; }
 

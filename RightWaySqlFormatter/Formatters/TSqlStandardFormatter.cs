@@ -266,6 +266,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
             var lines = new List<string>(output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None));
             int indentSize = Options.SpacesPerTab > 0 ? Options.SpacesPerTab : 4;
             bool[] insideStringOrComment = ComputeLinesInsideStringOrComment(lines);
+            string[] statementContexts = ComputeStatementContexts(lines, insideStringOrComment);
 
             // Find contiguous FROM/JOIN blocks and align each one.
             int i = 0;
@@ -274,6 +275,20 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 if (LineTouchesStringOrComment(insideStringOrComment, i)) { i++; continue; }
                 string trimmed = lines[i].TrimStart();
                 string upper = trimmed.ToUpperInvariant();
+                // FROM keywords appear in many statements that are NOT table-source clauses
+                // (FETCH ... FROM cursor, BULK INSERT ... FROM 'file', BEGIN DIALOG ... FROM
+                // SERVICE, REVOKE ... FROM principal, BACKUP/RESTORE ... FROM DISK, ...).
+                // Rewriting those corrupts or even DELETES content — skip such statements
+                // entirely. DELETE is special: its target FROM cannot take an AS alias, so
+                // the block may be aligned but never gains invented aliases.
+                string stmtContext = statementContexts[i];
+                if (IsNonTableSourceStatementContext(stmtContext)) { i++; continue; }
+                // DELETE's target FROM cannot take an AS alias. The statement context
+                // catches "DELETE ..." at statement start, but a CTE-prefixed
+                // "WITH x AS (...) DELETE FROM x" hides it — so also check whether the
+                // immediately preceding content line is a bare DELETE [TOP (n)].
+                bool allowAddAliases = !stmtContext.StartsWith("DELETE")
+                    && !PrecedingLineIsBareDelete(lines, insideStringOrComment, i);
                 if (IsFromOrJoinLine(upper))
                 {
                     int blockStart = i;
@@ -297,19 +312,108 @@ namespace PoorMansTSqlFormatterLib.Formatters
                         i++;
                     }
                     var blockLines = lines.GetRange(blockStart, i - blockStart);
-                    var newBlock = AlignFromJoinBlock(blockLines, indentSize);
+                    var newBlock = AlignFromJoinBlock(blockLines, indentSize, allowAddAliases);
                     lines.RemoveRange(blockStart, i - blockStart);
                     lines.InsertRange(blockStart, newBlock);
                     i = blockStart + newBlock.Count;
-                    //line indices shifted; keep the in-string/in-comment mask in sync
+                    //line indices shifted; keep the in-string/in-comment mask and the
+                    // statement-context map in sync
                     if (newBlock.Count != blockLines.Count)
+                    {
                         insideStringOrComment = ComputeLinesInsideStringOrComment(lines);
+                        statementContexts = ComputeStatementContexts(lines, insideStringOrComment);
+                    }
                     continue;
                 }
                 i++;
             }
 
             return string.Join(Environment.NewLine, lines);
+        }
+
+        /// <summary>
+        /// Computes, for each line, the leading keyword pair of the statement it belongs to
+        /// (e.g. "SELECT", "BULK INSERT", "BEGIN DIALOG"). Statement boundaries follow the
+        /// same text-level conventions as the other post-passes: blank lines, GO, and a
+        /// line-terminating semicolon end a statement.
+        /// </summary>
+        private static string[] ComputeStatementContexts(List<string> lines, bool[] insideStringOrComment)
+        {
+            var contexts = new string[lines.Count];
+            string current = "";
+            bool newStatement = true;
+            for (int i = 0; i < lines.Count; i++)
+            {
+                if (LineTouchesStringOrComment(insideStringOrComment, i)) { contexts[i] = current; continue; }
+                string t = lines[i].Trim();
+                if (t.Length == 0) { current = ""; newStatement = true; contexts[i] = current; continue; }
+                string up = t.ToUpperInvariant();
+                if (up == "GO" || up.StartsWith("GO ") || up.StartsWith("GO;"))
+                {
+                    current = ""; newStatement = true; contexts[i] = current; continue;
+                }
+                if (newStatement && !up.StartsWith("--") && !up.StartsWith("/*"))
+                {
+                    var words = up.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                    current = words.Length >= 2 ? words[0] + " " + words[1] : (words.Length == 1 ? words[0] : "");
+                    newStatement = false;
+                }
+                contexts[i] = current;
+                if (up.EndsWith(";"))
+                    newStatement = true;
+            }
+            return contexts;
+        }
+
+        /// <summary>
+        /// Returns true when the nearest preceding content line is a bare DELETE
+        /// (optionally with TOP (n)) — meaning the current FROM introduces the DELETE
+        /// target, which cannot take an invented alias.
+        /// </summary>
+        private static bool PrecedingLineIsBareDelete(List<string> lines, bool[] insideStringOrComment, int i)
+        {
+            for (int p = i - 1; p >= 0; p--)
+            {
+                if (LineTouchesStringOrComment(insideStringOrComment, p)) return false;
+                string t = lines[p].Trim();
+                if (t.Length == 0) return false; // blank = statement boundary
+                string up = t.ToUpperInvariant();
+                if (up.StartsWith("--")) continue;
+                return up == "DELETE" || (up.StartsWith("DELETE TOP") && !up.Contains(" FROM "));
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Statements whose FROM keyword introduces something other than a query table
+        /// source; their FROM lines must never be align-rewritten or given aliases.
+        /// </summary>
+        private static bool IsNonTableSourceStatementContext(string context)
+        {
+            if (string.IsNullOrEmpty(context)) return false;
+            int sp = context.IndexOf(' ');
+            string first = sp >= 0 ? context.Substring(0, sp) : context;
+            switch (first)
+            {
+                case "FETCH":       // FETCH NEXT FROM cursor
+                case "BULK":        // BULK INSERT ... FROM 'file'
+                case "BACKUP":      // BACKUP ... FROM/TO DISK
+                case "RESTORE":     // RESTORE ... FROM DISK
+                case "GRANT":
+                case "REVOKE":      // REVOKE ... FROM principal [CASCADE]
+                case "DENY":
+                case "OPEN":
+                case "CLOSE":
+                case "DEALLOCATE":
+                case "RECEIVE":     // RECEIVE ... FROM queue (Service Broker)
+                case "SEND":
+                case "GET":         // GET CONVERSATION GROUP ... FROM queue
+                    return true;
+                case "BEGIN":
+                    return context.StartsWith("BEGIN DIALOG"); // BEGIN DIALOG ... FROM SERVICE
+                default:
+                    return false;
+            }
         }
 
         private static bool IsFromOrJoinLine(string trimmedUpper)
@@ -334,7 +438,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
         /// is pulled up to be inline with ON; subsequent AND/OR conditions are aligned under ON.
         /// Returns the new lines for the block (may be fewer than input due to pulled-up conditions).
         /// </summary>
-        private List<string> AlignFromJoinBlock(List<string> blockLines, int indentSize)
+        private List<string> AlignFromJoinBlock(List<string> blockLines, int indentSize, bool allowAddAliases = true)
         {
             // Keyword tokens that we inject — respect UppercaseKeywords setting.
             bool uc = Options.UppercaseKeywords;
@@ -401,12 +505,28 @@ namespace PoorMansTSqlFormatterLib.Formatters
             if (items.Count == 0) return blockLines;
 
             // ---- Pass 2: ensure every item has an alias ---------------------
-            if (Options.AlignTableJoinsAddAliases)
+            if (Options.AlignTableJoinsAddAliases && allowAddAliases)
             {
                 foreach (var item in items)
                 {
-                    if (string.IsNullOrEmpty(item.Alias))
-                        item.Alias = BaseTableName(item.Table);
+                    if (!string.IsNullOrEmpty(item.Alias)) continue;
+                    string tbl = item.Table;
+                    // Only invent an alias for plain (possibly schema-qualified) table names.
+                    // Skip: derived tables "(", string sources ('file', N'svc'), table
+                    // variables (@t — the derived alias "@t" would be illegal), names with
+                    // parens (TVF calls, legacy "(nolock)" hints), bracket-quoted parts
+                    // (derivation is unsafe), and names carrying a statement terminator.
+                    if (string.IsNullOrEmpty(tbl)) continue;
+                    char c0 = tbl[0];
+                    if (c0 == '(' || c0 == '\'' || c0 == '@' || tbl.StartsWith("N'")
+                        || tbl.IndexOf('(') >= 0 || tbl.IndexOf('[') >= 0
+                        || tbl.EndsWith(";"))
+                        continue;
+                    string baseName = BaseTableName(tbl);
+                    // Reserved words / keyword-list names would need brackets as an alias —
+                    // not worth inventing; leave the table unaliased instead.
+                    if (!IsHarmlessUnbracketableName(baseName)) continue;
+                    item.Alias = baseName;
                 }
             }
 
@@ -511,7 +631,9 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 }
                 else if (string.IsNullOrEmpty(curItem.OnClause))
                 {
-                    result.Add(curItem.Indent + kwTable + tablepad + asPart);
+                    // No ON follows on this line — the alignment padding (and empty alias
+                    // slot) would become trailing whitespace; trim it.
+                    result.Add((curItem.Indent + kwTable + tablepad + asPart).TrimEnd());
                 }
                 else
                 {
@@ -648,27 +770,46 @@ namespace PoorMansTSqlFormatterLib.Formatters
         private static void ParseTableAndAlias(string tableAndAlias, out string table, out string alias)
         {
             // Tokens: tableName [AS] [alias]
-            // Could be: schema.Table, [schema].[Table], tableName, tableName alias, tableName AS alias
-            string upper = tableAndAlias.ToUpperInvariant();
-            
-            // Look for " AS " (with spaces)
-            int tryAs = upper.IndexOf(" AS ");
+            // Could be: schema.Table, [schema].[Table], tableName, tableName alias, tableName AS alias,
+            // or a table-valued function call: dbo.f(@a, @b) alias — the call's argument list
+            // contains spaces and commas, so all splitting must be paren-aware or content
+            // between the first and last token would be silently DROPPED.
+            tableAndAlias = tableAndAlias.Trim();
+
+            // Look for " AS " (with spaces) outside any parens (CAST(x AS y) can appear in TVF args)
+            int tryAs = FindTokenOutsideParens(tableAndAlias, " AS ");
             if (tryAs >= 0)
             {
                 table = tableAndAlias.Substring(0, tryAs).Trim();
                 alias = tableAndAlias.Substring(tryAs + 4).Trim();
                 return;
             }
-            // No AS keyword — try two-token split
-            var parts = tableAndAlias.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length >= 2)
+            // No AS keyword — split at the LAST whitespace that sits at paren depth 0;
+            // everything before it is the table expression, the final token is the alias.
+            int depth = 0;
+            int lastTopLevelSpace = -1;
+            for (int i = 0; i < tableAndAlias.Length; i++)
             {
-                table = parts[0];
-                alias = parts[parts.Length - 1];
+                char c = tableAndAlias[i];
+                if (c == '(') depth++;
+                else if (c == ')') depth--;
+                else if (depth == 0 && (c == ' ' || c == '\t')) lastTopLevelSpace = i;
+            }
+            if (lastTopLevelSpace > 0 && lastTopLevelSpace < tableAndAlias.Length - 1)
+            {
+                table = tableAndAlias.Substring(0, lastTopLevelSpace).TrimEnd();
+                alias = tableAndAlias.Substring(lastTopLevelSpace + 1).Trim();
+                // "t (nolock)" — a legacy hint is not an alias; keep it glued to the table
+                // (writing "t as (nolock)" would be invalid SQL).
+                if (alias.StartsWith("("))
+                {
+                    table = tableAndAlias;
+                    alias = "";
+                }
             }
             else
             {
-                table = tableAndAlias.Trim();
+                table = tableAndAlias;
                 alias = "";
             }
         }
@@ -747,12 +888,15 @@ namespace PoorMansTSqlFormatterLib.Formatters
             int autoAliasCounter = 0;
             int beginDepth = 0; // tracks BEGIN/END nesting depth
             int parenDepth = 0; // tracks open-paren depth inside a SELECT column expression
+            int caseDepth = 0;  // tracks open CASE...END depth — CASE arms wrapped onto
+                                // their own lines (AND/THEN/ELSE fragments) are expression
+                                // continuations, never new columns
             bool[] insideStringOrComment = ComputeLinesInsideStringOrComment(lines);
 
             for (int i = 0; i < lines.Length; i++)
             {
                 //never touch lines inside OR opening a multi-line string literal / block comment
-                if (LineTouchesStringOrComment(insideStringOrComment, i)) { inSelectList = false; parenDepth = 0; continue; }
+                if (LineTouchesStringOrComment(insideStringOrComment, i)) { inSelectList = false; parenDepth = 0; caseDepth = 0; continue; }
                 string line = lines[i];
                 string trimmed = line.TrimStart();
                 string trimmedUpper = trimmed.ToUpperInvariant();
@@ -765,14 +909,14 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     string afterBegin = trimmedUpper.Length > 5 ? trimmedUpper.Substring(6).TrimStart() : "";
                     if (!afterBegin.StartsWith("TRAN") && !afterBegin.StartsWith("DISTRIBUTED"))
                         beginDepth++;
-                    if (inSelectList) { inSelectList = false; parenDepth = 0; } // BEGIN always ends a SELECT list
+                    if (inSelectList) { inSelectList = false; parenDepth = 0; caseDepth = 0; } // BEGIN always ends a SELECT list
                     continue;
                 }
                 if (trimmedUpper == "END" || trimmedUpper.StartsWith("END ") || trimmedUpper.StartsWith("END\t")
                     || trimmedUpper.StartsWith("END;") || trimmedUpper.StartsWith("END,") || trimmedUpper.StartsWith("END)"))
                 {
                     if (beginDepth > 0) beginDepth--;
-                    if (inSelectList) { inSelectList = false; parenDepth = 0; }
+                    if (inSelectList) { inSelectList = false; parenDepth = 0; caseDepth = 0; }
                     continue;
                 }
 
@@ -786,6 +930,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
                         inSelectList = true;
                         autoAliasCounter = 0;
                         parenDepth = 0;
+                        caseDepth = 0;
                         int selectEnd = trimmed.IndexOf(' ');
                         if (selectEnd >= 0)
                         {
@@ -809,6 +954,8 @@ namespace PoorMansTSqlFormatterLib.Formatters
                                 }
                                 parenDepth += netParens1;
                                 if (parenDepth < 0) parenDepth = 0;
+                                caseDepth += CountNetCase(colExpr1);
+                                if (caseDepth < 0) caseDepth = 0;
                             }
                         }
                         continue;
@@ -824,6 +971,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     inSelectList = true;
                     autoAliasCounter = 0; // reset counter per query
                     parenDepth = 0;
+                    caseDepth = 0;
 
                     // The SELECT line itself may have first column inline.
                     int selectEnd = trimmed.IndexOf(' ');
@@ -865,18 +1013,35 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     {
                         inSelectList = false;
                         parenDepth = 0;
+                        caseDepth = 0;
                         continue;
                     }
-                    // If we're inside an unbalanced open-paren (multi-line expression continuation),
-                    // just track paren depth and skip alias processing for this line.
-                    if (parenDepth > 0)
+                    // If we're inside an unbalanced open-paren or open CASE (multi-line
+                    // expression continuation), just track depths and skip alias processing.
+                    if (parenDepth > 0 || caseDepth > 0)
                     {
                         parenDepth += CountNetParens(trimmed);
                         if (parenDepth < 0) parenDepth = 0;
+                        caseDepth += CountNetCase(trimmed);
+                        if (caseDepth < 0) caseDepth = 0;
                         continue;
                     }
 
                     bool startsWithComma = trimmed.StartsWith(",");
+                    // Width-wrapped continuations of a taller expression (boolean AND/OR,
+                    // CASE-arm keywords, operator-leading fragments) are not new columns.
+                    if (!startsWithComma
+                        && (trimmedUpper.StartsWith("AND ") || trimmedUpper.StartsWith("OR ")
+                            || trimmedUpper.StartsWith("THEN ") || trimmedUpper.StartsWith("WHEN ")
+                            || trimmedUpper.StartsWith("ELSE ")
+                            || "+-*/%=<>".IndexOf(trimmed[0]) >= 0))
+                    {
+                        parenDepth += CountNetParens(trimmed);
+                        if (parenDepth < 0) parenDepth = 0;
+                        caseDepth += CountNetCase(trimmed);
+                        if (caseDepth < 0) caseDepth = 0;
+                        continue;
+                    }
                     if (!startsWithComma && IsClauseStartLine(trimmedUpper))
                     {
                         inSelectList = false;
@@ -901,9 +1066,11 @@ namespace PoorMansTSqlFormatterLib.Formatters
                                 lines[i] = indent + "," + rewritten;
                             }
                         }
-                        // Track net parens for multi-line expression detection
+                        // Track net parens/CASE for multi-line expression detection
                         parenDepth += netParens;
                         if (parenDepth < 0) parenDepth = 0;
+                        caseDepth += netCase;
+                        if (caseDepth < 0) caseDepth = 0;
                     }
                     else if (!string.IsNullOrWhiteSpace(trimmed))
                     {
@@ -928,6 +1095,8 @@ namespace PoorMansTSqlFormatterLib.Formatters
                             parenDepth += netParens2;
                         }
                         if (parenDepth < 0) parenDepth = 0;
+                        caseDepth += netCase2;
+                        if (caseDepth < 0) caseDepth = 0;
                     }
                 }
             }
@@ -1062,11 +1231,18 @@ namespace PoorMansTSqlFormatterLib.Formatters
 
             // Already has an EqualSign-style alias (alias = expr) in the input SQL.
             // The column IS aliased — preserve the user's chosen style, do not rewrite to AS.
+            // A string literal on the LHS ('alias' = expr, the legacy alias syntax that
+            // RewriteAliasesToEqualSign itself emits for AS 'alias') counts too — without
+            // this, REformatting stacks a second alias in front and corrupts the column.
             if (!trimmed.StartsWith("@"))
             {
                 int eqPos = FindEqualSignOutsideParens(trimmed);
-                if (eqPos > 0 && IsSimpleColumnRef(trimmed.Substring(0, eqPos).Trim()))
-                    return (col, counter);
+                if (eqPos > 0)
+                {
+                    string lhs = trimmed.Substring(0, eqPos).Trim();
+                    if (IsSimpleColumnRef(lhs) || IsStringLiteralAlias(lhs))
+                        return (col, counter);
+                }
             }
 
             // Variable assignment SELECT @var = expr — not a column alias, leave alone
@@ -1090,6 +1266,29 @@ namespace PoorMansTSqlFormatterLib.Formatters
             }
 
             return (trimmed + " AS " + alias + suffix, counter);
+        }
+
+        /// <summary>
+        /// Returns true if <paramref name="expr"/> is a single self-contained string literal
+        /// ('alias' or N'alias' with no trailing content) — the legacy string-alias LHS form.
+        /// </summary>
+        private static bool IsStringLiteralAlias(string expr)
+        {
+            if (string.IsNullOrEmpty(expr)) return false;
+            int start = expr.StartsWith("N'") ? 2 : (expr[0] == '\'' ? 1 : -1);
+            if (start < 0 || expr.Length < start + 1 || !expr.EndsWith("'")) return false;
+            // Ensure the literal closes exactly at the end (embedded '' escapes allowed).
+            int i = start;
+            while (i < expr.Length)
+            {
+                if (expr[i] == '\'')
+                {
+                    if (i + 1 < expr.Length && expr[i + 1] == '\'') { i += 2; continue; } // escaped quote
+                    return i == expr.Length - 1; // closing quote must be the final char
+                }
+                i++;
+            }
+            return false;
         }
 
         /// <summary>

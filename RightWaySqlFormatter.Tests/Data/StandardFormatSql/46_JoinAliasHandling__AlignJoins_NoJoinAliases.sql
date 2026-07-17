@@ -2,7 +2,7 @@
 SELECT Employees.EmployeeID
     ,Departments.DeptName
     ,m.LastName
-FROM Employees              
+FROM Employees
 INNER JOIN Departments          ON  Employees.DeptID    = Departments.DeptID
 LEFT JOIN Managers      AS m    ON  Employees.ManagerID = m.ManagerID
 WHERE Employees.Active = 1

@@ -11,8 +11,8 @@ dotnet build RightWaySqlFormatter.NoSSMS.slnx
 # Full solution build — Windows only (includes SSMS plugin)
 dotnet build RightWaySqlFormatter.slnx
 
-# Run all tests (expected: 0 failed, 10 skipped — 2 historical + 8 ScriptDom-oracle ignores;
-# total-count differs by runner: sandbox counter 589, VS/Mac runner discovers ~691 / 579 succeeded)
+# Run all tests (expected: 0 failed, 26 skipped — 2 historical + 24 ScriptDom-oracle ignores
+# (8 inputs × 3 always-on oracle profiles); total-count differs by runner: sandbox counter 689)
 dotnet test RightWaySqlFormatter.NoSSMS.slnx
 
 # Regenerate expected-output files (deliberate use only — see Tests section)
