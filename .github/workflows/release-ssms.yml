@@ -1,0 +1,114 @@
+name: Release SSMS extensions
+
+# Builds BOTH SSMS VSIXes and creates a DRAFT GitHub Release with ready-to-install
+# assets, so users don't have to build from source:
+#   - RightWaySqlFormatter.SSMS22.vsix          (double-click / VSIXInstaller install)
+#   - RightWaySqlFormatter.SSMS18.zip           (vsix payload + install/uninstall scripts;
+#                                                SSMS 18's VS2017 shell has no VSIX installer)
+# Manual trigger; review the draft release on the Releases page, then publish it.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (stamped into both VSIX manifests and the tag, e.g. 2.0.6)"
+        required: true
+
+jobs:
+  release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v3
+
+      # Stamp the release version into both manifests' Identity (schema version on
+      # <PackageManifest> stays 2.0.0; anchored on each extension's GUID).
+      - name: Stamp manifest versions
+        shell: pwsh
+        run: |
+          $v = '${{ inputs.version }}'
+          if ($v -notmatch '^\d+\.\d+\.\d+$') { throw "version must look like 2.0.6 (got '$v')" }
+          $targets = @(
+            @{ File = 'RightWaySqlFormatter.SSMS22/source.extension.vsixmanifest'; Guid = 'e857c020-26ea-4b6f-b0d0-d97fb572ee81' },
+            @{ File = 'RightWaySqlFormatter.SSMS18/source.extension.vsixmanifest'; Guid = '247609b1-2692-47d6-972a-976544685f0e' }
+          )
+          foreach ($t in $targets) {
+            $text = Get-Content $t.File -Raw
+            $pattern = "Id=`"$($t.Guid)`" Version=`"[\d\.]+`""
+            $updated = [regex]::Replace($text, $pattern, "Id=`"$($t.Guid)`" Version=`"$v`"")
+            if ($updated -eq $text) { throw "Identity stamp did not match in $($t.File)" }
+            if ($updated -notmatch '<PackageManifest Version="2\.0\.0"') { throw "schema version altered in $($t.File)" }
+            Set-Content $t.File -Value $updated -NoNewline
+          }
+          Write-Host "Stamped both manifests to $v"
+
+      - name: Restore + build SSMS22 VSIX
+        run: |
+          msbuild RightWaySqlFormatter.SSMS22/RightWaySqlFormatter.SSMS22.csproj /t:Restore /p:Configuration=Release
+          msbuild RightWaySqlFormatter.SSMS22/RightWaySqlFormatter.SSMS22.csproj /t:Build /p:Configuration=Release /p:DeployExtension=false
+
+      - name: Restore + build SSMS18 VSIX
+        run: |
+          msbuild RightWaySqlFormatter.SSMS18/RightWaySqlFormatter.SSMS18.csproj /t:Restore /p:Configuration=Release /p:RestorePackagesConfig=true
+          msbuild RightWaySqlFormatter.SSMS18/RightWaySqlFormatter.SSMS18.csproj /t:Build /p:Configuration=Release /p:DeployExtension=false
+
+      - name: Assemble release assets
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+
+          $v22 = Get-ChildItem RightWaySqlFormatter.SSMS22/bin/Release -Recurse -Filter RightWaySqlFormatter.SSMS22.vsix | Select-Object -First 1
+          if (-not $v22) { throw 'SSMS22 vsix not found' }
+          Copy-Item $v22.FullName dist/RightWaySqlFormatter.SSMS22.vsix
+
+          $v18 = Get-ChildItem RightWaySqlFormatter.SSMS18/bin/Release -Recurse -Filter *.vsix | Select-Object -First 1
+          if (-not $v18) { throw 'SSMS18 vsix not found' }
+          New-Item -ItemType Directory -Force stage18 | Out-Null
+          Copy-Item $v18.FullName stage18/RightWaySqlFormatter.SSMS18.vsix
+          Copy-Item tools/ssms18-install.ps1 stage18/install.ps1
+          Copy-Item tools/ssms18-uninstall.ps1 stage18/uninstall.ps1
+          @"
+          Right Way SQL Formatter - SSMS 18 extension
+          ===========================================
+          SSMS 17-20 have no VSIX installer, so installation copies files into the
+          SSMS Extensions folder and rebuilds its package cache (requires admin).
+
+          Install:   right-click install.ps1 > Run with PowerShell
+                     (or: powershell -ExecutionPolicy Bypass -File .\install.ps1)
+          Uninstall: powershell -ExecutionPolicy Bypass -File .\uninstall.ps1
+
+          Non-default SSMS location: pass -SsmsRoot "C:\path\to\SSMS 18"
+          SSMS 22 users: use RightWaySqlFormatter.SSMS22.vsix from the release instead.
+          Source & docs: https://github.com/BadMonkeySoftware/right-way-sql-formatter
+          "@ | Set-Content stage18/README.txt
+          Compress-Archive -Path stage18/* -DestinationPath dist/RightWaySqlFormatter.SSMS18.zip -Force
+
+          Get-ChildItem dist | Format-Table Name, Length
+
+      - name: Create draft release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ssms-v${{ inputs.version }}
+          name: SSMS extensions v${{ inputs.version }}
+          draft: true
+          files: |
+            dist/RightWaySqlFormatter.SSMS22.vsix
+            dist/RightWaySqlFormatter.SSMS18.zip
+          body: |
+            T-SQL formatter extensions for SQL Server Management Studio. ([What's this?](https://github.com/BadMonkeySoftware/right-way-sql-formatter))
+
+            ## SSMS 22 (and 21+)
+            Download `RightWaySqlFormatter.SSMS22.vsix` and install it — no admin rights needed:
+            ```
+            "C:\Program Files\Microsoft SQL Server Management Studio 22\Release\Common7\IDE\VSIXInstaller.exe" RightWaySqlFormatter.SSMS22.vsix
+            ```
+            (Double-clicking the file also works if Visual Studio is installed.)
+            Also available from the [Open SSMS VSIX Gallery](https://ssmsgallery.azurewebsites.net/extension/e857c020-26ea-4b6f-b0d0-d97fb572ee81).
+
+            ## SSMS 17–20
+            Download and extract `RightWaySqlFormatter.SSMS18.zip`, then right-click `install.ps1` → **Run with PowerShell** (self-elevates; SSMS 18's shell has no VSIX installer, so the script copies the extension into SSMS and rebuilds its package cache).
+
+            Note: Microsoft does not officially support SSMS extensions — an SSMS update may require reinstalling.

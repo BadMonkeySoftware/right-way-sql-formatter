@@ -245,6 +245,17 @@ Use **"Right Way SQL: Format Document (Preview)"** to review changes in VS Code'
 
 ## SSMS Plugin
 
+**Install without building** — grab a prebuilt package:
+
+- **SSMS 21/22**: install from the [Open SSMS VSIX Gallery](https://ssmsgallery.azurewebsites.net/extension/e857c020-26ea-4b6f-b0d0-d97fb572ee81)
+  or download `RightWaySqlFormatter.SSMS22.vsix` from
+  [Releases](https://github.com/BadMonkeySoftware/right-way-sql-formatter/releases)
+  (installs per-user via SSMS's `VSIXInstaller.exe`, no admin needed).
+- **SSMS 17–20**: download `RightWaySqlFormatter.SSMS18.zip` from
+  [Releases](https://github.com/BadMonkeySoftware/right-way-sql-formatter/releases)
+  and run the bundled `install.ps1` (these shells have no VSIX installer, so the
+  script copies the extension into SSMS and rebuilds its package cache).
+
 Two package projects ship one plugin per shell generation, both built on the
 shared, shell-agnostic `RightWaySqlFormatter.SSMSLib`:
 
