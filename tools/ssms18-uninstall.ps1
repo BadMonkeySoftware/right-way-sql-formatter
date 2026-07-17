@@ -12,23 +12,34 @@ if (-not $isAdmin) {
     exit
 }
 
-$ssmsExe = Join-Path $SsmsRoot 'Common7\IDE\Ssms.exe'
-$dest = Join-Path $SsmsRoot 'Common7\IDE\Extensions\RightWaySqlFormatter'
+try {
+    $ssmsExe = Join-Path $SsmsRoot 'Common7\IDE\Ssms.exe'
+    $dest = Join-Path $SsmsRoot 'Common7\IDE\Extensions\RightWaySqlFormatter'
 
-if (Get-Process Ssms -ErrorAction SilentlyContinue) {
-    Write-Error "SSMS is running. Close all SSMS windows and re-run."
+    $ssmsProcs = Get-Process Ssms -ErrorAction SilentlyContinue
+    if ($ssmsProcs) {
+        throw "SSMS is running (PID $($ssmsProcs.Id -join ', ')). Close ALL SSMS windows and re-run."
+    }
+
+    if (Test-Path $dest) {
+        Remove-Item -Recurse -Force $dest
+        Write-Host "Extension files removed."
+    } else {
+        Write-Host "Extension folder not found ($dest) - nothing to remove."
+    }
+
+    if (Test-Path $ssmsExe) {
+        Write-Host "Rebuilding the SSMS package cache..."
+        Start-Process -FilePath $ssmsExe -ArgumentList '/setup' -Wait
+    }
+
+    Write-Host "SUCCESS - extension removed." -ForegroundColor Green
 }
-
-if (Test-Path $dest) {
-    Remove-Item -Recurse -Force $dest
-    Write-Host "Extension files removed."
-} else {
-    Write-Host "Extension folder not found ($dest) - nothing to remove."
+catch {
+    Write-Host ""
+    Write-Host "UNINSTALL FAILED: $($_.Exception.Message)" -ForegroundColor Red
 }
-
-if (Test-Path $ssmsExe) {
-    Write-Host "Rebuilding the SSMS package cache..."
-    Start-Process -FilePath $ssmsExe -ArgumentList '/setup' -Wait
+finally {
+    Write-Host ""
+    Read-Host "Press Enter to close this window"
 }
-
-Write-Host "Done."
