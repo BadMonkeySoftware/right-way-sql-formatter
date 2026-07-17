@@ -190,6 +190,9 @@ namespace PoorMansTSqlFormatterSSMSLib
 
             if (settings.ShowDialog() == DialogResult.OK)
             {
+                //Persist to disk — the dialog only set the in-memory settings, so without this
+                //the chosen options are lost when SSMS closes.
+                Properties.Settings.Default.Save();
                 _formattingManager = PluginShared.Utils.GetFormattingManager(Properties.Settings.Default);
                 if (_getKeyBindingScopeNameDelegate != null)
                     UpdateSettingsHotkeyIntoVS();

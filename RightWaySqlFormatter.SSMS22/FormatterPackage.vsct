@@ -55,7 +55,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   </Commands>
 
   <KeyBindings>
-    <!-- guidVSStd97 is global scope -->
+    <!-- guidVSStd97 is global scope. NOTE: the second key is Ctrl+K, F (no Ctrl on F)
+         on purpose — Ctrl+K, Ctrl+F is reserved by VS's built-in Edit.FormatSelection,
+         so binding to it is REJECTED (no registration, no menu hint, nothing fires). -->
     <KeyBinding guid="guidPoorMansTSqlFormatterSSMSVSPackageCmdSet" id="cmdidPoorMansFormatSQL"
                 editor="guidVSStd97"
                 key1="K" mod1="CONTROL"
