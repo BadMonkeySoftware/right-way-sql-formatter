@@ -151,7 +151,7 @@ namespace PoorMansTSqlFormatterSSMSAddIn {
         }
         
         /// <summary>
-        ///   Looks up a localized string similar to A simple free (AGPL) T-SQL Formatting Addin for SSMS and SSMS Express 2005-2012 and Visual Studio 2005-2010..
+        ///   Looks up a localized string similar to Right Way SQL Formatter — a free, open-source (AGPL) T-SQL formatting extension for SQL Server Management Studio..
         /// </summary>
         internal static string ProjectAboutDescription {
             get {

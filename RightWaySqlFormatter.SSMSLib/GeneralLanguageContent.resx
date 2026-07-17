@@ -150,7 +150,7 @@
     <value>Errors found. Continue?</value>
   </data>
   <data name="ProjectAboutDescription" xml:space="preserve">
-    <value>A simple free (AGPL) T-SQL Formatting Addin for SSMS and SSMS Express 2005-2012 and Visual Studio 2005-2010.</value>
+    <value>Right Way SQL Formatter — a free, open-source (AGPL) T-SQL formatting extension for SQL Server Management Studio. https://github.com/BadMonkeySoftware/right-way-sql-formatter</value>
   </data>
   <data name="TextEditorScopeNameRetrievalFailureMessage" xml:space="preserve">
     <value>Failed to retrieve localized Text Editor key binding scope name.{0}Error Details:{0}{1}</value>
