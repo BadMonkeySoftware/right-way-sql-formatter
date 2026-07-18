@@ -1210,6 +1210,20 @@ namespace PoorMansTSqlFormatterLib.Formatters
         {
             string trimmed = col.Trim();
 
+            //peel a trailing -- comment off before analysis: anything appended after it
+            // would be swallowed by the comment ("u.Id -- note AS ColumnAlias_1"), and the
+            // invisible alias would compound on every re-format. The alias goes BEFORE the
+            // comment; the comment is re-attached at the end.
+            string trailingComment = "";
+            int commentStart = FindLineCommentStart(trimmed);
+            if (commentStart >= 0)
+            {
+                trailingComment = " " + trimmed.Substring(commentStart);
+                trimmed = trimmed.Substring(0, commentStart).TrimEnd();
+                if (trimmed.Length == 0)
+                    return (col, counter); //comment-only line
+            }
+
             //peel a trailing statement terminator off before analysis; re-appended at the
             // end so "SELECT foo;" becomes "SELECT foo AS foo;", never "foo; AS foo;"
             string suffix = "";
@@ -1253,6 +1267,10 @@ namespace PoorMansTSqlFormatterLib.Formatters
             if (trimmed == "*" || trimmed.EndsWith(".*"))
                 return (col, counter);
 
+            // AS-less bracketed alias (expr [My Alias]) — the column IS aliased.
+            if (EndsWithBracketedAlias(trimmed))
+                return (col, counter);
+
             // Determine alias
             string alias;
             if (IsSimpleColumnRef(trimmed))
@@ -1265,7 +1283,52 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 alias = "ColumnAlias_" + counter;
             }
 
-            return (trimmed + " AS " + alias + suffix, counter);
+            return (trimmed + " AS " + alias + suffix + trailingComment, counter);
+        }
+
+        /// <summary>
+        /// Finds the start of a trailing -- comment outside string literals and bracket
+        /// identifiers; -1 when the line carries none.
+        /// </summary>
+        private static int FindLineCommentStart(string s)
+        {
+            bool inSingleQuote = false;
+            bool inBracket = false;
+            for (int i = 0; i < s.Length; i++)
+            {
+                char c = s[i];
+                if (inSingleQuote)
+                {
+                    if (c == '\'' && i + 1 < s.Length && s[i + 1] == '\'') { i++; continue; }
+                    if (c == '\'') inSingleQuote = false;
+                    continue;
+                }
+                if (inBracket) { if (c == ']') inBracket = false; continue; }
+                if (c == '\'') { inSingleQuote = true; continue; }
+                if (c == '[') { inBracket = true; continue; }
+                if (c == '-' && i + 1 < s.Length && s[i + 1] == '-') return i;
+            }
+            return -1;
+        }
+
+        /// <summary>
+        /// True when the expression ends in a standalone [bracketed] token that acts as an
+        /// AS-less alias (Name [Test Case Name]) — as opposed to a qualified reference
+        /// (t.[Col]), a lone bracketed column ([Col]), or a bracketed operand (a + [b]).
+        /// </summary>
+        private static bool EndsWithBracketedAlias(string expr)
+        {
+            if (!expr.EndsWith("]")) return false;
+            int open = expr.LastIndexOf('[');
+            if (open <= 0) return false; //no room for an expression before it (lone [Col])
+            char before = expr[open - 1];
+            if (before != ' ' && before != '\t') return false; //t.[Col] and glued forms
+            string prefix = expr.Substring(0, open - 1).TrimEnd();
+            if (prefix.Length == 0) return false;
+            //the alias must FOLLOW a complete expression: identifier/bracket/paren/quote
+            // endings qualify; a trailing operator (a + [b]) means [b] is an operand
+            char last = prefix[prefix.Length - 1];
+            return char.IsLetterOrDigit(last) || last == '_' || last == ']' || last == ')' || last == '\'';
         }
 
         /// <summary>
@@ -1553,8 +1616,19 @@ namespace PoorMansTSqlFormatterLib.Formatters
         /// </summary>
         private static string TryRewriteColumnLine(string col)
         {
+            //peel a trailing -- comment first: "expr AS alias -- note" must become
+            // "alias = expr -- note"; splitting naively leaves the comment glued to the
+            // alias and the comment then swallows " = expr" entirely.
+            string original = col;
+            string trailingComment = "";
+            int commentStart = FindLineCommentStart(col);
+            if (commentStart >= 0)
+            {
+                trailingComment = " " + col.Substring(commentStart);
+                col = col.Substring(0, commentStart).TrimEnd();
+            }
             int asPos = FindAsOutsideParens(col);
-            if (asPos < 0) return col;
+            if (asPos < 0) return original;
             string expr = col.Substring(0, asPos).TrimEnd();
             string alias = col.Substring(asPos + 4).Trim();
             //a trailing statement terminator belongs at the END of the rewritten line,
@@ -1565,8 +1639,8 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 suffix = ";" + suffix;
                 alias = alias.Substring(0, alias.Length - 1).TrimEnd();
             }
-            if (string.IsNullOrEmpty(alias) || string.IsNullOrEmpty(expr)) return col;
-            return alias + " = " + expr + suffix;
+            if (string.IsNullOrEmpty(alias) || string.IsNullOrEmpty(expr)) return original;
+            return alias + " = " + expr + suffix + trailingComment;
         }
 
         /// <summary>
