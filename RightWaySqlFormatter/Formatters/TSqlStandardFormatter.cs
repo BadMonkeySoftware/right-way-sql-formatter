@@ -1507,7 +1507,16 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     string topToken;
                     if (afterTop.StartsWith("("))
                     {
-                        int close = afterTop.IndexOf(')');
+                        // Find the MATCHING close paren — TOP arguments can nest calls,
+                        // e.g. TOP (LEN(ISNULL(@s, N''))); taking the first ')' would cut
+                        // the expression mid-call and alias the severed TOP as a column.
+                        int depth = 0;
+                        int close = -1;
+                        for (int p = 0; p < afterTop.Length; p++)
+                        {
+                            if (afterTop[p] == '(') depth++;
+                            else if (afterTop[p] == ')' && --depth == 0) { close = p; break; }
+                        }
                         if (close < 0)
                             return (accumulatedPrefix + trimmed, "", true); //unterminated TOP(...) — treat as modifier-only
                         topToken = afterTop.Substring(0, close + 1);
@@ -1828,6 +1837,20 @@ namespace PoorMansTSqlFormatterLib.Formatters
         /// Each row: indent + [comma] + colname + datatype + [constraint...]
         /// We align: colname and datatype into two columns.
         /// </summary>
+        /// <summary>
+        /// True when a DDLParens node actually contains column/parameter DEFINITIONS
+        /// (CREATE/ALTER object bodies, DECLARE @t TABLE) — the only shapes
+        /// AlignColumnDefinitionsInDDL may rewrite. INSERT/VALUES/OPTION parens and CTE
+        /// column-name lists share the element name but hold arbitrary content.
+        /// </summary>
+        private static bool IsColumnDefinitionParens(Node parensNode)
+        {
+            string? parentName = parensNode.Parent?.Name;
+            return parentName == SqlStructureConstants.ENAME_DDL_PROCEDURAL_BLOCK
+                || parentName == SqlStructureConstants.ENAME_DDL_OTHER_BLOCK
+                || parentName == SqlStructureConstants.ENAME_DDL_DECLARE_BLOCK;
+        }
+
         private string AlignDdlColumns(string ddlContent)
         {
             var lines = ddlContent.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
@@ -2202,8 +2225,14 @@ namespace PoorMansTSqlFormatterLib.Formatters
                         if (!innerState.StartsWithBreak)
                             state.WhiteSpace_BreakToNextLine();
                         // Apply DDL column alignment post-processing if enabled.
+                        // NOTE: the parser reuses ENAME_DDL_PARENS for INSERT column lists,
+                        // VALUES tuples, and OPTION(...) hints (layout convenience) — those
+                        // contain arbitrary expressions/literals, NOT "name type" pairs, and
+                        // aligning them pads INSIDE strings and function calls. Only parens
+                        // whose parent is a real DDL block hold column/parameter definitions.
                         if (Options.AlignColumnDefinitionsInDDL
-                            && contentElement.Name == SqlStructureConstants.ENAME_DDL_PARENS)
+                            && contentElement.Name == SqlStructureConstants.ENAME_DDL_PARENS
+                            && IsColumnDefinitionParens(contentElement))
                         {
                             state.AddOutputContentRaw(AlignDdlColumns(innerState.DumpOutput()));
                         }
