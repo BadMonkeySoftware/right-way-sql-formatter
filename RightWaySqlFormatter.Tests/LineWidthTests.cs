@@ -53,6 +53,45 @@ namespace PoorMansTSqlFormatterTests
         }
 
         [Test]
+        public void MultiLineStringLiteralWrapIsIdempotentAcrossCrlfNormalization()
+        {
+            // Root cause of heavy-profile idempotency drift (first-responder-kit sp_kill,
+            // maintenance-solution, DarlingData): the SELECT-align text pass rejoined
+            // lines with Environment.NewLine, silently rewriting the CRLF *inside* a
+            // multi-line string literal to LF. That both (a) altered the literal's value
+            // and (b) shrank its measured width, so the core wrap flipped between passes
+            // (pass 1 saw CRLF interiors, pass 2 saw LF) and oscillated forever. The
+            // post-passes now preserve each line's original terminator. Input uses CRLF
+            // interiors deliberately.
+            var options = new TSqlStandardFormatterOptions
+            {
+                MaxLineWidth = 65,
+                AlignColumnDefinitions = true,
+                ColumnAliasStyle = ColumnAliasStyle.EqualSign,
+                TrailingCommas = true,
+            };
+            string sql =
+                "SELECT\r\n"
+                + "  bigdynamicsqlcolumn = N'line one of the first chunk here,\r\n"
+                + "line two continues onward,\r\nthree' + N'second chunk begins now,\r\n"
+                + "and keeps going for a while,\r\nend' + N'third chunk near the edge,\r\n"
+                + "more text,\r\nfin' + @tail,\r\n"
+                + "  another = b\r\n"
+                + "FROM t;\r\n";
+
+            string pass1 = Format(sql, options);
+            string pass2 = Format(pass1, options);
+
+            Assert.That(pass2, Is.EqualTo(pass1),
+                "wrap around a multi-line literal must reach a fixed point regardless of interior newline style");
+            // Correctness half: the align pass must not clobber CRLF inside the literal
+            // (the dynamic-SQL text the user pastes back). The source's interior newlines
+            // are CRLF, so at least some must survive.
+            Assert.That(pass1, Does.Contain("first chunk here,\r\n"),
+                "multi-line string literal interior newlines must be preserved verbatim, not normalized");
+        }
+
+        [Test]
         public void TokensLongerThanMaxLineWidthSurviveTinyWidth()
         {
             // Adversarial: width far smaller than the tokens themselves.

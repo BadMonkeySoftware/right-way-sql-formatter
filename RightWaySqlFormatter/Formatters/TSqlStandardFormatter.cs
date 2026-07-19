@@ -261,9 +261,60 @@ namespace PoorMansTSqlFormatterLib.Formatters
             return insideMask[i] || (i + 1 < insideMask.Length && insideMask[i + 1]);
         }
 
+        /// <summary>
+        /// Splits into lines while remembering each line's ORIGINAL terminator
+        /// (index-aligned with the returned list; final line gets ""). The text
+        /// post-passes only rewrite structural (SQL) lines, never lines inside a
+        /// multi-line string literal - but the old Split(...).Join(Environment.NewLine)
+        /// silently rewrote the literal's interior \r\n to \n, which both altered the
+        /// literal's value (dynamic-SQL text the user pastes back) and shifted its
+        /// measured width, oscillating across idempotency passes. Pair with
+        /// JoinLinesPreservingEndings so untouched lines keep their bytes verbatim.
+        /// </summary>
+        private static List<string> SplitLinesPreservingEndings(string text, out List<string> endings)
+        {
+            var lines = new List<string>();
+            endings = new List<string>();
+            // Separators match Split(new[]{"\r\n","\n"}) exactly: \r\n and lone \n,
+            // but NOT a lone \r (kept as an ordinary char, as the old code did).
+            int start = 0, i = 0;
+            while (i < text.Length)
+            {
+                char c = text[i];
+                if (c == '\n')
+                {
+                    lines.Add(text.Substring(start, i - start));
+                    endings.Add("\n"); i++; start = i;
+                }
+                else if (c == '\r' && i + 1 < text.Length && text[i + 1] == '\n')
+                {
+                    lines.Add(text.Substring(start, i - start));
+                    endings.Add("\r\n"); i += 2; start = i;
+                }
+                else i++;
+            }
+            lines.Add(text.Substring(start));
+            endings.Add("");
+            return lines;
+        }
+
+        private static string JoinLinesPreservingEndings(IList<string> lines, IList<string> endings)
+        {
+            var sb = new System.Text.StringBuilder();
+            for (int i = 0; i < lines.Count; i++)
+            {
+                sb.Append(lines[i]);
+                // A pass that changed the line count (only EnsureColumnAliases does, and
+                // it keeps `endings` in sync) still has a matching terminator; the guard
+                // is a belt-and-braces fallback to the platform newline.
+                sb.Append(i < endings.Count ? endings[i] : Environment.NewLine);
+            }
+            return sb.ToString();
+        }
+
         private string AlignFromJoinClauses(string output)
         {
-            var lines = new List<string>(output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None));
+            var lines = SplitLinesPreservingEndings(output, out var lineEndings);
             int indentSize = Options.SpacesPerTab > 0 ? Options.SpacesPerTab : 4;
             bool[] insideStringOrComment = ComputeLinesInsideStringOrComment(lines);
             string[] statementContexts = ComputeStatementContexts(lines, insideStringOrComment);
@@ -313,8 +364,17 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     }
                     var blockLines = lines.GetRange(blockStart, i - blockStart);
                     var newBlock = AlignFromJoinBlock(blockLines, indentSize, allowAddAliases);
+                    // keep lineEndings index-aligned: FROM/JOIN blocks are structural
+                    // (never inside a literal), so new interior lines get the platform
+                    // newline; the block's terminal ending is preserved (handles EOF).
+                    string blockTailEnding = lineEndings[i - 1];
                     lines.RemoveRange(blockStart, i - blockStart);
+                    lineEndings.RemoveRange(blockStart, i - blockStart);
                     lines.InsertRange(blockStart, newBlock);
+                    var newEndings = new List<string>();
+                    for (int k = 0; k < newBlock.Count; k++)
+                        newEndings.Add(k == newBlock.Count - 1 ? blockTailEnding : Environment.NewLine);
+                    lineEndings.InsertRange(blockStart, newEndings);
                     i = blockStart + newBlock.Count;
                     //line indices shifted; keep the in-string/in-comment mask and the
                     // statement-context map in sync
@@ -328,7 +388,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 i++;
             }
 
-            return string.Join(Environment.NewLine, lines);
+            return JoinLinesPreservingEndings(lines, lineEndings);
         }
 
         /// <summary>
@@ -883,7 +943,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
         /// </summary>
         private string EnsureColumnAliases(string output)
         {
-            var lines = output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+            var lines = SplitLinesPreservingEndings(output, out var lineEndings);
             bool inSelectList = false;
             int autoAliasCounter = 0;
             int beginDepth = 0; // tracks BEGIN/END nesting depth
@@ -893,7 +953,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
                                 // continuations, never new columns
             bool[] insideStringOrComment = ComputeLinesInsideStringOrComment(lines);
 
-            for (int i = 0; i < lines.Length; i++)
+            for (int i = 0; i < lines.Count; i++)
             {
                 //never touch lines inside OR opening a multi-line string literal / block comment
                 if (LineTouchesStringOrComment(insideStringOrComment, i)) { inSelectList = false; parenDepth = 0; caseDepth = 0; continue; }
@@ -1101,7 +1161,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 }
             }
 
-            return string.Join(Environment.NewLine, lines);
+            return JoinLinesPreservingEndings(lines, lineEndings);
         }
 
         /// <summary>
@@ -1408,11 +1468,11 @@ namespace PoorMansTSqlFormatterLib.Formatters
         /// </summary>
         private string RewriteAliasesToEqualSign(string output)
         {
-            var lines = output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+            var lines = SplitLinesPreservingEndings(output, out var lineEndings);
             bool inSelectList = false;
             bool[] insideStringOrComment = ComputeLinesInsideStringOrComment(lines);
 
-            for (int i = 0; i < lines.Length; i++)
+            for (int i = 0; i < lines.Count; i++)
             {
                 //never touch lines inside OR opening a multi-line string literal / block comment
                 if (LineTouchesStringOrComment(insideStringOrComment, i)) { inSelectList = false; continue; }
@@ -1486,7 +1546,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 }
             }
 
-            return string.Join(Environment.NewLine, lines);
+            return JoinLinesPreservingEndings(lines, lineEndings);
         }
 
         private static bool IsClauseStartLine(string trimmedUpper)
@@ -1731,12 +1791,12 @@ namespace PoorMansTSqlFormatterLib.Formatters
         /// </summary>
         private string AlignSelectColumns(string output)
         {
-            var lines = output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+            var lines = SplitLinesPreservingEndings(output, out var lineEndings);
             bool[] insideStringOrComment = ComputeLinesInsideStringOrComment(lines);
 
             // Find runs of SELECT column lines and align each run.
             int i = 0;
-            while (i < lines.Length)
+            while (i < lines.Count)
             {
                 //never treat lines inside or opening a multi-line string literal / block comment as SQL
                 if (LineTouchesStringOrComment(insideStringOrComment, i)) { i++; continue; }
@@ -1747,7 +1807,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     int start = i;
                     // The SELECT line itself may have the first column inline.
                     // Column lines continue until we hit a non-column line.
-                    while (i < lines.Length)
+                    while (i < lines.Count)
                     {
                         if (LineTouchesStringOrComment(insideStringOrComment, i))
                             break;
@@ -1770,10 +1830,10 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 i++;
             }
 
-            return string.Join(Environment.NewLine, lines);
+            return JoinLinesPreservingEndings(lines, lineEndings);
         }
 
-        private void AlignBlockAsKeywords(string[] lines, int start, int end)
+        private void AlignBlockAsKeywords(IList<string> lines, int start, int end)
         {
             // For each line in the block, find the position of " AS " (outside parens).
             // Measure the max expression width and pad.
@@ -1852,7 +1912,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
             }
         }
 
-        private void AlignBlockEqualSign(string[] lines, int start, int end)
+        private void AlignBlockEqualSign(IList<string> lines, int start, int end)
         {
             // For lines in alias = expr format, align the = signs to a tab stop column.
             // Lines look like: indent + [SELECT | ,] + alias + = + expr
@@ -1927,7 +1987,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
 
         private string AlignDdlColumns(string ddlContent)
         {
-            var lines = ddlContent.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+            var lines = SplitLinesPreservingEndings(ddlContent, out var lineEndings);
 
             // Each "column definition" line has: indent + optional-comma + name + type + rest
             // We identify lines that look like a column definition (first token is an identifier, second is a data type).
@@ -1936,7 +1996,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
             var colNames = new List<string>();
             var afterNames = new List<string>();
 
-            for (int i = 0; i < lines.Length; i++)
+            for (int i = 0; i < lines.Count; i++)
             {
                 string line = lines[i];
                 if (string.IsNullOrWhiteSpace(line)) continue;
@@ -1994,7 +2054,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 lines[colLines[i]] = beforeName + namePart + padding + afterNames[i].TrimStart();
             }
 
-            return string.Join(Environment.NewLine, lines);
+            return JoinLinesPreservingEndings(lines, lineEndings);
         }
 
         private static string ExtractFirstToken(string line, int startPos, out int endPos)
