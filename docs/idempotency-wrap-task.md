@@ -148,28 +148,75 @@ is width-wrap. Both live in the text post-passes, not the core walk:
    re-attached a trailing `-- comment` with a leading space even after a `;`, so
    `expr; --c` drifted to the core's `expr;--c`. Heavy-profile UNSTABLE 35 → 25.
 
-## Still UNSTABLE after comment-drift fix (2026-07-18) — NOT comment drift
+## Width-wrap fixed-point work (2026-07-19; docs/width-wrap-fixed-point-task.md)
 
-The 25 remaining heavy-profile UNSTABLE files are two other families, both
-distinct from comment drift and left for a future pass:
+**Mechanism correction — the task's three named suspects were all wrong.** The
+width-wrap non-idempotency is NOT input physical-layout leaking via
+`SourceBreakPending` (verified inert for word tokens — it only forces a break
+before a *comment*), NOT boundary arithmetic, and NOT continuation-line
+indentation. The real, unified mechanism:
 
-- **Width-wrap fixed-point oscillation (~16 files, the bulk — sp_Blitz,
-  sp_BlitzCache, sp_BlitzFirst, DatabaseBackup, MaintenanceSolution, IndexOptimize,
-  DatabaseIntegrityCheck, sp_HumanEvents, ProtectSession, the Deprecated Blitz
-  procs, …).** A function-call argument / concat string / trailing `;` near the
-  200-col limit flips between end-of-line and start-of-next-line each pass
-  (`replace(…), '_',` ⏄ `'_', '[_]')`; `Details = '…'` ⏄ trailing `;`). The core
-  width accounting does not reach a fixed point when a wrapped element sits right
-  at the boundary — a different mechanism from the CRLF driver fixed earlier.
-- **Trailing whitespace at wrap points (~5 files — sp_BlitzIndex, sp_PerfCheck,
-  QuickieStore, Run_Methods, tSQLt.Private_ProcessTestAnnotations).** The core
-  leaves a trailing space when it wraps after a `,`/word separator; the next pass
-  strips it. A global trailing-WS strip is **NOT safe** — 30 `StandardFormatSql`
-  expected files contain intentional trailing whitespace, so it needs sign-off.
-- Two singletons: the `WITH … APPROXIMATE ve.Id` vector-search alias split
-  (DarlingData Vector Defense, 3 files) and the malformed `[A = 1` unclosed-bracket
-  case (`tsqlt/ParsingDisaster.sql`); plus `sp_IndexCleanup` (a JOIN-align ×
-  multi-line-comment-on-the-ON-line interaction).
+> **The core tree-walk makes its max-line-width wrap decision FIRST; then a text
+> post-pass LENGTHENS the same line** — `AlignFromJoinClauses` inserts an `as`
+> keyword, `EnsureColumnAliases`/`RewriteAliasesToEqualSign` insert a
+> `ColumnAlias_N = ` prefix — **so pass 1 wraps against a width the final line
+> won't have.** Once formatted, the inserted tokens are present in the input, so
+> pass 2 (and every pass after) wraps the *longer* line and settles on a
+> different, stable layout. These files are therefore a **one-time raw→formatted
+> transient (they converge at pass 2)**, not the "flips forever" the task title
+> assumed. (A true period-2 minority does exist — see oscillators below.)
+
+Traced to the exact 2-char divergence: raw `INNER JOIN @x alias` (no `as`) wraps
+`REPLACE(REPLACE(…),'_','[_]')` before `'[_]'`; after the align pass adds ` as `,
+the with-`as` line wraps 2 chars earlier (before `'_'`). Both layouts are
+internally stable; only the raw→formatted step differs.
+
+### Fixed this round (heavy-profile UNSTABLE 25 → 18)
+
+- **Overflowing single-literal alias value** — ✅ **FIXED** (`WrapOverflowingAliasLiterals`,
+  tests in `WidthWrapFixedPointTests`). When a post-pass assembles `alias = <lone
+  string/binary literal>` that overflows `MaxLineWidth`, the core would break
+  immediately before the (unbreakable) literal, dropping it to its own line at the
+  column indent. The new pass reproduces that break at assembly time, matching the
+  core's length accounting (padding + separator spaces are uncounted — measure from
+  the trimmed LHS + `=`). Additive-safe: only fires on overflow, default output
+  byte-identical. Cleared ProtectSession, sp_HumanEvents, sp_BlitzBackups,
+  Deprecated/sp_Blitz_SQL_Server_2005.
+- **Stranded trailing space at a width break** — ✅ **FIXED** (core `AddOutputContent`
+  drops the just-emitted word-separator space when it wraps before an over-long
+  token; `WrapOverflowingAliasLiterals` and `AlignBlockEqualSign` emit a bare `=`
+  for a wrapped value, consistently). Cleared sp_QuickieStore, sp_PerfCheck,
+  tSQLt.Private_ProcessTestAnnotations. **Jeremy-approved default-behavior change:**
+  this alters default-profile output on 38 corpus files — verified **trailing-
+  whitespace-only** (zero non-whitespace changes; makes default *more* idempotent)
+  — and required one sanctioned regen (`04_MiscProceduralSample_Unstructured__
+  NoExpandComma_Width60_Tab8.sql`, line 18 lost a stranded wrap-point space).
+
+### Still UNSTABLE (18) — classified, NOT fixed (would require the wrapping maze)
+
+All share the mechanism above (post-pass lengthens a core-wrapped line) but the
+wrapped tail is a *multi-token expression*, so reproducing the core's break means
+re-implementing per-token width accounting inside a text pass — the "wrapping
+maze" the core author flagged (`TODO: find a way out of the cross-dependent
+wrapping maze`). Left deliberately unfixed:
+
+- **JOIN `as`-insertion (4 — DatabaseBackup, DatabaseIntegrityCheck, IndexOptimize,
+  MaintenanceSolution; all the shared Ola availability-group `REPLACE(REPLACE(…))`
+  pattern).** conv@p2. The wrapped `'[_]')` continuation breaks *out* of the align
+  block (doesn't start with AND/OR), so `AlignFromJoinBlock` can't rebalance it.
+  (Rejected: making the core emit `as` for JOIN aliases — core alias-policy change,
+  shifts wrap in every AlignTableJoins expected file, blast radius ≫ 4 files.)
+- **Multi-token alias RHS wrap (4 — sp_BlitzFirst `= 'On the ' + case…`,
+  Private_RemoveSchemaBoundReferences `+ ';'`, sp_BlitzPlanCompare, sp_Blitz
+  trailing `;`).** conv@p2. Same as the fixed single-literal case but the RHS is a
+  concat/CASE expression; the core breaks mid-expression, not before one token.
+- **True period-2 oscillators (4 — sp_BlitzCache, sp_BlitzIndex, sp_BlitzQueryStore,
+  Deprecated/sp_BlitzIndex_SQL_Server_2005).** Never converge (p2≠p3). A CASE-arm /
+  padded-string-list concat sits exactly on the 200-col boundary and flips each pass.
+- **Singletons (6 — Vector Defense ×3 `WITH … APPROXIMATE ve.Id` alias split;
+  sp_IndexCleanup JOIN-align × multi-line comment on the ON line; ParsingDisaster
+  malformed `[A = 1` (deliberately invalid input); Run_Methods FOR XML `*` column ×
+  comment re-indent).** conv@p2 except ParsingDisaster (oscillates).
 
 3. **`+`-operator wrap oscillation under lighter profiles (fixed as a
    side effect).** Under the AlignEquals profile, `str' + @var + N'...` used to

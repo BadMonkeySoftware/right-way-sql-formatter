@@ -150,6 +150,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     output = AlignSelectColumns(output);
                 if (Options.AlignTableJoins)
                     output = AlignFromJoinClauses(output);
+                output = WrapOverflowingAliasLiterals(output);
             }
 
             return output;
@@ -938,6 +939,71 @@ namespace PoorMansTSqlFormatterLib.Formatters
             }
             result.Add(onClause.Substring(start).Trim());
             return result;
+        }
+
+        // ----------------------------------------------------------------
+        // WrapOverflowingAliasLiterals: reach a wrap fixed point for post-pass-lengthened lines
+        // ----------------------------------------------------------------
+
+        // Matches a line of the form  <indent><lhs> = <lone-literal>[,;]  where <lhs> contains
+        // no quote (so the '=' is the alias separator, never one inside a string) and the value
+        // is a single string/binary literal. Group 3 is the literal; group 4 an optional
+        // trailing separator.
+        private static readonly Regex _aliasLiteralLine = new Regex(
+            @"^(\s*)([^']*?)\s=\s(N?'(?:[^']|'')*'|0[xX][0-9A-Fa-f]+)([,;]?)\s*$",
+            RegexOptions.None);
+
+        /// <summary>
+        /// The alias/align post-passes assemble `alias = value` lines AFTER the core tree walk
+        /// has already made its max-line-width wrap decisions, so a line the passes lengthen
+        /// (by inserting `ColumnAlias_N = `) can end up past MaxLineWidth without the wrap that
+        /// the NEXT format pass would apply — the raw→formatted idempotency transient. When the
+        /// value is a single literal token, the core would break immediately before it (the
+        /// literal is unbreakable), putting it on its own line at the column indent. This pass
+        /// reproduces that break here, so pass 1 already emits pass 2's layout. Padding and
+        /// word-separator spaces are NOT part of the core's length accounting, so the threshold
+        /// is measured from the trimmed LHS exactly as the core measures it.
+        /// </summary>
+        private string WrapOverflowingAliasLiterals(string output)
+        {
+            if (Options.MaxLineWidth <= 0) return output;
+            var lines = SplitLinesPreservingEndings(output, out var endings);
+            bool[] insideStringOrComment = ComputeLinesInsideStringOrComment(lines);
+            var outLines = new List<string>(lines.Count);
+            var outEndings = new List<string>(lines.Count);
+            bool changed = false;
+            for (int i = 0; i < lines.Count; i++)
+            {
+                var m = LineTouchesStringOrComment(insideStringOrComment, i)
+                    ? System.Text.RegularExpressions.Match.Empty
+                    : _aliasLiteralLine.Match(lines[i]);
+                if (m.Success)
+                {
+                    string indent = m.Groups[1].Value;
+                    string lhsTrimmed = m.Groups[2].Value.TrimEnd();
+                    string literal = m.Groups[3].Value;
+                    // Core length just before the literal token: indent + LHS tokens + the '='
+                    // operator. Separator spaces around '=' and any alignment padding are not
+                    // counted by the core, so exclude them here too.
+                    int coreLenBeforeValue = indent.Length + lhsTrimmed.Length + 1;
+                    if (literal.Length + coreLenBeforeValue > Options.MaxLineWidth)
+                    {
+                        // Split: line 1 keeps the prefix through "=" (alignment padding before
+                        // "=" preserved). The separator space before the wrapped value is dropped
+                        // — the core strips it at a width break too (see AddOutputContent), so
+                        // keeping it would disagree with the next pass (trailing-space drift).
+                        outLines.Add(lines[i].Substring(0, m.Groups[3].Index).TrimEnd());
+                        outEndings.Add(Environment.NewLine);
+                        outLines.Add(indent + literal + m.Groups[4].Value);
+                        outEndings.Add(endings[i]);
+                        changed = true;
+                        continue;
+                    }
+                }
+                outLines.Add(lines[i]);
+                outEndings.Add(endings[i]);
+            }
+            return changed ? JoinLinesPreservingEndings(outLines, outEndings) : output;
         }
 
         // ----------------------------------------------------------------
@@ -2326,7 +2392,11 @@ namespace PoorMansTSqlFormatterLib.Formatters
             foreach (var (lineIdx, prefix, alias, expr) in items)
             {
                 int padding = targetCol - alias.Length;
-                lines[lineIdx] = prefix + alias + new string(' ', padding) + "= " + expr;
+                // An empty expr means the value wrapped to the next line (WrapOverflowingAliasLiterals
+                // or a core width break). Emit a bare "=" — a "= " here would strand a trailing
+                // space that the core strips on the next pass (trailing-space non-idempotency).
+                string eq = expr.Length == 0 ? "=" : "= " + expr;
+                lines[lineIdx] = prefix + alias + new string(' ', padding) + eq;
             }
         }
 
@@ -3520,7 +3590,12 @@ namespace PoorMansTSqlFormatterLib.Formatters
             public override void AddOutputContent(string content, string? htmlClassName)
             {
                 if (CurrentLineHasContent && (content.Length + CurrentLineLength > MaxLineWidth))
+                {
+                    if (SpecialRegionActive == null && _outBuilder.Length > 0
+                        && _outBuilder[_outBuilder.Length - 1] == ' ')
+                        _outBuilder.Length--;
                     WhiteSpace_BreakToNextLine();
+                }
 
                 if (SpecialRegionActive == null)
                     base.AddOutputContent(content, htmlClassName);

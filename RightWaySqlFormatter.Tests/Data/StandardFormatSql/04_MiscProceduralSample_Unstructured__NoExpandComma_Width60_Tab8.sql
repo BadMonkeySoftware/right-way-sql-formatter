@@ -15,7 +15,7 @@ BEGIN
     -- Inserting the string before the first comma
     INSERT #ValueTable (Id)
     VALUES (
-        SUBSTRING(@WorkingString, 1, PATINDEX('%,%', 
+        SUBSTRING(@WorkingString, 1, PATINDEX('%,%',
                 @WorkingString) - 1)
         )
 
