@@ -471,6 +471,16 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     return true;
                 case "BEGIN":
                     return context.StartsWith("BEGIN DIALOG"); // BEGIN DIALOG ... FROM SERVICE
+                case "CREATE":
+                case "ALTER":
+                    // CREATE/ALTER USER ... FROM LOGIN, CREATE LOGIN ... FROM CERTIFICATE/
+                    // WINDOWS/ASYMMETRIC KEY, CREATE ASSEMBLY ... FROM <bits/path>: the FROM
+                    // is a DDL source, not a table source (never gets an AS alias). CREATE
+                    // VIEW/PROCEDURE/FUNCTION bodies DO contain real SELECT...FROM, so only
+                    // these specific principal/assembly subtypes are excluded.
+                    return context.StartsWith(first + " USER")
+                        || context.StartsWith(first + " LOGIN")
+                        || context.StartsWith(first + " ASSEMBLY");
                 default:
                     return false;
             }
@@ -1088,13 +1098,28 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     }
 
                     bool startsWithComma = trimmed.StartsWith(",");
+                    // The previous column line ended with a trailing binary operator (an
+                    // alias RHS wrapped: "FieldList =" then "'...'", or a concat "... +"
+                    // then "N'...'"). This line is that wrapped operand, not a new column.
+                    if (!startsWithComma && !IsClauseStartLine(trimmedUpper)
+                        && PrevColumnLineEndsOpen(lines, i))
+                    {
+                        parenDepth += CountNetParens(trimmed);
+                        if (parenDepth < 0) parenDepth = 0;
+                        caseDepth += CountNetCase(trimmed);
+                        if (caseDepth < 0) caseDepth = 0;
+                        continue;
+                    }
                     // Width-wrapped continuations of a taller expression (boolean AND/OR,
                     // CASE-arm keywords, operator-leading fragments) are not new columns.
                     if (!startsWithComma
                         && (trimmedUpper.StartsWith("AND ") || trimmedUpper.StartsWith("OR ")
                             || trimmedUpper.StartsWith("THEN ") || trimmedUpper.StartsWith("WHEN ")
-                            || trimmedUpper.StartsWith("ELSE ")
-                            || "+-*/%=<>".IndexOf(trimmed[0]) >= 0))
+                            || trimmedUpper.StartsWith("ELSE ") || trimmedUpper.StartsWith("AS ")
+                            || "+-*/%=<>".IndexOf(trimmed[0]) >= 0
+                            // a line opening with '(' (but not a scalar subquery) is a wrapped
+                            // operand — e.g. a function call split "quotename \n (ObjectName)"
+                            || (trimmed[0] == '(' && !trimmedUpper.StartsWith("(SELECT"))))
                     {
                         parenDepth += CountNetParens(trimmed);
                         if (parenDepth < 0) parenDepth = 0;
@@ -1114,9 +1139,9 @@ namespace PoorMansTSqlFormatterLib.Formatters
                         string afterComma = trimmed.Substring(1).TrimStart();
                         int netParens = CountNetParens(afterComma);
                         int netCase = CountNetCase(afterComma);
-                        // Only alias if the expression is balanced (not a multi-line expression start).
-                        // netCase > 0 means the line opens a CASE block that closes on later lines.
-                        if (netParens <= 0 && netCase <= 0)
+                        // Only alias if the expression is balanced (not a multi-line expression start)
+                        // and its own AS-alias isn't waiting on the next line (wrapped "... \n AS x").
+                        if (netParens <= 0 && netCase <= 0 && !NextColumnLineIsAsAlias(lines, i))
                         {
                             var (rewritten, newCounter) = EnsureAlias(afterComma, autoAliasCounter);
                             autoAliasCounter = newCounter;
@@ -1141,7 +1166,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
 
                         int netParens2 = CountNetParens(colExpr2);
                         int netCase2 = CountNetCase(colExpr2);
-                        if (netParens2 <= 0 && netCase2 <= 0)
+                        if (netParens2 <= 0 && netCase2 <= 0 && !NextColumnLineIsAsAlias(lines, i))
                         {
                             var (rewritten, newCounter) = EnsureAlias(colExpr2, autoAliasCounter);
                             autoAliasCounter = newCounter;
@@ -1299,6 +1324,14 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 || trimmed.StartsWith("--"))
                 return (col, counter);
 
+            // Ends with a trailing binary operator (=, +, ...): an INCOMPLETE expression
+            // whose operand wraps to the next line. Aliasing it here appends "AS X" after
+            // the operator ("a + AS ColumnAlias_1") — invalid, and it masks the trailing
+            // operator so the wrapped operand line then looks like a new column too. Leave
+            // the whole multi-line expression un-aliased (valid SQL, deterministic).
+            if (EndsWithTrailingBinaryOperator(trimmed))
+                return (col, counter);
+
             // Already has AS alias?
             if (FindAsOutsideParens(trimmed) >= 0)
                 return (col, counter);
@@ -1323,19 +1356,45 @@ namespace PoorMansTSqlFormatterLib.Formatters
             if (trimmed.StartsWith("@") && trimmed.IndexOf('=') >= 0)
                 return (col, counter);
 
-            // Wildcard — skip
-            if (trimmed == "*" || trimmed.EndsWith(".*"))
+            // Wildcard — skip (a trailing /* ... */ comment doesn't make it aliasable)
+            string wildcardCheck = trimmed;
+            int wbc = wildcardCheck.LastIndexOf("/*", System.StringComparison.Ordinal);
+            if (wbc >= 0 && wildcardCheck.IndexOf("*/", wbc, System.StringComparison.Ordinal) == wildcardCheck.Length - 2)
+                wildcardCheck = wildcardCheck.Substring(0, wbc).TrimEnd();
+            if (wildcardCheck == "*" || wildcardCheck.EndsWith(".*"))
                 return (col, counter);
 
             // AS-less bracketed alias (expr [My Alias]) — the column IS aliased.
             if (EndsWithBracketedAlias(trimmed))
                 return (col, counter);
 
-            // Determine alias
+            // AS-less plain alias (expr alias) — the column IS aliased.
+            if (EndsWithPlainAlias(trimmed))
+                return (col, counter);
+
+            // AS-less string-literal alias (expr 'alias' / expr N'alias', legacy syntax).
+            if (EndsWithStringLiteralAlias(trimmed))
+                return (col, counter);
+
+            // Determine alias. A bare @variable is not a reusable column name (SELECT @v
+            // must alias to ColumnAlias_N, never "@v = @v"), so it takes the complex path.
             string alias;
-            if (IsSimpleColumnRef(trimmed))
+            if (IsSimpleColumnRef(trimmed) && !trimmed.StartsWith("@"))
             {
                 alias = ExtractColumnBaseName(trimmed);
+                if (IsReservedAliasKeyword(alias))
+                {
+                    // A bare keyword column (SELECT NULL) can't alias to itself; a derived
+                    // alias that collides with a reserved keyword (t.HASH -> HASH) must be
+                    // bracketed to stay valid (HASH = t.HASH is a syntax error).
+                    if (string.Equals(alias, trimmed, System.StringComparison.OrdinalIgnoreCase))
+                    {
+                        counter++;
+                        alias = "ColumnAlias_" + counter;
+                    }
+                    else
+                        alias = "[" + alias + "]";
+                }
             }
             else
             {
@@ -1391,6 +1450,185 @@ namespace PoorMansTSqlFormatterLib.Formatters
             return char.IsLetterOrDigit(last) || last == '_' || last == ']' || last == ')' || last == '\'';
         }
 
+        // Keywords that, appearing immediately before the final identifier, mean that
+        // identifier is an OPERAND of the keyword, not an AS-less alias:
+        //   x COLLATE Latin1   (Latin1 is the collation)   a AND b   a IS NULL   x LIKE y
+        private static readonly HashSet<string> _operandExpectingBeforeAlias = new HashSet<string>(
+            new[] { "COLLATE", "AND", "OR", "NOT", "LIKE", "IN", "BETWEEN", "ESCAPE", "IS", "AS", "THEN", "WHEN", "ELSE", "OVER" },
+            System.StringComparer.OrdinalIgnoreCase);
+
+        // Keywords that terminate/are part of an expression, so a column ending in one is
+        // NOT aliased (a trailing NULL/END/DEFAULT is expression content, not an alias name).
+        private static readonly HashSet<string> _nonAliasTerminatorKeywords = new HashSet<string>(
+            new[] { "NULL", "END", "DEFAULT" }, System.StringComparer.OrdinalIgnoreCase);
+
+        private static bool IsReservedAliasKeyword(string name)
+        {
+            if (string.IsNullOrEmpty(name) || name[0] == '[') return false; // already bracketed
+            return Parsers.TSqlStandardParser.KeywordList.ContainsKey(name.ToUpperInvariant());
+        }
+
+        /// <summary>
+        /// True when a line's last non-comment character is a binary operator that requires a
+        /// following operand (=, +, -, *, /, %, &amp;, |, ^, and comparison &lt;/&gt;). Such a
+        /// line's expression continues onto the next physical line, so that next line is a
+        /// wrapped operand, not a new SELECT column. A trailing ',' (complete column) and a
+        /// closing quote/paren/identifier (complete expression) return false.
+        /// </summary>
+        private static bool EndsWithTrailingBinaryOperator(string line)
+        {
+            string s = line;
+            int lc = FindLineCommentStart(s);
+            if (lc >= 0) s = s.Substring(0, lc);
+            // strip a trailing /* ... */ block comment (whole-line-tail only)
+            int bc = s.LastIndexOf("/*", System.StringComparison.Ordinal);
+            if (bc >= 0 && s.IndexOf("*/", bc, System.StringComparison.Ordinal) == s.Length - 2)
+                s = s.Substring(0, bc);
+            s = s.TrimEnd();
+            if (s.Length == 0) return false;
+            // '*' is excluded: a trailing '*' is almost always a wildcard (SELECT *, t.*),
+            // not multiplication, and treating it as an operator makes the following FROM
+            // look like a wrapped operand. A trailing '.' is a member-access split (AL. \n Col).
+            if ("+-/%=<>&|^.".IndexOf(s[s.Length - 1]) >= 0)
+                return true;
+            // A trailing word operator (expr wrapped after AS/AND/OR/THEN/...) also means the
+            // operand/alias lands on the next line: "... END AS" then the alias, "x =" then RHS.
+            int w = s.LastIndexOfAny(new[] { ' ', '\t' });
+            string lastWord = w >= 0 ? s.Substring(w + 1) : s;
+            return _trailingWordOperators.Contains(lastWord);
+        }
+
+        private static readonly HashSet<string> _trailingWordOperators = new HashSet<string>(
+            new[] { "AS", "AND", "OR", "NOT", "THEN", "WHEN", "ELSE", "LIKE", "IN", "BETWEEN", "ESCAPE", "OVER", "COLLATE" },
+            System.StringComparer.OrdinalIgnoreCase);
+
+        private static bool IsWholeLineComment(string trimmed)
+        {
+            return trimmed.StartsWith("--")
+                || (trimmed.StartsWith("/*") && trimmed.TrimEnd().EndsWith("*/"));
+        }
+
+        /// <summary>
+        /// True when the nearest PRECEDING non-comment column line left its expression open
+        /// (ended with a trailing operator). Whole-line comments between a wrapped operator
+        /// and its operand ("script =" / "/* note */" / "N'...'") are skipped; a blank line
+        /// is a statement boundary and stops the search.
+        /// </summary>
+        private static bool PrevColumnLineEndsOpen(IList<string> lines, int i)
+        {
+            for (int k = i - 1; k >= 0; k--)
+            {
+                string t = lines[k].TrimStart();
+                if (string.IsNullOrWhiteSpace(t)) return false;
+                if (IsWholeLineComment(t)) continue;
+                return EndsWithTrailingBinaryOperator(lines[k]);
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// True when the next non-comment line CONTINUES the current column's expression, so
+        /// the current line is not a complete column and must not be aliased: an "AS alias"
+        /// tail (already aliased on the next line), or a fragment leading with a continuation
+        /// operator/keyword (+ / AND / THEN ... — a concat/boolean wrapped onto the next line).
+        /// Stops at a blank line, a leading comma (new column), or a clause keyword.
+        /// </summary>
+        private static bool NextColumnLineIsAsAlias(IList<string> lines, int i)
+        {
+            for (int k = i + 1; k < lines.Count; k++)
+            {
+                string t = lines[k].TrimStart();
+                if (string.IsNullOrWhiteSpace(t)) return false;
+                if (IsWholeLineComment(t)) continue;
+                if (t.StartsWith(",")) return false; // next is a new (leading-comma) column
+                string tu = t.ToUpperInvariant();
+                if (IsClauseStartLine(tu)) return false;
+                return tu.StartsWith("AS ") || tu == "AS"
+                    || tu.StartsWith("AND ") || tu.StartsWith("OR ") || tu.StartsWith("THEN ")
+                    || tu.StartsWith("WHEN ") || tu.StartsWith("ELSE ")
+                    || "+-*/%=<>&|^".IndexOf(t[0]) >= 0
+                    || (t[0] == '(' && !tu.StartsWith("(SELECT")); // function-call / group split
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// True when the expression ends in a bare (non-bracketed) identifier that acts as
+        /// an AS-less alias: "expr alias" where a complete expression is followed by a
+        /// plain identifier — 'B' Id, count(1) Cnt, CASE ... END AvailabilityGroup,
+        /// 0 i, 'x' COLLATE coll c1. Prepending "ColumnAlias_N =" or appending "AS x" to
+        /// such a column produces invalid SQL (alias = expr alias2), which is exactly what
+        /// EnsureColumnAliases did before this check existed. Conservative: any doubt →
+        /// treat as an operand (return false) rather than risk hiding a real missing alias.
+        /// </summary>
+        private static bool EndsWithPlainAlias(string expr)
+        {
+            expr = expr.TrimEnd();
+            int ws = expr.LastIndexOfAny(new[] { ' ', '\t' });
+            if (ws <= 0) return false; // single token — no room for "expr alias"
+            string last = expr.Substring(ws + 1);
+            // the alias must be a plain identifier (bracketed handled by EndsWithBracketedAlias),
+            // must not start with @ (variables aren't aliases), and must not be one of the few
+            // keywords that TERMINATE/are part of an expression (NULL/END/DEFAULT) - those mean
+            // the column is un-aliased. Function-name-ish keywords (VALUE, HASH, TYPE_NAME) can
+            // legitimately be AS-less aliases, so they are not excluded here.
+            if (last.Length == 0 || last[0] == '@'
+                || !System.Text.RegularExpressions.Regex.IsMatch(last, @"^[A-Za-z_#][A-Za-z0-9_$#]*$"))
+                return false;
+            if (_nonAliasTerminatorKeywords.Contains(last))
+                return false;
+            string prefix = expr.Substring(0, ws).TrimEnd();
+            if (prefix.Length == 0) return false;
+            // the alias must FOLLOW a complete expression: identifier/bracket/paren/quote/digit
+            char lastPrefixChar = prefix[prefix.Length - 1];
+            if (!(char.IsLetterOrDigit(lastPrefixChar) || lastPrefixChar == '_'
+                  || lastPrefixChar == ']' || lastPrefixChar == ')' || lastPrefixChar == '\''))
+                return false;
+            // the token right before the alias must not expect an operand (a COLLATE b, a AND b)
+            int pw = prefix.LastIndexOfAny(new[] { ' ', '\t' });
+            string beforeAlias = pw >= 0 ? prefix.Substring(pw + 1) : prefix;
+            if (_operandExpectingBeforeAlias.Contains(beforeAlias))
+                return false;
+            return true;
+        }
+
+        /// <summary>
+        /// True when the expression ends in a bare string literal acting as an AS-less alias
+        /// (legacy syntax): CONVERT(...) N'sp_BlitzIndex v2.02'  →  the trailing N'...' is the
+        /// column's alias, not a concat operand. Re-aliasing such a column yields invalid SQL
+        /// (alias = expr 'alias'). The string is an OPERAND (return false) when preceded by an
+        /// operator (a + 'b'); it is an ALIAS when preceded by a complete expression.
+        /// Also recognizes the glued empty-string alias ''r / N''r (upstream #200 adjacency).
+        /// </summary>
+        private static bool EndsWithStringLiteralAlias(string expr)
+        {
+            expr = expr.TrimEnd();
+            // glued empty-string alias: ''r or N''alias (no space, adjacency-preserved)
+            if (System.Text.RegularExpressions.Regex.IsMatch(expr, @"^N?''[A-Za-z_#][A-Za-z0-9_$#]*$"))
+                return true;
+            if (!expr.EndsWith("'")) return false;
+            // walk back to the opening quote of the trailing literal (skip '' escapes)
+            int i = expr.Length - 2;
+            while (i >= 0)
+            {
+                if (expr[i] == '\'')
+                {
+                    if (i - 1 >= 0 && expr[i - 1] == '\'') { i -= 2; continue; }
+                    break;
+                }
+                i--;
+            }
+            if (i < 0) return false;
+            int litStart = i;
+            if (litStart - 1 >= 0 && (expr[litStart - 1] == 'N' || expr[litStart - 1] == 'n')) litStart--;
+            string prefix = expr.Substring(0, litStart).TrimEnd();
+            if (prefix.Length == 0) return false; // the whole column IS the string literal — no alias
+            char last = prefix[prefix.Length - 1];
+            // an operator/open-paren/dot before the string means it's an operand, not an alias
+            if ("+-*/%=<>&|^.,(".IndexOf(last) >= 0) return false;
+            return char.IsLetterOrDigit(last) || last == '_' || last == ')' || last == ']' || last == '\'';
+        }
+
         /// <summary>
         /// Returns true if <paramref name="expr"/> is a single self-contained string literal
         /// ('alias' or N'alias' with no trailing content) — the legacy string-alias LHS form.
@@ -1428,12 +1666,21 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 return false;
             // Scan character by character; spaces and special chars inside bracket-quoted
             // segments (e.g. [Active Flag]) are valid and must not trigger a false negative.
+            // A ]] inside brackets is an escaped ] and stays in-bracket ([Definition: [x]] y]).
             bool inBracket = false;
-            foreach (char c in expr)
+            for (int k = 0; k < expr.Length; k++)
             {
+                char c = expr[k];
+                if (inBracket)
+                {
+                    if (c == ']')
+                    {
+                        if (k + 1 < expr.Length && expr[k + 1] == ']') { k++; continue; } // escaped ]]
+                        inBracket = false;
+                    }
+                    continue;
+                }
                 if (c == '[') { inBracket = true; continue; }
-                if (c == ']') { inBracket = false; continue; }
-                if (inBracket) continue;
                 if (c == '(' || c == ')' || c == ' ' || c == '\t' ||
                     c == '+' || c == '-' || c == '/' || c == '%' || c == '*')
                     return false;
@@ -1470,12 +1717,13 @@ namespace PoorMansTSqlFormatterLib.Formatters
         {
             var lines = SplitLinesPreservingEndings(output, out var lineEndings);
             bool inSelectList = false;
+            int parenDepth = 0, caseDepth = 0; // multi-line expression continuation tracking
             bool[] insideStringOrComment = ComputeLinesInsideStringOrComment(lines);
 
             for (int i = 0; i < lines.Count; i++)
             {
                 //never touch lines inside OR opening a multi-line string literal / block comment
-                if (LineTouchesStringOrComment(insideStringOrComment, i)) { inSelectList = false; continue; }
+                if (LineTouchesStringOrComment(insideStringOrComment, i)) { inSelectList = false; parenDepth = 0; caseDepth = 0; continue; }
                 string line = lines[i];
                 string trimmed = line.TrimStart();
                 string trimmedUpper = trimmed.ToUpperInvariant();
@@ -1484,6 +1732,8 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 if (trimmedUpper.StartsWith("SELECT ") || trimmedUpper == "SELECT")
                 {
                     inSelectList = true;
+                    parenDepth = 0;
+                    caseDepth = 0;
                     int selectEnd = trimmed.IndexOf(' ');
                     if (selectEnd >= 0)
                     {
@@ -1495,10 +1745,20 @@ namespace PoorMansTSqlFormatterLib.Formatters
                             string indent = line.Substring(0, line.Length - trimmed.Length);
                             bool hadTrailingComma1 = colPart1.EndsWith(",");
                             string colExpr1 = hadTrailingComma1 ? colPart1.Substring(0, colPart1.Length - 1).TrimEnd() : colPart1;
-                            string rewritten = TryRewriteColumnLine(colExpr1);
-                            string finalCol1 = rewritten + (hadTrailingComma1 ? "," : "");
-                            if (finalCol1 != colPart1)
-                                lines[i] = indent + "SELECT " + modPfx1 + finalCol1;
+                            // only rewrite a self-contained (balanced) column; a multi-line
+                            // expression start would have its "AS alias" flipped onto a fragment
+                            if (CountNetParens(colExpr1) <= 0 && CountNetCase(colExpr1) <= 0
+                                && !EndsWithTrailingBinaryOperator(colExpr1))
+                            {
+                                string rewritten = TryRewriteColumnLine(colExpr1);
+                                string finalCol1 = rewritten + (hadTrailingComma1 ? "," : "");
+                                if (finalCol1 != colPart1)
+                                    lines[i] = indent + "SELECT " + modPfx1 + finalCol1;
+                            }
+                            parenDepth += CountNetParens(colExpr1);
+                            if (parenDepth < 0) parenDepth = 0;
+                            caseDepth += CountNetCase(colExpr1);
+                            if (caseDepth < 0) caseDepth = 0;
                         }
                     }
                     continue;
@@ -1511,12 +1771,37 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     if (string.IsNullOrWhiteSpace(trimmed))
                     {
                         inSelectList = false;
+                        parenDepth = 0;
+                        caseDepth = 0;
                         continue;
                     }
                     bool startsWithComma = trimmed.StartsWith(",");
-                    if (!startsWithComma && IsClauseStartLine(trimmedUpper))
+                    // A continuation of a wrapped column expression (inside open parens/CASE,
+                    // after a line ending in an operator, or leading with AND/OR/THEN/operator)
+                    // is a FRAGMENT: rewriting its "... AS alias" tail flips the alias onto an
+                    // incomplete expression ("DatabaseItem = and right(...)"). Track depths, skip.
+                    bool isContinuation =
+                        parenDepth > 0 || caseDepth > 0
+                        || (!startsWithComma && PrevColumnLineEndsOpen(lines, i))
+                        || (!startsWithComma
+                            && (trimmedUpper.StartsWith("AND ") || trimmedUpper.StartsWith("OR ")
+                                || trimmedUpper.StartsWith("THEN ") || trimmedUpper.StartsWith("WHEN ")
+                                || trimmedUpper.StartsWith("ELSE ") || trimmedUpper.StartsWith("AS ")
+                                || (trimmed.Length > 0 && "+-*/%=<>&|^".IndexOf(trimmed[0]) >= 0)
+                                || (trimmed.Length > 0 && trimmed[0] == '(' && !trimmedUpper.StartsWith("(SELECT"))));
+                    if (!startsWithComma && !isContinuation && IsClauseStartLine(trimmedUpper))
                     {
                         inSelectList = false;
+                        continue;
+                    }
+
+                    string colBody = startsWithComma ? trimmed.Substring(1).TrimStart() : trimmed;
+                    if (isContinuation)
+                    {
+                        parenDepth += CountNetParens(colBody);
+                        if (parenDepth < 0) parenDepth = 0;
+                        caseDepth += CountNetCase(colBody);
+                        if (caseDepth < 0) caseDepth = 0;
                         continue;
                     }
 
@@ -1524,12 +1809,20 @@ namespace PoorMansTSqlFormatterLib.Formatters
                     {
                         // Leading comma style: ,expr AS alias
                         string afterComma = trimmed.Substring(1).TrimStart();
-                        string rewritten = TryRewriteColumnLine(afterComma);
-                        if (rewritten != afterComma)
+                        if (CountNetParens(afterComma) <= 0 && CountNetCase(afterComma) <= 0
+                            && !EndsWithTrailingBinaryOperator(afterComma))
                         {
-                            string indent = line.Substring(0, line.Length - trimmed.Length);
-                            lines[i] = indent + "," + rewritten;
+                            string rewritten = TryRewriteColumnLine(afterComma);
+                            if (rewritten != afterComma)
+                            {
+                                string indent = line.Substring(0, line.Length - trimmed.Length);
+                                lines[i] = indent + "," + rewritten;
+                            }
                         }
+                        parenDepth += CountNetParens(afterComma);
+                        if (parenDepth < 0) parenDepth = 0;
+                        caseDepth += CountNetCase(afterComma);
+                        if (caseDepth < 0) caseDepth = 0;
                     }
                     else if (!string.IsNullOrWhiteSpace(trimmed))
                     {
@@ -1538,10 +1831,18 @@ namespace PoorMansTSqlFormatterLib.Formatters
                         if (modOnly2)
                             continue; // pure TOP N or DISTINCT line — not a column, leave as-is
 
-                        string rewritten = TryRewriteColumnLine(colExpr2);
-                        string indent2 = line.Substring(0, line.Length - trimmed.Length);
-                        if (rewritten != colExpr2 || modPfx2.Length > 0)
-                            lines[i] = indent2 + modPfx2 + rewritten + (hadTrailingComma ? "," : "");
+                        if (CountNetParens(colExpr2) <= 0 && CountNetCase(colExpr2) <= 0
+                            && !EndsWithTrailingBinaryOperator(colExpr2))
+                        {
+                            string rewritten = TryRewriteColumnLine(colExpr2);
+                            string indent2 = line.Substring(0, line.Length - trimmed.Length);
+                            if (rewritten != colExpr2 || modPfx2.Length > 0)
+                                lines[i] = indent2 + modPfx2 + rewritten + (hadTrailingComma ? "," : "");
+                        }
+                        parenDepth += CountNetParens(colExpr2);
+                        if (parenDepth < 0) parenDepth = 0;
+                        caseDepth += CountNetCase(colExpr2);
+                        if (caseDepth < 0) caseDepth = 0;
                     }
                 }
             }
@@ -1552,6 +1853,8 @@ namespace PoorMansTSqlFormatterLib.Formatters
         private static bool IsClauseStartLine(string trimmedUpper)
         {
             return trimmedUpper.StartsWith("FROM ") || trimmedUpper == "FROM"
+                // FROM glued to its source with no space: FROM(subquery), FROM::fn_trace_gettable(...)
+                || trimmedUpper.StartsWith("FROM(") || trimmedUpper.StartsWith("FROM::")
                 || trimmedUpper.StartsWith("WHERE ") || trimmedUpper == "WHERE"
                 || trimmedUpper.StartsWith("GROUP ") || trimmedUpper == "GROUP"
                 || trimmedUpper.StartsWith("ORDER ") || trimmedUpper == "ORDER"
@@ -1687,16 +1990,28 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 trailingComment = " " + col.Substring(commentStart);
                 col = col.Substring(0, commentStart).TrimEnd();
             }
+            else
+            {
+                //also peel a whole trailing block comment ("expr AS alias, /* note */"):
+                // otherwise it glues to the alias and the alias becomes "alias, /* note */"
+                int bc = col.LastIndexOf("/*", System.StringComparison.Ordinal);
+                if (bc >= 0 && col.IndexOf("*/", bc, System.StringComparison.Ordinal) == col.TrimEnd().Length - 2)
+                {
+                    trailingComment = " " + col.Substring(bc).TrimEnd();
+                    col = col.Substring(0, bc).TrimEnd();
+                }
+            }
             int asPos = FindAsOutsideParens(col);
             if (asPos < 0) return original;
             string expr = col.Substring(0, asPos).TrimEnd();
             string alias = col.Substring(asPos + 4).Trim();
-            //a trailing statement terminator belongs at the END of the rewritten line,
-            // not glued to the alias ("SELECT x AS a;" must become "a = x;", not "a; = x")
+            //a trailing statement terminator / column-separator comma belongs at the END of
+            // the rewritten line, not glued to the alias ("x AS a;" -> "a = x;" not "a; = x";
+            // "x AS a," -> "a = x," not "a, = x")
             string suffix = "";
-            while (alias.EndsWith(";"))
+            while (alias.EndsWith(";") || alias.EndsWith(","))
             {
-                suffix = ";" + suffix;
+                suffix = alias[alias.Length - 1] + suffix;
                 alias = alias.Substring(0, alias.Length - 1).TrimEnd();
             }
             if (string.IsNullOrEmpty(alias) || string.IsNullOrEmpty(expr)) return original;
@@ -1777,7 +2092,9 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 if (c == ')') { depth--; continue; }
                 if (depth == 0 && c == '=')
                 {
-                    if (i > 0 && (s[i - 1] == '!' || s[i - 1] == '>' || s[i - 1] == '<')) continue;
+                    // exclude comparison !=/>=/<= and compound-assignment +=/-=/*=//=/%=/&=/|=/^=
+                    // (SELECT @v += (...) must not be split into "@v + = (...)")
+                    if (i > 0 && "!<>+-*/%&|^".IndexOf(s[i - 1]) >= 0) continue;
                     if (i + 1 < s.Length && s[i + 1] == '=') continue;
                     return i;
                 }
@@ -1833,8 +2150,46 @@ namespace PoorMansTSqlFormatterLib.Formatters
             return JoinLinesPreservingEndings(lines, lineEndings);
         }
 
+        /// <summary>
+        /// Marks each line in a SELECT block [start,end) that is a CONTINUATION of a
+        /// wrapped column expression rather than a column of its own: inside parens/CASE
+        /// opened on an earlier line, following a line that ended with a trailing operator
+        /// (=, +, AS, ...), or leading with a continuation token (AND/OR/THEN/operator).
+        /// The align passes must not treat these as "alias = expr" / "expr AS alias" — doing
+        /// so splices a spurious alias into the middle of a wrapped CASE/concat (invalid SQL).
+        /// Returned array is indexed 0..(end-start).
+        /// </summary>
+        private static bool[] ComputeSelectBlockContinuationMask(IList<string> lines, int start, int end)
+        {
+            var mask = new bool[end - start];
+            int parenDepth = 0, caseDepth = 0;
+            for (int i = start; i < end; i++)
+            {
+                string trimmed = lines[i].TrimStart();
+                string tu = trimmed.ToUpperInvariant();
+                // strip the SELECT / leading-comma marker to inspect the column expression
+                string content = tu.StartsWith("SELECT ") ? trimmed.Substring(7).TrimStart()
+                               : trimmed.StartsWith(",") ? trimmed.Substring(1).TrimStart()
+                               : trimmed;
+                bool leadingContinuation =
+                    !trimmed.StartsWith(",")
+                    && (tu.StartsWith("AND ") || tu.StartsWith("OR ") || tu.StartsWith("THEN ")
+                        || tu.StartsWith("WHEN ") || tu.StartsWith("ELSE ") || tu.StartsWith("AS ")
+                        || tu == "AS" || (trimmed.Length > 0 && "+-/%=<>&|^".IndexOf(trimmed[0]) >= 0)
+                        || (trimmed.Length > 0 && trimmed[0] == '(' && !tu.StartsWith("(SELECT")));
+                bool prevOpen = i > start && PrevColumnLineEndsOpen(lines, i);
+                mask[i - start] = parenDepth > 0 || caseDepth > 0 || prevOpen || leadingContinuation;
+                parenDepth += CountNetParens(content);
+                if (parenDepth < 0) parenDepth = 0;
+                caseDepth += CountNetCase(content);
+                if (caseDepth < 0) caseDepth = 0;
+            }
+            return mask;
+        }
+
         private void AlignBlockAsKeywords(IList<string> lines, int start, int end)
         {
+            bool[] continuation = ComputeSelectBlockContinuationMask(lines, start, end);
             // For each line in the block, find the position of " AS " (outside parens).
             // Measure the max expression width and pad.
             // Lines using EqualSign-style aliases (alias = expr) are preserved as-is and
@@ -1844,6 +2199,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
 
             for (int i = start; i < end; i++)
             {
+                if (continuation[i - start]) continue; // wrapped-expression continuation, not a column
                 string line = lines[i];
                 string trimmed = line.TrimStart();
                 string indent = line.Substring(0, line.Length - trimmed.Length);
@@ -1917,9 +2273,11 @@ namespace PoorMansTSqlFormatterLib.Formatters
             // For lines in alias = expr format, align the = signs to a tab stop column.
             // Lines look like: indent + [SELECT | ,] + alias + = + expr
             var items = new List<(int lineIdx, string prefix, string alias, string expr)>();
+            bool[] continuation = ComputeSelectBlockContinuationMask(lines, start, end);
 
             for (int i = start; i < end; i++)
             {
+                if (continuation[i - start]) continue; // wrapped-expression continuation, not a column
                 string line = lines[i];
                 string trimmed = line.TrimStart();
                 string indent = line.Substring(0, line.Length - trimmed.Length);

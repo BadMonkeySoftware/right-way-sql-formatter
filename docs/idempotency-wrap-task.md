@@ -122,23 +122,21 @@ The width-wrap hypothesis was only ~5/51 of the UNSTABLE set. After fixing it
 (see below), the remaining 46 split into two distinct families, neither of which
 is width-wrap. Both live in the text post-passes, not the core walk:
 
-1. **Align/alias post-pass corrupts WRAPPED expression continuation lines (~33
-   files, the majority).** When a long expression is wrapped across physical
-   lines, `AlignSelectColumns` / `RewriteAliasesToEqualSign` treat a continuation
-   line as its own column and inject an alias `=` into it. This is worse than
-   non-idempotency — it emits **semantically-changed / invalid SQL**. Concrete
-   (maintenance-solution `DatabaseBackup.sql`):
-   `case when left(DatabaseItem,1) = '[' and right(...) = ']' then ...` becomes
-   `case when left(DatabaseItem,1) = '[' DatabaseItem = ` / `and right(...) = ']'`
-   — a spurious `DatabaseItem =` spliced into the middle of the CASE. Also seen:
-   `as ColumnAlias_1 = substring(...)` → `ColumnAlias_1 = as ColumnAlias_1 = ...`
-   (double-alias). The `APPROXIMATE` mis-split and `[A = 1` bracket/equals cases
-   above are the same family. **The ScriptDom oracle does NOT catch this** — it
-   only covers the 8 canned test inputs, not the corpus; a corpus-wide re-parse
-   oracle would surface it. Root cause: the align passes assume every line in a
-   SELECT block is a standalone column; they need to detect and skip lines that
-   are continuations of a wrapped expression (unbalanced parens / no top-level
-   comma boundary).
+1. **Align/alias post-pass corrupts WRAPPED expression continuation lines** —
+   ✅ **FIXED 2026-07-18** (see `docs/corpus-oracle-task.md`; regression tests in
+   `AliasPassCorruptionTests`). A corpus-wide oracle (`ScriptDomValidationTests.
+   CorpusOracle`) was added and driven from **188 → 0** parse failures. This was
+   NOT one family — it was ~8 distinct textual mis-parses in `EnsureColumnAliases`
+   / `RewriteAliasesToEqualSign` / `AlignSelectColumns`: AS-less plain & string-
+   literal aliases re-aliased; wrapped RHS / concat / CASE continuations aliased as
+   columns; keyword-named aliases needing brackets; `@var` self-aliased; `+=` split
+   into `+ =`; `]]` escaped-bracket aliases; trailing block comments glued to the
+   alias; `FROM::fn_`/`FROM(` clause glue; function-call/member-access width splits;
+   and DDL `CREATE/ALTER USER|LOGIN|ASSEMBLY … FROM`. All fixed by giving the three
+   passes shared continuation detection (paren/CASE depth, prev-line-ends-open,
+   next-line-continues, leading-token) and hardening the alias predicates. The
+   original hunch that it was one "inject alias `=` into a wrapped CASE" family was
+   only ~4 of the 188. Fixing this also dropped the heavy-profile UNSTABLE 46 → 35.
 
 2. **Comment-position drift (~13 files).** The align passes pad or re-indent
    comment lines (`--`, `/* … */`) that fall inside a SELECT block, walking their
