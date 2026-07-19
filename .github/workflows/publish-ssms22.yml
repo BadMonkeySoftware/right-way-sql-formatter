@@ -36,18 +36,18 @@ jobs:
       # TWICE — on <Identity> (bump this) and on <PackageManifest> (the vsx SCHEMA
       # version, must stay 2.0.0). Anchor on the extension GUID so ONLY the
       # Identity is rewritten; the [22.0,)/[17.0,)/[4.8,) ranges are untouched too.
-      - name: Stamp VSIX version 2.0.${{ github.run_number }}
+      - name: Stamp VSIX version 2.1.${{ github.run_number }}
         shell: pwsh
         run: |
           $m = 'RightWaySqlFormatter.SSMS22/source.extension.vsixmanifest'
           $text = Get-Content $m -Raw
           $pattern = 'Id="e857c020-26ea-4b6f-b0d0-d97fb572ee81" Version="2\.0\.0"'
-          $new = 'Id="e857c020-26ea-4b6f-b0d0-d97fb572ee81" Version="2.0.${{ github.run_number }}"'
+          $new = 'Id="e857c020-26ea-4b6f-b0d0-d97fb572ee81" Version="2.1.${{ github.run_number }}"'
           $updated = [regex]::Replace($text, $pattern, $new)
           if ($updated -eq $text) { throw 'Identity version stamp did not match - manifest layout changed?' }
           if ($updated -notmatch '<PackageManifest Version="2\.0\.0"') { throw 'PackageManifest schema version was altered - aborting.' }
           Set-Content $m -Value $updated -NoNewline
-          Write-Host 'Stamped Identity version = 2.0.${{ github.run_number }} (schema version 2.0.0 preserved)'
+          Write-Host 'Stamped Identity version = 2.1.${{ github.run_number }} (schema version 2.0.0 preserved)'
 
       - name: Restore
         run: msbuild RightWaySqlFormatter.SSMS22/RightWaySqlFormatter.SSMS22.csproj /t:Restore /p:Configuration=Release

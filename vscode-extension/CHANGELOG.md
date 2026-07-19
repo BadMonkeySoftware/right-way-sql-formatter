@@ -4,7 +4,30 @@ All notable changes to the Right Way T-SQL Formatter extension.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [0.1.6] - 2026-07-15
+## [0.2.0] - 2026-07-19
+
+A correctness release for the styling options. The formatting engine was
+validated against Microsoft's own T-SQL parser (ScriptDom) across ~400
+real-world SQL files (First Responder Kit, Ola Hallengren, DarlingData,
+tSQLt): every profile now always produces valid T-SQL, and re-formatting
+already-formatted files is stable in all but a handful of known cosmetic
+cases. If you use the alignment/alias settings, this release fixes a long
+tail of cases where they could silently corrupt SQL.
+
+### Fixed
+
+- `alignTableJoins` no longer rewrites statements that merely contain a FROM keyword: `BULK INSERT … FROM`, Service Broker `BEGIN DIALOG … FROM SERVICE` (which previously **lost content**), `REVOKE … FROM`, `FETCH NEXT FROM cursor`, `BACKUP`/`RESTORE`, and DELETE targets are all left alone. Table-valued function calls in JOINs keep their full argument lists (arguments were previously dropped).
+- Auto-alias settings (`columnAlwaysHasAlias`, `tableJoinsAddAliases`) no longer invent invalid aliases: table variables, derived tables, `(nolock)` hints, reserved-word names, and complex bracketed names are skipped; reserved-word column aliases get brackets.
+- Existing aliases in every T-SQL spelling are now recognized (so they're never double-aliased): AS-less plain aliases (`count(1) Cnt`), bracketed (`Name [Test Case Name]`, including `]]` escapes), string-literal (`CONVERT(…) N'v2.02'`, `'time' = expr`), and compound assignment `@v += …` is left intact.
+- Expressions wrapped across lines (long CASE arms, string concatenations, `TOP (nested(calls))`) are treated as one expression — continuation lines are no longer aliased or spliced as if they were new columns.
+- Comments are never damaged: aliases are inserted before trailing `--` comments instead of after them (where they were dead text), alignment never pads inside or re-positions comments, and comment positions no longer drift on repeated formatting.
+- `alignDdlColumns` only aligns real column/parameter definitions (CREATE/ALTER, `DECLARE @t TABLE`) — INSERT column lists and VALUES rows are untouched (previously padding could be inserted **inside string literals**).
+- Multi-line string literals keep their original line endings — CRLF inside dynamic-SQL text is no longer rewritten to LF.
+- With `maxLineWidth` set, wrap decisions are now stable on re-format, and no trailing space is left at wrap points.
+
+### Changed
+
+- Lines wrapped at `maxLineWidth` no longer end with a stranded space. If you diff formatter output before/after upgrading, expect whitespace-only changes at wrap points.
 
 Nine formatting-engine fixes (from a full triage of the original
 PoorMansTSqlFormatter's open issues) and one new opt-in setting.
