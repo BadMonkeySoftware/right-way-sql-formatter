@@ -138,11 +138,38 @@ is width-wrap. Both live in the text post-passes, not the core walk:
    original hunch that it was one "inject alias `=` into a wrapped CASE" family was
    only ~4 of the 188. Fixing this also dropped the heavy-profile UNSTABLE 46 → 35.
 
-2. **Comment-position drift (~13 files).** The align passes pad or re-indent
-   comment lines (`--`, `/* … */`) that fall inside a SELECT block, walking their
-   indentation right on each pass (darling-data `Isolation Levels.sql`,
-   sp_WhoIsActive header block). The passes should leave comment-only lines
-   untouched.
+2. **Comment-position drift** — ✅ **FIXED 2026-07-18** (see
+   `docs/comment-drift-task.md`; regression tests in `CommentDriftTests`).
+   `AlignDdlColumns` treated comment lines as column definitions and padded them:
+   single-line `/* */`/`--` comment-only lines (the `Isolation Levels` `˅˅˅˅˅`
+   ratchet, sp_WhoIsActive param-doc `--` lines) AND interior lines of multi-line
+   `/* … */` comments (sp_BlitzCache) — it lacked the `ComputeLinesInsideStringOrComment`
+   mask the other align passes use. Also `EnsureAlias`/`TryRewriteColumnLine`
+   re-attached a trailing `-- comment` with a leading space even after a `;`, so
+   `expr; --c` drifted to the core's `expr;--c`. Heavy-profile UNSTABLE 35 → 25.
+
+## Still UNSTABLE after comment-drift fix (2026-07-18) — NOT comment drift
+
+The 25 remaining heavy-profile UNSTABLE files are two other families, both
+distinct from comment drift and left for a future pass:
+
+- **Width-wrap fixed-point oscillation (~16 files, the bulk — sp_Blitz,
+  sp_BlitzCache, sp_BlitzFirst, DatabaseBackup, MaintenanceSolution, IndexOptimize,
+  DatabaseIntegrityCheck, sp_HumanEvents, ProtectSession, the Deprecated Blitz
+  procs, …).** A function-call argument / concat string / trailing `;` near the
+  200-col limit flips between end-of-line and start-of-next-line each pass
+  (`replace(…), '_',` ⏄ `'_', '[_]')`; `Details = '…'` ⏄ trailing `;`). The core
+  width accounting does not reach a fixed point when a wrapped element sits right
+  at the boundary — a different mechanism from the CRLF driver fixed earlier.
+- **Trailing whitespace at wrap points (~5 files — sp_BlitzIndex, sp_PerfCheck,
+  QuickieStore, Run_Methods, tSQLt.Private_ProcessTestAnnotations).** The core
+  leaves a trailing space when it wraps after a `,`/word separator; the next pass
+  strips it. A global trailing-WS strip is **NOT safe** — 30 `StandardFormatSql`
+  expected files contain intentional trailing whitespace, so it needs sign-off.
+- Two singletons: the `WITH … APPROXIMATE ve.Id` vector-search alias split
+  (DarlingData Vector Defense, 3 files) and the malformed `[A = 1` unclosed-bracket
+  case (`tsqlt/ParsingDisaster.sql`); plus `sp_IndexCleanup` (a JOIN-align ×
+  multi-line-comment-on-the-ON-line interaction).
 
 3. **`+`-operator wrap oscillation under lighter profiles (fixed as a
    side effect).** Under the AlignEquals profile, `str' + @var + N'...` used to

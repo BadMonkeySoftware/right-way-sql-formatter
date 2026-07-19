@@ -1402,6 +1402,11 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 alias = "ColumnAlias_" + counter;
             }
 
+            // A -- comment that directly follows a statement terminator uses the core's
+            // ";--comment" spacing (no gap), so re-attaching " --comment" would drift to
+            // ";--comment" on the next pass. Match the core when suffix ends with ';'.
+            if (suffix.EndsWith(";") && trailingComment.StartsWith(" --"))
+                trailingComment = trailingComment.Substring(1);
             return (trimmed + " AS " + alias + suffix + trailingComment, counter);
         }
 
@@ -2015,6 +2020,9 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 alias = alias.Substring(0, alias.Length - 1).TrimEnd();
             }
             if (string.IsNullOrEmpty(alias) || string.IsNullOrEmpty(expr)) return original;
+            // match the core's ";--comment" (no gap) so it doesn't drift on re-format
+            if (suffix.EndsWith(";") && trailingComment.StartsWith(" --"))
+                trailingComment = trailingComment.Substring(1);
             return alias + " = " + expr + suffix + trailingComment;
         }
 
@@ -2346,6 +2354,9 @@ namespace PoorMansTSqlFormatterLib.Formatters
         private string AlignDdlColumns(string ddlContent)
         {
             var lines = SplitLinesPreservingEndings(ddlContent, out var lineEndings);
+            // interior lines of a multi-line /* ... */ comment must never be treated as
+            // column definitions or padded (their content would ratchet rightward each pass)
+            bool[] insideStringOrComment = ComputeLinesInsideStringOrComment(lines);
 
             // Each "column definition" line has: indent + optional-comma + name + type + rest
             // We identify lines that look like a column definition (first token is an identifier, second is a data type).
@@ -2358,11 +2369,17 @@ namespace PoorMansTSqlFormatterLib.Formatters
             {
                 string line = lines[i];
                 if (string.IsNullOrWhiteSpace(line)) continue;
+                if (LineTouchesStringOrComment(insideStringOrComment, i)) continue;
 
                 // Strip indent and optional comma
                 int pos = 0;
                 while (pos < line.Length && (line[pos] == '\t' || line[pos] == ' ')) pos++;
                 if (pos >= line.Length) continue;
+
+                // comment-only lines (/* ... */, -- ...) are not column definitions and must
+                // never be padded — otherwise their content ratchets rightward every pass
+                if (line[pos] == '/' && pos + 1 < line.Length && line[pos + 1] == '*') continue;
+                if (line[pos] == '-' && pos + 1 < line.Length && line[pos + 1] == '-') continue;
 
                 bool hasComma = line[pos] == ',';
                 if (hasComma) { pos++; while (pos < line.Length && line[pos] == ' ') pos++; }
