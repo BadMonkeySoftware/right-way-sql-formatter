@@ -1313,7 +1313,36 @@ namespace PoorMansTSqlFormatterLib.Parsers
             if (!sqlTree.FindValidBatchEnd())
                 sqlTree.SetError();
 
+            // Guard against pathologically deep nesting: the formatter walks the tree
+            // recursively, so a tree far deeper than any real SQL would overflow the stack
+            // and kill the process. Flag it as a parse error here (before formatting) so the
+            // usual best-effort error path runs instead - marks the offending node and the
+            // root, driving the warning prefix + non-zero exit code.
+            Node? tooDeep = FindNodeBeyondDepth(sqlTree, SqlStructureConstants.MAX_NESTING_DEPTH);
+            if (tooDeep != null)
+            {
+                tooDeep.SetAttribute(SqlStructureConstants.ANAME_HASERROR, "1");
+                sqlTree.SetAttribute(SqlStructureConstants.ANAME_ERRORFOUND, "1");
+            }
+
             return sqlTree;
+        }
+
+        // Iterative DFS (never recursive - it inspects the very trees that would overflow a
+        // recursive walk): returns the first node deeper than maxDepth, or null if none.
+        private static Node? FindNodeBeyondDepth(Node root, int maxDepth)
+        {
+            var stack = new Stack<(Node node, int depth)>();
+            stack.Push((root, 0));
+            while (stack.Count > 0)
+            {
+                var (node, depth) = stack.Pop();
+                if (depth > maxDepth)
+                    return node;
+                foreach (Node child in node.Children)
+                    stack.Push((child, depth + 1));
+            }
+            return null;
         }
 
         /// <summary>

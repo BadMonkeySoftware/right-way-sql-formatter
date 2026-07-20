@@ -103,8 +103,13 @@ namespace PoorMansTSqlFormatterLib.Formatters
         public bool HTMLFormatted { get { return Options.HTMLColoring; } }
         public string ErrorOutputPrefix { get; set; }
 
+        // Recursion-depth counter for ProcessSqlNode; reset per FormatSQLTree call so a
+        // formatter instance reused across calls (and one that aborted mid-walk) starts clean.
+        private int _nodeRecursionDepth;
+
         public string FormatSQLTree(Node sqlTreeDoc)
         {
+            _nodeRecursionDepth = 0;
             //thread-safe - each call to FormatSQLTree() gets its own independent state object
             TSqlStandardFormattingState state = new TSqlStandardFormattingState(Options.HTMLColoring, Options.IndentString, Options.SpacesPerTab, Options.MaxLineWidth, 0);
 
@@ -2527,6 +2532,16 @@ namespace PoorMansTSqlFormatterLib.Formatters
 
         private void ProcessSqlNode(Node contentElement, TSqlStandardFormattingState state)
         {
+            // Stop descending past MAX_NESTING_DEPTH so pathologically nested input degrades
+            // gracefully instead of overflowing the stack (the parser has already flagged such
+            // a tree as a parse error). No output is emitted for the truncated subtree; nothing
+            // below this point touched indent/state yet, so an early return leaves state intact.
+            if (++_nodeRecursionDepth > SqlStructureConstants.MAX_NESTING_DEPTH)
+            {
+                _nodeRecursionDepth--;
+                return;
+            }
+
             int initialIndent = state.IndentLevel;
 
             if (contentElement.GetAttributeValue(SqlStructureConstants.ANAME_HASERROR) == "1")
@@ -3261,6 +3276,8 @@ namespace PoorMansTSqlFormatterLib.Formatters
 
             if (initialIndent != state.IndentLevel)
                 throw new Exception("Messed up the indenting!! Check code/stack or panic!");
+
+            _nodeRecursionDepth--;
         }
 
 

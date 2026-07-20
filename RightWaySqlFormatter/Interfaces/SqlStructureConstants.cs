@@ -22,6 +22,18 @@ namespace PoorMansTSqlFormatterLib.Interfaces
 {
     public static class SqlStructureConstants
     {
+        // Maximum parse-tree nesting depth. Beyond this the parser flags the tree as a
+        // parse error (errorFound) and the formatter stops descending, so pathologically
+        // nested input (e.g. thousands of stacked derived tables) degrades to a best-effort
+        // parse-error result + non-zero exit instead of overflowing the recursion stack.
+        // Real-world T-SQL tops out < 90 levels deep (measured across the whole corpus), so
+        // 300 leaves >3x headroom while staying well below the overflow point. That overflow
+        // point (~1200+) was measured on net10/macOS; the net472/SSMS stack could be smaller
+        // with larger frames, so this is a deliberately conservative judgment call, not a
+        // measured floor - lower it (nothing real trips even at 150) before raising it.
+        // The parser (FindNodeBeyondDepth) and the formatter (ProcessSqlNode's depth guard)
+        // BOTH key off this one constant and must stay welded: flag-but-still-walk would crash.
+        public const int MAX_NESTING_DEPTH = 300;
 
         public const string ENAME_SQL_ROOT = "SqlRoot";
         public const string ENAME_SQL_STATEMENT = "SqlStatement";

@@ -115,6 +115,43 @@ namespace PoorMansTSqlFormatterTests
         }
 
         [Test]
+        public void TestCmdLineDeeplyNestedInputExitsGracefullyNotStackOverflow()
+        {
+            // ~1000 stacked derived tables: parse-tree depth (~3000) far past MAX_NESTING_DEPTH.
+            // Before the nesting guard this overflowed the formatter's ProcessSqlNode recursion
+            // and aborted the process (SIGABRT/exit 134); the guard now flags it as a parse
+            // error so a best-effort formatted result is still emitted with the warning comment
+            // and the standard parse-error exit code 5. Run in a child process on purpose: a
+            // regressed guard crashes the child (exit != 5), failing this test cleanly rather
+            // than tearing down the whole test host.
+            var sb = new StringBuilder("SELECT 1 AS c");
+            for (int i = 0; i < 1000; i++)
+                sb.Insert(0, "SELECT * FROM (").Append(") AS d").Append(i);
+            sb.Append(';');
+
+            string deepSql = sb.ToString();
+            // Default profile, and the heavy editor profile this task targets - the heavy
+            // profile runs the extra alias/align text post-passes over the (structurally
+            // truncated) best-effort output, so it exercises more than the tree walk.
+            foreach (string args in new[] { "", HeavyProfileArgs })
+            {
+                var (exitCode, stdOut, stdErr) = RunFormatter(deepSql, args);
+                Assert.That(exitCode, Is.EqualTo(5),
+                    $"pathologically deep nesting must degrade to a parse-error exit (5), not crash the process (args: '{args}')");
+                Assert.That(stdOut, Does.Contain("WARNING! ERRORS ENCOUNTERED DURING SQL PARSING"),
+                    "best-effort formatted output with the warning comment must still be emitted");
+                Assert.That(stdErr, Does.Contain("parsing error"), "stderr must carry the warning too");
+            }
+        }
+
+        private const string HeavyProfileArgs =
+            "--expand-between=false --expand-boolean=false --expand-case=false --expand-in-lists=false "
+            + "--uppercase-keywords=false --standardize-keywords=false --trailing-commas=true --align-table-joins=true "
+            + "--column-always-has-alias=true --select-first-column-newline=true --align-columns=true --align-ddl-columns=true "
+            + "--alias-style=equals --indent-where-and-or=true --max-line-width=200 --compact-raiserror=true "
+            + "--compact-single-statement-blocks=true";
+
+        [Test]
         public void TestCmdLineAllowParsingErrorsExitsZero()
         {
             var (exitCode, stdOut, _) = RunFormatter("SELECT 1)", "--allow-parsing-errors");
