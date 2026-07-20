@@ -33,7 +33,7 @@ namespace PoorMansTSqlFormatterTests
             return (p1, p2, p3);
         }
 
-        private static void AssertStable(string sql, string config, string commentMustSurvive = null)
+        private static void AssertStable(string sql, string config, string? commentMustSurvive = null)
         {
             var (p1, p2, p3) = FormatThrice(sql, config);
             Assert.That(p2, Is.EqualTo(p1), "format is not idempotent (pass2 != pass1):\n--pass1--\n" + p1 + "\n--pass2--\n" + p2);
