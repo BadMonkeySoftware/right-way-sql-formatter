@@ -75,7 +75,7 @@ dotnet build RightWaySqlFormatter.NoSSMS.slnx
 dotnet test RightWaySqlFormatter.NoSSMS.slnx
 ```
 
-Expected: `0 failed, 10 skipped` (total counts grow as test data is added and differ by test runner; failures must be zero)
+Expected: `0 failed, 26 skipped` (total counts grow as test data is added and differ by test runner; failures must be zero)
 
 ### CLI (Release build)
 
@@ -283,7 +283,7 @@ path (Extensions folder + `ssms.exe /setup`) and the SSMS-22 gotchas
 - **Namespaces** are intentionally kept as `PoorMansTSqlFormatterLib.*` in the core library to avoid breaking anything if upstream changes are ever cherry-picked in. Project folders and assemblies use the `RightWaySqlFormatter.*` names.
 - **Upstream reference**: `git fetch upstream` to pull latest changes from TaoK/PoorMansTSqlFormatter for comparison.
 - **Build warnings**: the build is warning-free; keep it that way.
-- **Known test skips** (the 10 in the expected count): `02_Random_INVALID.sql` and `28_BadNestingDontCrash.sql` contain intentionally malformed SQL that can't round-trip cleanly, plus 8 ScriptDom-oracle ignores for inputs using legacy syntax the TSql170 oracle itself can't parse.
+- **Known test skips** (the 26 in the expected count): `02_Random_INVALID.sql` and `28_BadNestingDontCrash.sql` contain intentionally malformed SQL that can't round-trip cleanly, plus 24 ScriptDom-oracle ignores — 8 inputs using legacy/other-dialect syntax the TSql170 oracle itself can't parse, × 3 always-on validation profiles (Default, AlignEquals, HeavyEditor).
 - **Test data is byte-exact** (BOM + CRLF significant) — `.editorconfig` carves `RightWaySqlFormatter.Tests/Data/**` out of all normalization; never let an editor reformat those files.
 
 ---
