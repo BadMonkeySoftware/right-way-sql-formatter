@@ -38,6 +38,7 @@ cd vscode-extension && npm run build:host                # fast dev loop (this m
 ```
 
 `dotnet` must be on PATH. If not found: `export PATH="$HOME/.dotnet:$PATH"`.
+- builds must stay warning-free
 
 ## Architecture
 
