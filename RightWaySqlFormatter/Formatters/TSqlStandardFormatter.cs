@@ -107,10 +107,20 @@ namespace PoorMansTSqlFormatterLib.Formatters
         // formatter instance reused across calls (and one that aborted mid-walk) starts clean.
         private int _nodeRecursionDepth;
 
+        // Reentrancy guard for the post-pass fixed-point reformat (see FormatSQLTree): the
+        // single extra pass must not itself trigger another, so the whole thing is bounded
+        // to exactly two formats.
+        private bool _inReformatPass;
+
         public string FormatSQLTree(Node sqlTreeDoc)
         {
             _nodeRecursionDepth = 0;
-            //thread-safe - each call to FormatSQLTree() gets its own independent state object
+            // Output goes into a per-call state object, but a few bookkeeping flags
+            // (_nodeRecursionDepth, _inReformatPass) live on the formatter INSTANCE, so a
+            // single formatter is single-threaded: format concurrently only on separate
+            // instances (the CLI is one-per-process; each test constructs its own; SSMS/VS Code
+            // format one document at a time). Reused sequentially across calls is fine - both
+            // flags reset here at entry.
             TSqlStandardFormattingState state = new TSqlStandardFormattingState(Options.HTMLColoring, Options.IndentString, Options.SpacesPerTab, Options.MaxLineWidth, 0);
 
             if (sqlTreeDoc.Name == SqlStructureConstants.ENAME_SQL_ROOT && sqlTreeDoc.GetAttributeValue(SqlStructureConstants.ANAME_ERRORFOUND) == "1")
@@ -143,6 +153,7 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 }
             }
             string output = state.DumpOutput();
+            string preText = output;
 
             // Post-processing passes for SELECT column formatting.
             if (!Options.HTMLColoring)
@@ -156,6 +167,28 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 if (Options.AlignTableJoins)
                     output = AlignFromJoinClauses(output);
                 output = WrapOverflowingAliasLiterals(output);
+            }
+
+            // Fixed-point guarantee. A text post-pass can LENGTHEN a line that the core
+            // tree-walk already wrapped (it inserts `as`/`ColumnAlias_N = `), so the core's
+            // re-wrap of that line only settles on the NEXT format pass -
+            // format(format(x)) != format(x) for otherwise-cosmetic layout drift. When the
+            // post-passes actually changed the output, reformat once so the emitted result
+            // IS that fixed point (the corpus has no period-3+ cycle, so one extra pass
+            // suffices - verified corpus-wide). Guarded so the DEFAULT profile, whose gated
+            // passes never run and whose output is therefore unchanged here, never reformats
+            // and stays byte-for-byte identical at zero extra cost; and bounded by
+            // _inReformatPass to a single extra format.
+            if (!_inReformatPass && !ReferenceEquals(output, preText) && output != preText)
+            {
+                _inReformatPass = true;
+                try
+                {
+                    Node reparsed = new Parsers.TSqlStandardParser().ParseSQL(
+                        new Tokenizers.TSqlStandardTokenizer().TokenizeSQL(output));
+                    output = FormatSQLTree(reparsed);
+                }
+                finally { _inReformatPass = false; }
             }
 
             return output;
@@ -1362,6 +1395,47 @@ namespace PoorMansTSqlFormatterLib.Formatters
         /// - Simple column ref (e.g. col, t.col, [col], t.[col]) → appends AS &lt;baseName&gt;.
         /// - Complex expression → appends AS ColumnAlias_N (counter incremented).
         /// </summary>
+        // True when the text has a '[' with no matching ']' (outside string literals).
+        // '[' and ']' don't nest; ']]' is an escaped literal ']' inside a bracket-quoted name.
+        private static bool HasUnclosedBracketOutsideString(string s)
+        {
+            int i = 0;
+            while (i < s.Length)
+            {
+                char c = s[i];
+                if (c == '\'')
+                {
+                    i++; // skip the string literal (handling '' escapes)
+                    while (i < s.Length)
+                    {
+                        if (s[i] == '\'')
+                        {
+                            if (i + 1 < s.Length && s[i + 1] == '\'') { i += 2; continue; }
+                            i++; break;
+                        }
+                        i++;
+                    }
+                }
+                else if (c == '[')
+                {
+                    i++;
+                    bool closed = false;
+                    while (i < s.Length)
+                    {
+                        if (s[i] == ']')
+                        {
+                            if (i + 1 < s.Length && s[i + 1] == ']') { i += 2; continue; } // escaped ]]
+                            closed = true; i++; break;
+                        }
+                        i++;
+                    }
+                    if (!closed) return true;
+                }
+                else i++;
+            }
+            return false;
+        }
+
         private static (string result, int counter) EnsureAlias(string col, int counter)
         {
             string trimmed = col.Trim();
@@ -1393,6 +1467,14 @@ namespace PoorMansTSqlFormatterLib.Formatters
             if (string.IsNullOrEmpty(trimmed)
                 || (trimmed.StartsWith("/*") && trimmed.IndexOf("*/") == trimmed.Length - 2)
                 || trimmed.StartsWith("--"))
+                return (col, counter);
+
+            // An unclosed '[' bracket (malformed input, e.g. `SELECT 1 AS [A` with no ']')
+            // makes the alias structure unparseable: the LHS/expr split is ambiguous, so
+            // re-aliasing stacks a fresh alias every pass (`[A = 1` -> `[A = 1 = [A = 1` ->
+            // ..., unbounded). Well-formed columns always close their brackets, so skipping
+            // these leaves valid SQL untouched while making the malformed case idempotent.
+            if (HasUnclosedBracketOutsideString(trimmed))
                 return (col, counter);
 
             // Ends with a trailing binary operator (=, +, ...): an INCOMPLETE expression
@@ -2462,6 +2544,15 @@ namespace PoorMansTSqlFormatterLib.Formatters
                 // First token: identifier (column name) or bracket-quoted
                 string firstToken = ExtractFirstToken(line, pos, out int afterFirst);
                 if (string.IsNullOrEmpty(firstToken)) continue;
+
+                // A real column name never contains a string-literal quote. When a computed
+                // column's expression wraps, a continuation line can BEGIN with a string
+                // literal (e.g. `N'EXEC dbo...'`); ExtractFirstToken splits it at the space
+                // INSIDE the literal, so padding this "column" injects spaces inside the
+                // string - corrupting its value and ratcheting it rightward on every pass
+                // (unbounded, non-convergent). Such lines are expression continuations, not
+                // column definitions: skip them.
+                if (firstToken.IndexOf('\'') >= 0) continue;
 
                 // Skip constraint lines (CONSTRAINT, PRIMARY, UNIQUE, etc.)
                 string upper = firstToken.TrimStart('[').TrimEnd(']').ToUpperInvariant();

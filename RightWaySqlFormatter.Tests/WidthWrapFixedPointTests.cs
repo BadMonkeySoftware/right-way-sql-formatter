@@ -99,5 +99,32 @@ namespace PoorMansTSqlFormatterTests
                 Assert.That(line, Is.EqualTo(line.TrimEnd()),
                     "a wrapped line was left with a stranded trailing space:\n[" + line + "]");
         }
+
+        [Test]
+        public void JoinAsInsertion_ReachesFixedPoint()
+        {
+            // The Ola DatabaseBackup/IndexOptimize family: AlignFromJoinClauses inserts `as`,
+            // lengthening the JOIN line past MaxLineWidth; the core then re-wraps the ON
+            // predicate at a DIFFERENT point on the next pass, so format(format(x)) != format(x)
+            // by pure layout drift (period-1, converges at pass 2). The internal fixed-point
+            // reformat (post-passes changed the output -> format once more) settles it on pass 1.
+            string sql =
+                "SELECT a.x FROM tmpAvailabilityGroups a "
+                + "INNER JOIN @SelectedAvailabilityGroups SelectedAvailabilityGroups "
+                + "ON a.AvailabilityGroupName LIKE "
+                + "REPLACE(REPLACE(SelectedAvailabilityGroups.AvailabilityGroupName, '[', '[[]'), '_', '[_]');";
+            var (p1, p2, p3) = FormatThrice(sql, Heavy100);
+            Assert.That(p2, Is.EqualTo(p1), "JOIN-`as` layout must be idempotent (fixed-point reformat)");
+            Assert.That(p3, Is.EqualTo(p2), "fixed point holds through pass 3");
+        }
+
+        // Heavy editor profile at a narrow width, so the align passes' insertions push lines
+        // past the limit and exercise the wrap/re-wrap interaction that the reformat settles.
+        private const string Heavy100 =
+            "ExpandBetweenConditions=false,ExpandBooleanExpressions=false,ExpandCaseStatements=false,"
+            + "ExpandInLists=false,UppercaseKeywords=false,TrailingCommas=True,AlignTableJoins=True,"
+            + "ColumnAlwaysHasAlias=True,SelectFirstColumnOnNewLine=True,AlignColumnDefinitions=True,"
+            + "AlignColumnDefinitionsInDDL=True,ColumnAliasStyle=EqualSign,IndentWhereAndOrConditions=True,"
+            + "MaxLineWidth=100,CompactRaiserror=True,CompactSingleStatementBlocks=True";
     }
 }

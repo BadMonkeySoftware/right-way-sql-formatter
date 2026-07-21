@@ -60,6 +60,52 @@ namespace PoorMansTSqlFormatterTests
             Assert.That(pass2, Is.EqualTo(pass1), "re-formatting formatted output must be a no-op");
         }
 
+        // A computed column (col AS <expr>) whose expression wraps produces continuation
+        // lines that can BEGIN with a string literal. The DDL-align pass tokenizes on
+        // whitespace, so it split `N'EXEC dbo.thing @p='` at the space INSIDE the literal
+        // and padded there - injecting spaces into the string and ratcheting it rightward
+        // on every re-format (unbounded, non-convergent; the sp_BlitzIndex/sp_BlitzCache
+        // index_definition corpus bug). A real column name never contains a quote, so such
+        // lines are expression continuations, not column definitions, and must be skipped.
+        private static string FormatNarrowDdl(string sql)
+        {
+            var formatter = new TSqlStandardFormatter(new TSqlStandardFormatterOptions
+            {
+                AlignColumnDefinitionsInDDL = true,
+                MaxLineWidth = 70,
+            });
+            bool error = false;
+            string result = new SqlFormattingManager(formatter).Format(sql, ref error);
+            Assert.That(error, Is.False, "input should format without parse errors");
+            return result;
+        }
+
+        private const string ComputedColumnWithWrappingStringExpr =
+            "create table #t (col_one int null, long_column_name_here nvarchar(max) null, "
+            + "computed_col as N'first part text' + N'second part more text here' + "
+            + "N'EXEC dbo.thing @p=' + N'another chunk of literal text goes here' + N'trailing part');";
+
+        [Test]
+        public void ComputedColumnWrappedStringLiteralIsNeverPaddedInside()
+        {
+            string output = FormatNarrowDdl(ComputedColumnWithWrappingStringExpr);
+            Assert.That(output, Does.Contain("N'EXEC dbo.thing @p='"),
+                "a string literal starting a wrapped continuation line must keep its exact spacing");
+            Assert.That(output, Does.Contain("N'trailing part'"),
+                "string literal content must survive DDL alignment untouched");
+        }
+
+        [Test]
+        public void ComputedColumnWrappedStringExprIsIdempotent()
+        {
+            string p1 = FormatNarrowDdl(ComputedColumnWithWrappingStringExpr);
+            string p2 = FormatNarrowDdl(p1);
+            string p3 = FormatNarrowDdl(p2);
+            Assert.That(p2, Is.EqualTo(p1),
+                "re-formatting must not ratchet spaces into the string literal (was unbounded drift)");
+            Assert.That(p3, Is.EqualTo(p2), "fixed point by pass 3");
+        }
+
         [Test]
         public void CreateTableColumnDefinitionsAreStillAligned()
         {

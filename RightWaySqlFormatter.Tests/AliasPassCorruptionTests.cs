@@ -44,6 +44,24 @@ namespace PoorMansTSqlFormatterTests
         }
 
         [Test]
+        public void UnclosedBracketColumn_IsIdempotent_NoAliasStacking()
+        {
+            // Deliberately malformed: the `[A` bracket never closes on its own line (it pairs
+            // with the ']' of a later [X]). EnsureColumnAliases could not parse the alias
+            // structure, so it re-aliased the column every pass: `[A = 1` -> `[A = 1 = [A = 1`
+            // -> ... (unbounded, non-convergent - the tsqlt ParsingDisaster corpus file).
+            // Malformed input is not required to be VALID, but it must be STABLE.
+            var mgr = new SqlFormattingManager(new TSqlStandardFormatter(new TSqlStandardFormatterOptions(Heavy)));
+            bool err = false;
+            string p1 = mgr.Format("SELECT 1 AS [A\r\nGO\r\nSELECT 0 AS [X]\r\n", ref err);
+            string p2 = mgr.Format(p1, ref err);
+            string p3 = mgr.Format(p2, ref err);
+            Assert.That(p1, Does.Contain("[A = 1"), "the malformed column renders once");
+            Assert.That(p2, Is.EqualTo(p1), "an unclosed-bracket column must not stack a new alias each pass");
+            Assert.That(p3, Is.EqualTo(p2), "fixed point by pass 3");
+        }
+
+        [Test]
         public void AsLessPlainAlias_NotReAliased()
         {
             // 'B' Id / count(1) Cnt / CASE...END AvailabilityGroup are already aliased (AS-less).

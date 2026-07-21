@@ -247,3 +247,70 @@ wrapping maze`). Left deliberately unfixed:
 End with: what oscillated and why (root cause, file/line), what changed, new
 tests added, before/after UNSTABLE counts, and anything discovered but
 deliberately not fixed (add it to the list above rather than scope-creeping).
+
+---
+
+## Discovery: final idempotency task (docs/final-idempotency-task.md) — DONE (2026-07-21)
+
+**Heavy sweep UNSTABLE 18 → 0** (0 FATAL / 2 known PARSEWARN: ChangeDbAndExecuteStatement,
+AnnotationParser). Re-running the sweep first paid off — the classification shrank on contact
+exactly as warned:
+
+- The "18" was measured with the installers skipped; a fresh 3-pass temp-file sweep found
+  **21** (the 18 + the 3 giant installers, which just BUNDLE the unstable procs).
+- The "period-2 oscillators (4)" were **not** period-2. Six files
+  (sp_BlitzIndex, sp_BlitzCache, sp_BlitzQueryStore, sp_BlitzIndex_2005 + 2 installers) showed
+  **unbounded, non-convergent drift** (8 passes → 8 distinct hashes, bytes growing every pass) —
+  and it was a **correctness bug**, not cosmetic: string-literal CONTENT was being corrupted.
+
+### Root cause #1 — AlignDdlColumns padded INSIDE string literals (correctness bug, FIXED)
+`CREATE TABLE` computed columns (`index_definition AS CASE … N'[DISABLED] ' … END`) wrap; the
+wrapped **continuation lines** were mistaken for new column definitions by `AlignDdlColumns`,
+which tokenizes on whitespace (`ExtractFirstToken` stops at the first space). When a continuation
+began with a string literal (`N'EXEC dbo…'`), it split the token at the space INSIDE the literal
+and injected alignment padding there — `N'EXEC dbo…'` → `N'EXEC          dbo…'`, growing ~40
+spaces every pass. The `LineTouchesStringOrComment` mask only guards MULTI-line strings; a
+single-line literal has `mask[i]=mask[i+1]=false`. **Fix:** skip any candidate line whose first
+token contains a `'` (a real column name never does). TSqlStandardFormatter.cs `AlignDdlColumns`.
+Provably de-corruption-only (the guard only ADDS a `continue`). Also fixed latent (idempotent-
+but-corrupt) string bloat in sp_HumanEvents/sp_HealthParser/sp_WhoIsActive. Dropped 21→18 and
+converted the 6 drifters to convergent/idempotent. Tests: `DdlAlignScopeTests`
+(ComputedColumnWrappedStringLiteralIsNeverPaddedInside, ComputedColumnWrappedStringExprIsIdempotent).
+
+### Root cause #2 — EnsureColumnAliases doubled on an unclosed bracket (FIXED)
+tsqlt `ParsingDisaster` (deliberately malformed `SELECT 1 AS [A`, the `[A` pairing with a later
+`]`) is exit-0 but period≥3: `[A = 1` → `[A = 1 = [A = 1` → … unbounded. The unclosed `[` makes
+the alias LHS/expr split ambiguous, so `EnsureColumnAliases` re-aliased it every pass. **Fix:**
+`EnsureAlias` leaves a column untouched when it has an unclosed `[` outside strings
+(`HasUnclosedBracketOutsideString`) — well-formed columns always close brackets, so valid SQL is
+unaffected (idempotent by construction). Test: `AliasPassCorruptionTests.UnclosedBracketColumn_IsIdempotent_NoAliasStacking`.
+
+### The remaining 17 were genuinely cosmetic — Plan B (fixed-point reformat)
+After the two source fixes, all 17 remaining files were **period-1, converge@p2, and
+token-identical p1→p2** (collapse-whitespace equal — pure wrap/indent drift, the "wrapping maze"
+this doc's earlier sections deferred). With no period-3+ cycle left in the corpus, F∘F is
+idempotent everywhere. Implemented **Plan B as internal always-on**: `FormatSQLTree`, after the
+text post-passes, reformats once IF the post-passes actually changed the output (bounded by
+`_inReformatPass`). Guarded so the DEFAULT profile — whose gated passes never run, leaving output
+unchanged here — never reformats and stays byte-for-byte identical at zero cost. Test:
+`WidthWrapFixedPointTests.JoinAsInsertion_ReachesFixedPoint` (verified fail-before by toggling the
+reformat off). **Plan B papers over (does not root-cause-fix) these families:** JOIN-`as`
+insertion (Ola DatabaseBackup/DatabaseIntegrityCheck/IndexOptimize/MaintenanceSolution),
+multi-token alias RHS (sp_Blitz/sp_BlitzFirst/sp_BlitzPlanCompare/Private_RemoveSchemaBoundReferences),
+and the Vector-Defense/sp_IndexCleanup/Run_Methods/sp_BlitzIndex/installer wrap oscillations.
+
+**⚠ FOR JEREMY:** Plan B is a deliberate behavior change under post-pass-active profiles
+(heavy/AlignEquals): previously-unstable files now emit their pass-2 fixed point. Default is
+untouched (proven byte-identical). Cost: heavy formatting does ~2 pipeline passes →
+**1.68× on the worst case** (same-binary Plan-B off vs on, Install-All-Scripts 2 MB heavy:
+1.67 s → 2.81 s), within the task's ≤2× expectation. It is internal and always-on (no new
+user-visible option, per the task). If you'd rather it be behind a flag or off by default, say so.
+
+### Verification
+Suite 705/0/26; **DEFAULT profile byte-identical** (the hard requirement — proven on the corpus
++ all InputSql); CorpusOracle green; heavy sweep 0 UNSTABLE / 2 PARSEWARN / 0 FATAL; no
+previously-stable file destabilized. AlignEquals profile changed on 4 inputs
+(01_SimpleTypes_StrangeRules, 23_ReparsingInconsistency via Plan B; DarlingData, sp_HumanEvents
+via the AlignDdlColumns de-corruption) — all now idempotent, and NONE has an AlignEquals-configured
+expected file (their expected outputs use the default config), so the suite is unaffected. Harness:
+`tools/memprofile` (hash/depth) + a 3-pass temp-file `heavy-sweep.sh`.
