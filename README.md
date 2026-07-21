@@ -203,12 +203,17 @@ sp_WhoIsActive, DarlingData, tSQLt):
 | default | 394 | 2* | 0 | 0 |
 | classic SSMS (tabs, no keyword standardization) | 394 | 2* | 0 | 0 |
 | trailing commas, no IN-list expansion | 394 | 2* | 0 | 0 |
-| align-columns + equals aliases | 381 | 2* | 0 | 13** |
+| align-columns + equals aliases | 394 | 2* | 0 | 0 |
+| "heavy editor" (every styling option at once, width 200) | 394 | 2* | 0 | 0 |
 
 \* Both expected: one file is SQLCMD-mode (`$(var)`, `:OUT` — not T-SQL), one contains
 an intentionally unclosed comment (tSQLt parser experiment).
-\** Cosmetic oscillation on dynamic-SQL string-concatenation boundary lines; output is
-valid SQL on every pass. Tracked as a known limitation of the text-based align passes.
+
+Two properties are machine-enforced on this corpus: **validity** — for every input
+that parses under Microsoft's own T-SQL grammar (ScriptDom), the formatted and
+re-formatted output parses too (the `CorpusOracle` test) — and **stability** —
+re-formatting already-formatted output is a byte-for-byte no-op under every
+profile above.
 
 ---
 

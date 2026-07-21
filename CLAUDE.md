@@ -31,6 +31,10 @@ cd vscode-extension && npm install && npm run build      # all six platforms
 cd vscode-extension && npm run build:host                # fast dev loop (this machine only)
 
 # Release the extension (platform-specific .vsix per target, ~7 MB each)
+# 0. pre-release regression gate: run the corpus sweep under the heavy profile
+#    (README "Real-world corpus results" has the PROFILE line) — baseline is
+#    0 FATAL / 0 UNSTABLE / 2 known PARSEWARN; any other number is a regression.
+#    Also run: dotnet test ... --filter "Name~CorpusOracle" (must be green).
 # 1. bump "version" in vscode-extension/package.json
 # 2. npm run changelog   (drafts from commits since last v* tag - EDIT it for users)
 # 3. commit, git tag v<version>, push --tags
