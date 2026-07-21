@@ -4,6 +4,33 @@ All notable changes to the Right Way T-SQL Formatter extension.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [1.0.0] - 2026-07-21
+
+**1.0.** Two properties are now guaranteed and machine-enforced, verified
+across ~400 real-world SQL files (First Responder Kit, Ola Hallengren,
+DarlingData, tSQLt) under every settings profile:
+
+- **Validity** — for any input that parses under Microsoft's own T-SQL grammar
+  (ScriptDom), the formatted output parses too. The formatter never corrupts
+  your SQL.
+- **Stability** — re-formatting already-formatted SQL is a byte-for-byte
+  no-op. Format-on-save never produces churn.
+
+The public contracts are frozen as of 1.0: settings names and semantics, the
+CLI flags and exit codes (0 clean / 1 fatal / 5 parse-errors-with-output), the
+preserve-your-alias-style policy, and additive-only formatting changes going
+forward.
+
+### Fixed
+
+- The last known re-format drift cases with alignment/alias settings are gone: aligned JOIN blocks now account for the `AS` aliases they add near the line-width limit, wrapped computed-column expressions are never padded inside their string literals, and a column with an unclosed `[` bracket (invalid SQL) no longer gains a fresh alias on every pass.
+- Pathologically deep nesting (hundreds of stacked derived tables — think generated SQL) now produces a normal best-effort result with a parse-error warning instead of crashing the formatter process.
+
+### Changed
+
+- When the styling passes adjust a line's layout, the formatter internally settles the result before returning it, so what you get is already its own fixed point. This can add up to ~70% to formatting time on very large files (multi-MB scripts) when alignment/alias settings are active; typical editor-sized files are unaffected, and formatting with default settings is byte-identical to 0.2.0 with zero overhead.
+
+
 ## [0.2.0] - 2026-07-19
 
 A correctness release for the styling options. The formatting engine was
@@ -28,6 +55,8 @@ tail of cases where they could silently corrupt SQL.
 ### Changed
 
 - Lines wrapped at `maxLineWidth` no longer end with a stranded space. If you diff formatter output before/after upgrading, expect whitespace-only changes at wrap points.
+
+## [0.1.6] - 2026-07-15
 
 Nine formatting-engine fixes (from a full triage of the original
 PoorMansTSqlFormatter's open issues) and one new opt-in setting.

@@ -6,7 +6,7 @@
     "type": "git",
     "url": "https://github.com/BadMonkeySoftware/right-way-sql-formatter.git"
   },
-  "version": "0.2.0",
+  "version": "1.0.0",
   "icon": "rightwayIcon.png",
   "publisher": "BadMonkeySoftware",
   "engines": {
